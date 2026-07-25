@@ -5,6 +5,11 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
+- **Germany PEGELONLINE collector** (`collectors/pegelonline.py`): recent water
+  level and discharge observations from federal waterway gauges, emitted as
+  `WaterLevelReading` and `StreamflowReading`. Supports station UUIDs, W/Q
+  selection, CLI collection, and the upstream 31-day history limit. No API key
+  required.
 - **Canonical SPI drought classification** (`climate.indices.drought_class`):
   McKee et al. category labels with explicit boundary and missing-value
   handling. `SPIModel` now delegates SPI calculation and classification to the
