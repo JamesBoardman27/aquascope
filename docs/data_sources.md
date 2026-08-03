@@ -1,6 +1,6 @@
 # Data Sources
 
-AquaScope ships **23 collectors** that normalise water data into typed Pydantic records. One API call per source, one schema across the toolkit.
+AquaScope ships **24 collectors** that normalise water data into typed Pydantic records. One API call per source, one schema across the toolkit.
 
 Most sources emit point observations and share the unified `water_data` schema (`WaterQualitySample`, `WaterLevelReading`, `ReservoirStatus`). Three aggregate/gridded sources use purpose-built record types that match their data shape: **FAO AQUASTAT** returns country-level `AquastatRecord`, **UN SDG 6** returns `SDG6Indicator`, and **FAO WaPOR** returns gridded `WaPORObservation`.
 
@@ -35,6 +35,7 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | [India WRIS](https://indiawris.gov.in) | India | River water level | REST | ✅ |
 | [GRDC](https://zenodo.org/records/19126732) | Global | River discharge (in-situ gauges + RSEG satellite) | Zenodo / Dataverse | ✅ |
 | [CAMELS-CL](https://www.cr2.cl/camels-cl/) | Chile | Daily observed streamflow, catchment attributes | ZIP / CSV | ✅ |
+| [Ireland OPW](https://waterlevel.ie) | Ireland | River / lake water level (15-min resolution) | GeoJSON / CSV | ✅ |
 
 ---
 
@@ -56,6 +57,7 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | PEGELONLINE | No | Open access |
 | Japan MLIT / Korea WAMIS | No | Open access |
 | CAMELS-CL | No | Open access |
+| Ireland OPW | No | Open access via waterlevel.ie |
 
 ---
 
