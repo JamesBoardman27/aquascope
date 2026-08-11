@@ -11,8 +11,9 @@ Usage
     aquascope agri plan --crop maize --planting-date 2026-04-01 --eto-file eto.csv --precip-file precip.csv
     aquascope list-methods
     aquascope list-sources
+    aquascope completion bash
 """
-
+# PYTHON_ARGCOMPLETE_OK
 from __future__ import annotations
 
 import argparse
@@ -21,6 +22,8 @@ import logging
 import sys
 from datetime import date
 from pathlib import Path
+
+import argcomplete
 
 # ----------------------------------------------------------
 from aquascope.collectors.india_wris import IndiaWRISCollector
@@ -544,6 +547,12 @@ def cmd_list_sources(args: argparse.Namespace) -> None:
         print(f"    Data   : {info[2]}")
         print(f"    URL    : {info[3]}")
         print()
+
+
+def cmd_completion(args: argparse.Namespace) -> None:
+    """Print the shell activation line for tab-completion."""
+    from argcomplete.shell_integration import shellcode
+    print(shellcode(["aquascope"], shell=args.shell))
 
 
 def cmd_solve(args: argparse.Namespace) -> None:
@@ -1197,6 +1206,10 @@ def main() -> None:
     p_run.add_argument("--config", default=None, help="Pipeline config as JSON string")
     p_run.add_argument("--output", default=None, help="Path to save results JSON")
 
+    # ── completion  ────────────────────────────────────────────────────
+    p_completion = sub.add_parser("completion", help="Print shell tab-completion activation script")
+    p_completion.add_argument("shell", choices=["bash", "zsh", "fish"], help="Shell to generate completion for")
+
     # ── list-methods ─────────────────────────────────────────────────
     sub.add_parser("list-methods", help="List all available research methodologies and pipelines")
 
@@ -1378,6 +1391,7 @@ def main() -> None:
     p_hydro.add_argument("--n-day", type=int, default=None, help="N-day window for low-flow (default: 7)")
     p_hydro.add_argument("--return-period", type=int, default=None, help="Return period for low-flow (default: 10)")
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
     commands = {
         "collect": cmd_collect,
@@ -1396,6 +1410,7 @@ def main() -> None:
         "agri": cmd_agri,
         "groundwater": cmd_groundwater,
         "climate": cmd_climate,
+        "completion": cmd_completion,
     }
 
     handler = commands.get(args.command)
