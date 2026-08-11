@@ -8,7 +8,7 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 from aquascope.collectors.france_hubeau import HubeauHydrometrieCollector
-from aquascope.schemas.water_data import DataSource, WaterQualitySample
+from aquascope.schemas.water_data import DataSource, StreamflowReading, WaterQualitySample
 
 
 class TestFranceHubeauFetchRawPagination:
@@ -116,9 +116,9 @@ class TestFranceHubeauNormaliseGrandeur:
         ]
         samples = collector.normalise(raw)
         assert len(samples) == 1
-        assert samples[0].parameter == "Discharge"
-        assert samples[0].value == 84.3
-        assert samples[0].unit == "L/s"
+        assert isinstance(samples[0], StreamflowReading)
+        assert samples[0].discharge_cms == 0.0843
+        assert samples[0].unit == "m3/s"
 
     def test_unknown_grandeur_falls_back_to_raw_code(self):
         collector = HubeauHydrometrieCollector()
@@ -183,7 +183,7 @@ class TestFranceHubeauNormaliseDatetime:
         ]
         samples = collector.normalise(raw)
         assert len(samples) == 1
-        dt = samples[0].sample_datetime
+        dt = samples[0].reading_datetime
         assert dt.tzinfo is None
         assert dt.isoformat() == "2026-07-08T10:00:00"
 

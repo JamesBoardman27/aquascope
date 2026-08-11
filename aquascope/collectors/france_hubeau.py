@@ -21,11 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from aquascope.collectors.base import BaseCollector
-from aquascope.schemas.water_data import (
-    DataSource,
-    GeoLocation,
-    WaterQualitySample,
-)
+from aquascope.schemas.water_data import DataSource, GeoLocation, StreamflowReading, WaterQualitySample
 from aquascope.utils.http_client import CachedHTTPClient, RateLimiter
 
 logger = logging.getLogger(__name__)
@@ -42,6 +38,7 @@ GRANDEUR_UNITS: dict[str, str] = {
     "Q": "L/s",
 }
 
+LS_TO_M3S = 0.001
 
 class HubeauHydrometrieCollector(BaseCollector):
     """
@@ -141,7 +138,7 @@ class HubeauHydrometrieCollector(BaseCollector):
 
         return all_data
 
-    def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample]:
+    def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample | StreamflowReading]:
         samples: list[WaterQualitySample] = []
         skipped = 0
         for row in raw:
@@ -163,18 +160,37 @@ class HubeauHydrometrieCollector(BaseCollector):
                 # Hub'Eau returns date_obs with a trailing "Z". datetime.fromisoformat() only
                 # accepts a bare "Z" on Python 3.11+; normalise it explicitly so this works on 3.10 too.
                 # Stored tz-naive to match the convention used by other collectors in this codebase.
-                samples.append(
-                    WaterQualitySample(
-                        source=DataSource.HUBEAU,
-                        station_id=row["code_station"],
-                        station_name=row.get("libelle_station"),  # not present on this endpoint; stays None
-                        location=loc,
-                        sample_datetime=datetime.fromisoformat(row["date_obs"].replace("Z", "+00:00")).replace(tzinfo=None),
-                        parameter=label,
-                        value=float(val),
-                        unit=unit,
+                dt = datetime.fromisoformat(row["date_obs"].replace("Z", "+00:00")).replace(tzinfo=None)
+
+                # Map Discharge readings to StreamflowReading, and all other grandeurs to WaterQualitySample.
+                if label == "Discharge":
+                    discharge_cms = float(val) * LS_TO_M3S
+                    samples.append(
+                        StreamflowReading(
+                            source=DataSource.HUBEAU,
+                            station_id=row["code_station"],
+                            station_name=row.get("libelle_station"),  # not present on this endpoint; stays None
+                            location=loc,
+                            reading_datetime=dt,
+                            discharge_cms=discharge_cms,
+                            source_type="in_situ",
+                            catchment_area_km2=None,
+                        )
                     )
-                )
+                else:
+                    samples.append(
+                        WaterQualitySample(
+                            source=DataSource.HUBEAU,
+                            station_id=row["code_station"],
+                            station_name=row.get("libelle_station"),  # not present on this endpoint; stays None
+                            location=loc,
+                            sample_datetime=dt,
+                            parameter=label,
+                            value=float(val),
+                            unit=unit,
+                        )
+                    )
+
             except (ValueError, KeyError, TypeError) as exc:
                 skipped += 1
                 logger.debug("Skipping Hub'Eau row: %s", exc)
