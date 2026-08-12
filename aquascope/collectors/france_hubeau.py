@@ -218,7 +218,7 @@ class HubeauHydrometrieCollector(BaseCollector):
 
         try:
             metadata_response = self.client.get_json(
-                f"referentiel/sites",
+                "referentiel/sites",
                 params={
                     "code_site": site_code,
                     "f": "json"
