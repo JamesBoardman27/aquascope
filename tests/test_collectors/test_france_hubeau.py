@@ -280,3 +280,57 @@ class TestFranceHubeauNormaliseEdgeCases:
         samples = collector.normalise(raw)
         assert len(samples) == 1
         assert samples[0].parameter == "Water level"
+
+
+class TestFranceHubeauCatchmentAreaMetadata:
+
+        page1 = {
+            "data": [
+                {
+                    "code_station": "A1",
+                    "grandeur_hydro": "Q",
+                    "date_obs": "2026-07-08T10:00:00Z",
+                    "resultat_obs": 1.0,
+                }
+            ],
+            "next": "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr?cursor=abc&size=1",
+        }
+        page2 = {
+            "data": [
+                {
+                    "code_station": "A1",
+                    "grandeur_hydro": "Q",
+                    "date_obs": "2026-07-08T10:05:00Z",
+                    "resultat_obs": 2.0,
+                }
+            ],
+            # no "next" key - this is the last page
+        }
+
+        mock_get_json = Mock(side_effect=[page1, page2])
+        collector.client.get_json = mock_get_json
+
+    def test_returns_none_for_empty_location_id(self):
+        collector = HubeauHydrometrieCollector()
+
+        assert collector._get_hydrometric_site_metadata("") is None
+
+    def test_converts_and_rounds_drainage_area(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(
+            return_value={"properties": {"drainage_area": "12.5"}}
+        )
+
+        area = collector._get_hydrometric_site_metadata("K0020001")
+
+        assert area == pytest.approx(32.4)
+        collector.client.get_json.assert_called_once_with(
+            "collections/monitoring-locations/items/USGS-01646500",
+            params={"f": "json"},
+        )
+
+    def test_returns_none_when_feature_has_no_drainage_area(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(return_value={"properties": {}})
+
+        assert collector._get_hydrometric_site_metadata("K0020001") is None

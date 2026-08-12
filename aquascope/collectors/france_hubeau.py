@@ -162,27 +162,35 @@ class HubeauHydrometrieCollector(BaseCollector):
                 # Stored tz-naive to match the convention used by other collectors in this codebase.
                 dt = datetime.fromisoformat(row["date_obs"].replace("Z", "+00:00")).replace(tzinfo=None)
 
+                station_code = row["code_station"]
+                station_name = row.get("libelle_station") # not present on the observations_tr endpoint; stays None.
+
                 # Map Discharge readings to StreamflowReading, and all other grandeurs to WaterQualitySample.
                 if label == "Discharge":
                     discharge_cms = float(val) * LS_TO_M3S
+
+                    # Make supplementary call to the /referentiel/sites endpoint to obtain catchment area.
+                    site_code = row["code_site"]
+                    catchment_area = self._get_hydrometric_site_metadata(site_code)
+
                     samples.append(
                         StreamflowReading(
                             source=DataSource.HUBEAU,
-                            station_id=row["code_station"],
-                            station_name=row.get("libelle_station"),  # not present on this endpoint; stays None
+                            station_id=station_code,
+                            station_name=station_name,
                             location=loc,
                             reading_datetime=dt,
                             discharge_cms=discharge_cms,
                             source_type="in_situ",
-                            catchment_area_km2=None,
+                            catchment_area_km2=catchment_area,
                         )
                     )
                 else:
                     samples.append(
                         WaterQualitySample(
                             source=DataSource.HUBEAU,
-                            station_id=row["code_station"],
-                            station_name=row.get("libelle_station"),  # not present on this endpoint; stays None
+                            station_id=station_code,
+                            station_name=station_name,
                             location=loc,
                             sample_datetime=dt,
                             parameter=label,
@@ -202,3 +210,32 @@ class HubeauHydrometrieCollector(BaseCollector):
                 len(raw),
             )
         return samples
+
+
+    def _get_hydrometric_site_metadata(self, site_code: str) -> float | None:
+        if not site_code:
+            return None
+
+        try:
+            metadata_response = self.client.get_json(
+                f"referentiel/sites",
+                params={
+                    "code_site": site_code,
+                    "f": "json"
+                    },
+            )
+        except RuntimeError:
+            logger.warning(
+                f"Cannot obtain metadata for site code {site_code} - catchment area data is unavailable."
+            )
+            return None
+
+        station_metadata = metadata_response["data"][0]
+        catchment_area = station_metadata.get("surface_bv")
+        if catchment_area is None:
+            logger.warning(
+                f"Metadata for station {site_code} does not contain catchment area data."
+            )
+            return None
+
+        return float(catchment_area)
