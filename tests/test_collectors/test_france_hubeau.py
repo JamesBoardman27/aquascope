@@ -106,9 +106,11 @@ class TestFranceHubeauNormaliseGrandeur:
 
     def test_discharge_row(self):
         collector = HubeauHydrometrieCollector()
+        collector._get_hydrometric_site_metadata = Mock(return_value=120.0)
         raw = [
             {
                 "code_station": "K002000101",
+                "code_site": "K0020001",
                 "grandeur_hydro": "Q",
                 "date_obs": "2026-07-08T10:00:00Z",
                 "resultat_obs": 84.3,
@@ -119,6 +121,7 @@ class TestFranceHubeauNormaliseGrandeur:
         assert isinstance(samples[0], StreamflowReading)
         assert samples[0].discharge_cms == 0.0843
         assert samples[0].unit == "m3/s"
+        assert samples[0].catchment_area_km2 == 120.0
 
     def test_unknown_grandeur_falls_back_to_raw_code(self):
         collector = HubeauHydrometrieCollector()
@@ -157,9 +160,11 @@ class TestFranceHubeauNormaliseLocation:
 
     def test_location_none_when_coords_absent(self):
         collector = HubeauHydrometrieCollector()
+        collector._get_hydrometric_site_metadata = Mock(return_value=None)
         raw = [
             {
                 "code_station": "K002000101",
+                "code_site": "K0020001",
                 "grandeur_hydro": "Q",
                 "date_obs": "2026-07-08T10:00:00Z",
                 "resultat_obs": 84.3,
@@ -173,9 +178,11 @@ class TestFranceHubeauNormaliseLocation:
 class TestFranceHubeauNormaliseDatetime:
     def test_z_suffix_parses_to_tz_naive(self):
         collector = HubeauHydrometrieCollector()
+        collector._get_hydrometric_site_metadata = Mock(return_value=None)
         raw = [
             {
                 "code_station": "K002000101",
+                "code_site": "K0020001",
                 "grandeur_hydro": "Q",
                 "date_obs": "2026-07-08T10:00:00Z",
                 "resultat_obs": 84.3,
@@ -283,54 +290,68 @@ class TestFranceHubeauNormaliseEdgeCases:
 
 
 class TestFranceHubeauCatchmentAreaMetadata:
-
-        page1 = {
-            "data": [
-                {
-                    "code_station": "A1",
-                    "grandeur_hydro": "Q",
-                    "date_obs": "2026-07-08T10:00:00Z",
-                    "resultat_obs": 1.0,
-                }
-            ],
-            "next": "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr?cursor=abc&size=1",
-        }
-        page2 = {
-            "data": [
-                {
-                    "code_station": "A1",
-                    "grandeur_hydro": "Q",
-                    "date_obs": "2026-07-08T10:05:00Z",
-                    "resultat_obs": 2.0,
-                }
-            ],
-            # no "next" key - this is the last page
-        }
-
-        mock_get_json = Mock(side_effect=[page1, page2])
-        collector.client.get_json = mock_get_json
-
-    def test_returns_none_for_empty_location_id(self):
+    def test_returns_none_for_falsy_location_id(self):
         collector = HubeauHydrometrieCollector()
 
+        assert collector._get_hydrometric_site_metadata(None) is None
         assert collector._get_hydrometric_site_metadata("") is None
 
-    def test_converts_and_rounds_drainage_area(self):
+    def test_returns_catchment_area_when_present(self):
         collector = HubeauHydrometrieCollector()
         collector.client.get_json = Mock(
-            return_value={"properties": {"drainage_area": "12.5"}}
+            return_value={
+                "data": [
+                    {
+                        "code_site": "K0020001",
+                        "surface_bv": 1250.5,
+                    }
+                ]
+            }
         )
 
         area = collector._get_hydrometric_site_metadata("K0020001")
 
-        assert area == pytest.approx(32.4)
+        assert area == 1250.5
         collector.client.get_json.assert_called_once_with(
-            "collections/monitoring-locations/items/USGS-01646500",
-            params={"f": "json"},
+            "referentiel/sites",
+            params={
+                "code_site": "K0020001",
+                "f": "json",
+            },
         )
 
-    def test_returns_none_when_feature_has_no_drainage_area(self):
+    def test_returns_none_when_catchment_area_is_none(self, caplog):
         collector = HubeauHydrometrieCollector()
-        collector.client.get_json = Mock(return_value={"properties": {}})
+        collector.client.get_json = Mock(
+            return_value={
+                "data": [
+                    {
+                        "code_site": "K0020001",
+                        "surface_bv": None,
+                    }
+                ]
+            }
+        )
 
-        assert collector._get_hydrometric_site_metadata("K0020001") is None
+        with caplog.at_level("WARNING"):
+            area = collector._get_hydrometric_site_metadata("K0020001")
+
+        assert area is None
+        assert any(
+            "Metadata for station K0020001 does not contain catchment area data." in r.message
+            for r in caplog.records
+        )
+
+    def test_returns_none_on_runtime_error(self, caplog):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(side_effect=RuntimeError("API error"))
+
+        with caplog.at_level("WARNING"):
+            area = collector._get_hydrometric_site_metadata("K0020001")
+
+        assert area is None
+        assert any(
+            "Cannot obtain metadata for site code K0020001" in r.message
+            for r in caplog.records
+        )
+

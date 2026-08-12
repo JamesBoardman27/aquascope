@@ -170,7 +170,7 @@ class HubeauHydrometrieCollector(BaseCollector):
                     discharge_cms = float(val) / _LS_PER_M3S
 
                     # Make supplementary call to the /referentiel/sites endpoint to obtain catchment area.
-                    site_code = row["code_site"]
+                    site_code = row.get("code_site")
                     catchment_area = self._get_hydrometric_site_metadata(site_code)
 
                     samples.append(
