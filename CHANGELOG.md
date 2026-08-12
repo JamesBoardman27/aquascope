@@ -4,6 +4,14 @@ All notable changes to AquaScope are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Mixed-record support in `records_to_xarray`** (`io/interop.py`): each record type is now processed individually and merged into a single mixed `xarray.Dataset`, so water-quality and streamflow records can coexist in one export, with incompatible fields holding `NaN` rather than raising or dropping data. (#158)
+
+### Fixed
+- **USGS discharge now normalises into `StreamflowReading`** (`collectors/usgs.py`): discharge (00060) values from both API endpoints are emitted as `StreamflowReading` instead of `WaterQualitySample`, with unit conversion (ft³/s → m³/s for discharge, miles² → km² for catchment area), significant-figure preservation, and a helper to fetch catchment area when not already present. Water quality sample normalisation for non-discharge parameters is unchanged. (#155, contributes to #97 and #104)
+- **Hub'Eau discharge now normalises into `StreamflowReading`** (`collectors/france_hubeau.py`): discharge readings are migrated off `WaterQualitySample`, with an extra call to `referentiel/sites` to obtain catchment area for a given station and a fix for a floating-point division issue in the `discharge_cms` calculation. (#164, closes #97 and #104)
+- **USGS CLI `--days` and kwarg handling fixed** (`cli`): corrected bugs in how `--days` and other USGS-specific parameters were passed through as kwargs to the collector, with new test coverage for valid-parameter acceptance, rejection of unrecognised parameters, and implicit/explicit API key selection. (#159)
+
 ## [0.10.0] - 2026-08-12
 
 A correctness release first and a feature release second.
