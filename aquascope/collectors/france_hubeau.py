@@ -38,7 +38,7 @@ GRANDEUR_UNITS: dict[str, str] = {
     "Q": "L/s",
 }
 
-LS_TO_M3S = 0.001
+_LS_PER_M3S = 1_000  # divide L/s by this to get m³/s (avoids 0.001 float rounding)
 
 class HubeauHydrometrieCollector(BaseCollector):
     """
@@ -167,7 +167,7 @@ class HubeauHydrometrieCollector(BaseCollector):
 
                 # Map Discharge readings to StreamflowReading, and all other grandeurs to WaterQualitySample.
                 if label == "Discharge":
-                    discharge_cms = float(val) * LS_TO_M3S
+                    discharge_cms = float(val) / _LS_PER_M3S
 
                     # Make supplementary call to the /referentiel/sites endpoint to obtain catchment area.
                     site_code = row["code_site"]
