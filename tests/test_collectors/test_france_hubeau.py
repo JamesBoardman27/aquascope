@@ -50,7 +50,7 @@ class TestFranceHubeauFetchRawPagination:
 
         first_args, first_kwargs = mock_get_json.call_args_list[0]
         assert first_args[0] == "/observations_tr"
-        assert first_kwargs["params"]["code_station"] == "A1"
+        assert first_kwargs["params"]["code_entite"] == "A1"
 
         second_args, second_kwargs = mock_get_json.call_args_list[1]
         assert second_args[0] == page1["next"]

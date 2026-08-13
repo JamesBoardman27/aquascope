@@ -92,9 +92,9 @@ class HubeauHydrometrieCollector(BaseCollector):
         Parameters
         ----------
         code_station : str, optional
-            Hydrometric station code (e.g. "K002000101"). Without this
-            (or a date/grandeur filter), Hub'Eau returns observations
-            across thousands of stations nationwide.
+            Hydrometric station code (e.g. "K002000101"). Sent to the
+            API as ``code_entite``. Without this (or a date/grandeur filter),
+            Hub'Eau returns observations across thousands of stations nationwide.
         grandeur_hydro : str, optional
             "H" (water level) or "Q" (discharge). Omit to fetch both.
         date_debut_obs / date_fin_obs : str, optional
@@ -116,7 +116,7 @@ class HubeauHydrometrieCollector(BaseCollector):
         all_data: list[dict] = []
         params: dict[str, Any] = {"format": "json", "size": min(size, 20_000)}
         if code_station:
-            params["code_station"] = code_station
+            params["code_entite"] = code_station
         if grandeur_hydro:
             params["grandeur_hydro"] = grandeur_hydro
         if date_debut_obs:
