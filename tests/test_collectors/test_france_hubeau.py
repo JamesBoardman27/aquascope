@@ -288,6 +288,34 @@ class TestFranceHubeauNormaliseEdgeCases:
         assert len(samples) == 1
         assert samples[0].parameter == "Water level"
 
+    def test_batch_survives_unknown_site_in_metadata_lookup(self, caplog):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(return_value={"data": []})
+        raw = [
+            {
+                "code_station": "K002000101",
+                "grandeur_hydro": "H",
+                "date_obs": "2026-07-08T10:00:00Z",
+                "resultat_obs": 1250.0,
+            },
+            {
+                "code_station": "K002000102",
+                "code_site": "UNKNOWN_SITE",
+                "grandeur_hydro": "Q",
+                "date_obs": "2026-07-08T10:05:00Z",
+                "resultat_obs": 84.3,
+            },
+        ]
+        with caplog.at_level("WARNING"):
+            samples = collector.normalise(raw)
+        assert len(samples) == 2
+        discharge = next(s for s in samples if isinstance(s, StreamflowReading))
+        assert discharge.catchment_area_km2 is None
+        assert any(
+            "No metadata found for site code UNKNOWN_SITE" in r.message
+            for r in caplog.records
+        )
+
 
 class TestFranceHubeauCatchmentAreaMetadata:
     def test_returns_none_for_falsy_location_id(self):
@@ -339,6 +367,19 @@ class TestFranceHubeauCatchmentAreaMetadata:
         assert area is None
         assert any(
             "Metadata for station K0020001 does not contain catchment area data." in r.message
+            for r in caplog.records
+        )
+
+    def test_returns_none_when_site_unknown_data_is_empty(self, caplog):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(return_value={"data": []})
+
+        with caplog.at_level("WARNING"):
+            area = collector._get_hydrometric_site_metadata("UNKNOWN_SITE")
+
+        assert area is None
+        assert any(
+            "No metadata found for site code UNKNOWN_SITE" in r.message
             for r in caplog.records
         )
 

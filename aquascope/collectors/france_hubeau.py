@@ -230,7 +230,15 @@ class HubeauHydrometrieCollector(BaseCollector):
             )
             return None
 
-        station_metadata = metadata_response["data"][0]
+        all_site_records = metadata_response.get("data", [])
+        # We read metadata from the first site record if present. If all_site_records is empty, we set station_metadata to None
+        station_metadata = all_site_records[0] if len(all_site_records) > 0 else None
+        if not station_metadata:
+            logger.warning(
+                f"No metadata found for site code {site_code} - catchment area data is unavailable."
+            )
+            return None
+
         catchment_area = station_metadata.get("surface_bv")
         if catchment_area is None:
             logger.warning(
