@@ -105,7 +105,9 @@ class TestFranceHubeauNormaliseGrandeur:
 
     def test_discharge_row(self):
         collector = HubeauHydrometrieCollector()
-        collector._get_hydrometric_site_metadata = Mock(return_value=120.0)
+        collector.client.get_json = Mock(
+            return_value={"data": [{"code_site": "K0020001", "surface_bv": 120.0}]}
+        )
         raw = [
             {
                 "code_station": "K002000101",
@@ -160,7 +162,7 @@ class TestFranceHubeauNormaliseLocation:
 
     def test_location_none_when_coords_absent(self):
         collector = HubeauHydrometrieCollector()
-        collector._get_hydrometric_site_metadata = Mock(return_value=None)
+        collector.client.get_json = Mock(return_value={"data": []})
         raw = [
             {
                 "code_station": "K002000101",
@@ -178,7 +180,7 @@ class TestFranceHubeauNormaliseLocation:
 class TestFranceHubeauNormaliseDatetime:
     def test_z_suffix_parses_to_tz_naive(self):
         collector = HubeauHydrometrieCollector()
-        collector._get_hydrometric_site_metadata = Mock(return_value=None)
+        collector.client.get_json = Mock(return_value={"data": []})
         raw = [
             {
                 "code_station": "K002000101",
@@ -318,34 +320,62 @@ class TestFranceHubeauNormaliseEdgeCases:
 
 
 class TestFranceHubeauCatchmentAreaMetadata:
-    def test_returns_none_for_falsy_location_id(self):
+    def test_returns_empty_dict_without_network_for_empty_request(self):
         collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock()
 
-        assert collector._get_hydrometric_site_metadata(None) is None
-        assert collector._get_hydrometric_site_metadata("") is None
+        assert collector._get_catchment_areas(set()) == {}
+        collector.client.get_json.assert_not_called()
 
-    def test_returns_catchment_area_when_present(self):
+    def test_maps_catchment_area_for_requested_codes(self):
         collector = HubeauHydrometrieCollector()
         collector.client.get_json = Mock(
             return_value={
                 "data": [
-                    {
-                        "code_site": "K0020001",
-                        "surface_bv": 1250.5,
-                    }
+                    {"code_site": "K0020001", "surface_bv": 1250.5},
+                    {"code_site": "K0020002", "surface_bv": 300.0},
                 ]
             }
         )
 
-        area = collector._get_hydrometric_site_metadata("K0020001")
+        areas = collector._get_catchment_areas({"K0020001", "K0020002"})
 
-        assert area == 1250.5
+        assert areas == {"K0020001": 1250.5, "K0020002": 300.0}
         collector.client.get_json.assert_called_once_with(
             "referentiel/sites",
             params={
-                "code_site": "K0020001",
+                "size": 10_000,
+                "fields": "code_site,surface_bv",
                 "f": "json",
             },
+        )
+
+    def test_ignores_sites_not_requested(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(
+            return_value={
+                "data": [
+                    {"code_site": "K0020001", "surface_bv": 1250.5},
+                    {"code_site": "OTHER_SITE", "surface_bv": 999.0},
+                ]
+            }
+        )
+
+        areas = collector._get_catchment_areas({"K0020001"})
+
+        assert areas == {"K0020001": 1250.5}
+
+    def test_returns_none_for_codes_absent_from_response(self, caplog):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(return_value={"data": []})
+
+        with caplog.at_level("WARNING"):
+            areas = collector._get_catchment_areas({"UNKNOWN_SITE"})
+
+        assert areas == {"UNKNOWN_SITE": None}
+        assert any(
+            "No metadata found for site code UNKNOWN_SITE" in r.message
+            for r in caplog.records
         )
 
     def test_returns_none_when_catchment_area_is_none(self, caplog):
@@ -362,37 +392,114 @@ class TestFranceHubeauCatchmentAreaMetadata:
         )
 
         with caplog.at_level("WARNING"):
-            area = collector._get_hydrometric_site_metadata("K0020001")
+            areas = collector._get_catchment_areas({"K0020001"})
 
-        assert area is None
+        assert areas == {"K0020001": None}
         assert any(
-            "Metadata for station K0020001 does not contain catchment area data." in r.message
+            "Metadata for site K0020001 does not contain catchment area data." in r.message
             for r in caplog.records
         )
 
-    def test_returns_none_when_site_unknown_data_is_empty(self, caplog):
-        collector = HubeauHydrometrieCollector()
-        collector.client.get_json = Mock(return_value={"data": []})
-
-        with caplog.at_level("WARNING"):
-            area = collector._get_hydrometric_site_metadata("UNKNOWN_SITE")
-
-        assert area is None
-        assert any(
-            "No metadata found for site code UNKNOWN_SITE" in r.message
-            for r in caplog.records
-        )
-
-    def test_returns_none_on_runtime_error(self, caplog):
+    def test_returns_empty_dict_on_runtime_error(self, caplog):
         collector = HubeauHydrometrieCollector()
         collector.client.get_json = Mock(side_effect=RuntimeError("API error"))
 
         with caplog.at_level("WARNING"):
-            area = collector._get_hydrometric_site_metadata("K0020001")
+            areas = collector._get_catchment_areas({"K0020001"})
 
-        assert area is None
+        assert areas == {}
         assert any(
-            "Cannot obtain metadata for site code K0020001" in r.message
+            "Cannot obtain hydrometric site metadata" in r.message
             for r in caplog.records
         )
+
+    def test_resolves_many_rows_in_single_referentiel_call(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(
+            return_value={
+                "data": [
+                    {"code_site": "K0020001", "surface_bv": 120.0},
+                    {"code_site": "K0020002", "surface_bv": 340.5},
+                ]
+            }
+        )
+        raw = [
+            {
+                "code_station": f"S{i}",
+                "code_site": code,
+                "grandeur_hydro": "Q",
+                "date_obs": "2026-07-08T10:00:00Z",
+                "resultat_obs": 10.0,
+            }
+            for i, code in enumerate(["K0020001", "K0020002", "K0020001", "K0020002"])
+        ]
+
+        samples = collector.normalise(raw)
+
+        assert len(samples) == 4
+        assert all(isinstance(s, StreamflowReading) for s in samples)
+        collector.client.get_json.assert_called_once_with(
+            "referentiel/sites",
+            params={"size": 10_000, "fields": "code_site,surface_bv", "f": "json"},
+        )
+        assert [s.catchment_area_km2 for s in samples] == [120.0, 340.5, 120.0, 340.5]
+
+    def test_no_referentiel_call_without_discharge_rows(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock()
+        raw = [
+            {
+                "code_station": "K002000101",
+                "grandeur_hydro": "H",
+                "date_obs": "2026-07-08T10:00:00Z",
+                "resultat_obs": 1250.0,
+            }
+        ]
+
+        samples = collector.normalise(raw)
+
+        assert len(samples) == 1
+        assert isinstance(samples[0], WaterLevelReading)
+        collector.client.get_json.assert_not_called()
+
+    def test_no_referentiel_call_for_empty_batch(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock()
+
+        assert collector.normalise([]) == []
+        collector.client.get_json.assert_not_called()
+
+    def test_no_referentiel_call_when_discharge_values_are_null(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock()
+        raw = [
+            {
+                "code_station": "K002000101",
+                "code_site": "K0020001",
+                "grandeur_hydro": "Q",
+                "date_obs": "2026-07-08T10:00:00Z",
+                "resultat_obs": None,
+            }
+        ]
+
+        assert collector.normalise(raw) == []
+        collector.client.get_json.assert_not_called()
+
+    def test_no_referentiel_call_when_discharge_row_lacks_site_code(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock()
+        raw = [
+            {
+                "code_station": "K002000101",
+                "grandeur_hydro": "Q",
+                "date_obs": "2026-07-08T10:00:00Z",
+                "resultat_obs": 84.3,
+            }
+        ]
+
+        samples = collector.normalise(raw)
+
+        assert len(samples) == 1
+        assert samples[0].catchment_area_km2 is None
+        collector.client.get_json.assert_not_called()
 

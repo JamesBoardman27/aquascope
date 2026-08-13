@@ -149,6 +149,22 @@ class HubeauHydrometrieCollector(BaseCollector):
         self,
         raw: list[dict],
     ) -> Sequence[WaterLevelReading | StreamflowReading | WaterQualitySample]:
+        # The /referentiel/sites lookup is hoisted out of the row loop. Collect
+        # the distinct code_site values carried by discharge (Q) rows and resolve
+        # them in a single batched call: Hub'Eau serves the entire hydrometric
+        # site referentiel in one page (size=10000), so one call covers every
+        # requested site. No referentiel call is made unless a Q row needs it.
+        discharge_sites = {
+            row.get("code_site")
+            for row in raw
+            if row.get("grandeur_hydro") == "Q"
+            and row.get("resultat_obs") is not None
+            and row.get("code_site")
+        }
+        catchment_areas = (
+            self._get_catchment_areas(discharge_sites) if discharge_sites else {}
+        )
+
         samples: list[WaterLevelReading | StreamflowReading | WaterQualitySample] = []
         skipped = 0
         for row in raw:
@@ -177,7 +193,7 @@ class HubeauHydrometrieCollector(BaseCollector):
                 # Map water level (H) to WaterLevelReading and discharge (Q) to
                 # StreamflowReading; any other grandeur falls back to WaterQualitySample.
                 if label == "Water level":
-                    water_level_m = float(val) / _MM_PER_M,
+                    water_level_m = float(val) / _MM_PER_M
 
                     samples.append(
                         WaterLevelReading(
@@ -191,9 +207,10 @@ class HubeauHydrometrieCollector(BaseCollector):
                 elif label == "Discharge":
                     discharge_cms = float(val) / _LS_PER_M3S
 
-                    # Make supplementary call to the /referentiel/sites endpoint to obtain catchment area.
+                    # Catchment area comes from the single batched referentiel
+                    # call above - no per-row network request.
                     site_code = row.get("code_site")
-                    catchment_area = self._get_hydrometric_site_metadata(site_code)
+                    catchment_area = catchment_areas.get(site_code) if site_code else None
 
                     samples.append(
                         StreamflowReading(
@@ -232,38 +249,60 @@ class HubeauHydrometrieCollector(BaseCollector):
         return samples
 
 
-    def _get_hydrometric_site_metadata(self, site_code: str) -> float | None:
-        if not site_code:
-            return None
+    def _get_catchment_areas(self, site_codes: set[str]) -> dict[str, float | None]:
+        """
+        Resolve catchment areas (``surface_bv``) for *site_codes* in a single
+        ``/referentiel/sites`` call.
+
+        Hub'Eau serves the entire hydrometric site referentiel in one page
+        (``size=10000`` holds all ~9.3k sites), so a single call covers every
+        requested code. The ``fields`` parameter keeps the payload down to the
+        two attributes we need.
+
+        Returns a dict mapping each requested code to its catchment area in
+        km², or ``None`` when it is unavailable.
+        """
+        if not site_codes:
+            return {}
 
         try:
             metadata_response = self.client.get_json(
                 "referentiel/sites",
                 params={
-                    "code_site": site_code,
-                    "f": "json"
-                    },
+                    "size": 10_000,
+                    "fields": "code_site,surface_bv",
+                    "f": "json",
+                },
             )
         except RuntimeError:
             logger.warning(
-                f"Cannot obtain metadata for site code {site_code} - catchment area data is unavailable."
+                "Cannot obtain hydrometric site metadata - catchment area data is unavailable."
             )
-            return None
+            return {}
 
-        all_site_records = metadata_response.get("data", [])
-        # We read metadata from the first site record if present. If all_site_records is empty, we set station_metadata to None
-        station_metadata = all_site_records[0] if len(all_site_records) > 0 else None
-        if not station_metadata:
+        # For each site, if metadata for the site has been requested, add this data to the catchment areas dict.
+        requested = set(site_codes)
+        catchment_areas: dict[str, float | None] = {}
+        for record in metadata_response.get("data", []):
+            code = record.get("code_site")
+            if code in requested:
+                surface = record.get("surface_bv")
+                catchment_areas[code] = None if surface is None else float(surface)
+
+        # If any catchment area is None for a requested site,
+        # we emit a warning.
+        for code, area in catchment_areas.items():
+            if area is None:
+                logger.warning(
+                    f"Metadata for site {code} does not contain catchment area data."
+                )
+
+        # If we cannot find a site code that is part of the request,
+        # we set that site's catchment area to None and emit a warning.
+        for code in requested - catchment_areas.keys():
+            catchment_areas[code] = None
             logger.warning(
-                f"No metadata found for site code {site_code} - catchment area data is unavailable."
+                f"No metadata found for site code {code} - catchment area data is unavailable."
             )
-            return None
 
-        catchment_area = station_metadata.get("surface_bv")
-        if catchment_area is None:
-            logger.warning(
-                f"Metadata for station {site_code} does not contain catchment area data."
-            )
-            return None
-
-        return float(catchment_area)
+        return catchment_areas
