@@ -139,9 +139,10 @@ class HubeauHydrometrieCollector(BaseCollector):
             next_link = resp.get("next")
             if not next_link or len(rows) == 0:
                 break
-            # next_link is absolute and already carries the cursor; switch to direct fetch
+            # next_link is absolute and already carries the cursor; switch to direct fetch.
             url = next_link
-            params = {}
+            # params=None means "use the URL as-is"; we use the exact next_link url provided by the API.
+            params = None
 
         return all_data
 

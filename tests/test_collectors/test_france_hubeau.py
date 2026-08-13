@@ -54,7 +54,7 @@ class TestFranceHubeauFetchRawPagination:
 
         second_args, second_kwargs = mock_get_json.call_args_list[1]
         assert second_args[0] == page1["next"]
-        assert second_kwargs["params"] == {}
+        assert second_kwargs["params"] is None
 
     def test_stops_when_max_items_reached_mid_page(self):
         collector = HubeauHydrometrieCollector()
