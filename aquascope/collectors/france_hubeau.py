@@ -21,7 +21,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from aquascope.collectors.base import BaseCollector
-from aquascope.schemas.water_data import DataSource, GeoLocation, StreamflowReading, WaterQualitySample
+from aquascope.schemas.water_data import (
+    DataSource,
+    GeoLocation,
+    StreamflowReading,
+    WaterLevelReading,
+    WaterQualitySample,
+)
 from aquascope.utils.http_client import CachedHTTPClient, RateLimiter
 
 logger = logging.getLogger(__name__)
@@ -39,6 +45,7 @@ GRANDEUR_UNITS: dict[str, str] = {
 }
 
 _LS_PER_M3S = 1_000  # divide L/s by this to get m³/s (avoids 0.001 float rounding)
+_MM_PER_M = 1_000  # divide mm by this to get m (Hub'Eau serves water level in mm)
 
 class HubeauHydrometrieCollector(BaseCollector):
     """
@@ -138,8 +145,11 @@ class HubeauHydrometrieCollector(BaseCollector):
 
         return all_data
 
-    def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample | StreamflowReading]:
-        samples: list[WaterQualitySample] = []
+    def normalise(
+        self,
+        raw: list[dict],
+    ) -> Sequence[WaterLevelReading | StreamflowReading | WaterQualitySample]:
+        samples: list[WaterLevelReading | StreamflowReading | WaterQualitySample] = []
         skipped = 0
         for row in raw:
             try:
@@ -163,10 +173,22 @@ class HubeauHydrometrieCollector(BaseCollector):
                 dt = datetime.fromisoformat(row["date_obs"].replace("Z", "+00:00")).replace(tzinfo=None)
 
                 station_code = row["code_station"]
-                station_name = row.get("libelle_station") # not present on the observations_tr endpoint; stays None.
 
-                # Map Discharge readings to StreamflowReading, and all other grandeurs to WaterQualitySample.
-                if label == "Discharge":
+                # Map water level (H) to WaterLevelReading and discharge (Q) to
+                # StreamflowReading; any other grandeur falls back to WaterQualitySample.
+                if label == "Water level":
+                    water_level_m = float(val) / _MM_PER_M,
+
+                    samples.append(
+                        WaterLevelReading(
+                            source=DataSource.HUBEAU,
+                            station_id=station_code,
+                            location=loc,
+                            reading_datetime=dt,
+                            water_level=water_level_m,
+                        )
+                    )
+                elif label == "Discharge":
                     discharge_cms = float(val) / _LS_PER_M3S
 
                     # Make supplementary call to the /referentiel/sites endpoint to obtain catchment area.
@@ -177,7 +199,6 @@ class HubeauHydrometrieCollector(BaseCollector):
                         StreamflowReading(
                             source=DataSource.HUBEAU,
                             station_id=station_code,
-                            station_name=station_name,
                             location=loc,
                             reading_datetime=dt,
                             discharge_cms=discharge_cms,
@@ -190,7 +211,6 @@ class HubeauHydrometrieCollector(BaseCollector):
                         WaterQualitySample(
                             source=DataSource.HUBEAU,
                             station_id=station_code,
-                            station_name=station_name,
                             location=loc,
                             sample_datetime=dt,
                             parameter=label,

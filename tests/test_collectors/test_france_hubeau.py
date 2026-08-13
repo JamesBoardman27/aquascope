@@ -8,7 +8,7 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 from aquascope.collectors.france_hubeau import HubeauHydrometrieCollector
-from aquascope.schemas.water_data import DataSource, StreamflowReading, WaterQualitySample
+from aquascope.schemas.water_data import DataSource, StreamflowReading, WaterLevelReading, WaterQualitySample
 
 
 class TestFranceHubeauFetchRawPagination:
@@ -97,12 +97,11 @@ class TestFranceHubeauNormaliseGrandeur:
         ]
         samples = collector.normalise(raw)
         assert len(samples) == 1
-        assert isinstance(samples[0], WaterQualitySample)
+        assert isinstance(samples[0], WaterLevelReading)
         assert samples[0].source == DataSource.HUBEAU
         assert samples[0].station_id == "K002000101"
-        assert samples[0].parameter == "Water level"
-        assert samples[0].value == 1250.0
-        assert samples[0].unit == "mm"
+        assert samples[0].water_level == 1.25
+        assert samples[0].unit == "m"
 
     def test_discharge_row(self):
         collector = HubeauHydrometrieCollector()
@@ -135,6 +134,7 @@ class TestFranceHubeauNormaliseGrandeur:
         ]
         samples = collector.normalise(raw)
         assert len(samples) == 1
+        assert isinstance(samples[0], WaterQualitySample)
         assert samples[0].parameter == "X"
         assert samples[0].unit == ""
 
@@ -286,7 +286,7 @@ class TestFranceHubeauNormaliseEdgeCases:
         ]
         samples = collector.normalise(raw)
         assert len(samples) == 1
-        assert samples[0].parameter == "Water level"
+        assert isinstance(samples[0], WaterLevelReading)
 
     def test_batch_survives_unknown_site_in_metadata_lookup(self, caplog):
         collector = HubeauHydrometrieCollector()
