@@ -413,6 +413,19 @@ class TestFranceHubeauCatchmentAreaMetadata:
             for r in caplog.records
         )
 
+    def test_returns_empty_dict_on_value_error(self, caplog):
+        collector = HubeauHydrometrieCollector()
+        collector.client.get_json = Mock(side_effect=ValueError("HTML response"))
+
+        with caplog.at_level("WARNING"):
+            areas = collector._get_catchment_areas({"K0020001"})
+
+        assert areas == {}
+        assert any(
+            "Cannot obtain hydrometric site metadata" in r.message
+            for r in caplog.records
+        )
+
     def test_resolves_many_rows_in_single_referentiel_call(self):
         collector = HubeauHydrometrieCollector()
         collector.client.get_json = Mock(

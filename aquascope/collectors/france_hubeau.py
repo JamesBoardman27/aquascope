@@ -275,7 +275,7 @@ class HubeauHydrometrieCollector(BaseCollector):
                     "f": "json",
                 },
             )
-        except RuntimeError:
+        except (RuntimeError, ValueError):
             logger.warning(
                 "Cannot obtain hydrometric site metadata - catchment area data is unavailable."
             )
