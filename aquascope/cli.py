@@ -13,6 +13,7 @@ Usage
     aquascope list-sources
     aquascope completion bash
 """
+
 # PYTHON_ARGCOMPLETE_OK
 from __future__ import annotations
 
@@ -70,6 +71,7 @@ def cmd_collect(args: argparse.Namespace) -> None:
     """Run a data collector and save results."""
     from aquascope.collectors import (
         AquastatCollector,
+        BOMCollector,
         CAMELSBRCollector,
         CAMELSCLCollector,
         CopernicusCollector,
@@ -129,6 +131,7 @@ def cmd_collect(args: argparse.Namespace) -> None:
         "camels_br": lambda: CAMELSBRCollector(),
         "noaa_nwps": lambda: NOAANWPSCollector(),
         "pegelonline": lambda: PegelonlineCollector(),
+        "bom": lambda: BOMCollector(),
     }
 
     if source not in collector_map:
@@ -265,6 +268,19 @@ def cmd_collect(args: argparse.Namespace) -> None:
             kwargs["end"] = args.end_date
     if source == "ireland_opw" and args.max_stations:
         kwargs["max_stations"] = args.max_stations
+    if source == "bom":
+        if not args.station:
+            logger.error("BOM requires --station with an AWRC station number, e.g. 410001.")
+            sys.exit(1)
+        kwargs["station_id"] = args.station
+        if args.days is not None:
+            kwargs["days"] = args.days
+        if args.start_date:
+            kwargs["start_date"] = args.start_date
+        if args.end_date:
+            kwargs["end_date"] = args.end_date
+        if args.parameter_type:
+            kwargs["parameter_type"] = args.parameter_type
     records = collector.collect(**kwargs)
     if not records:
         logger.warning("No records collected.")
@@ -490,10 +506,10 @@ def cmd_list_sources(args: argparse.Namespace) -> None:
         "sdg6": ("UN SDG 6", "Global", "SDG 6 indicators (6.1.1 – 6.6.1)", "https://sdg6data.org"),
         "gemstat": ("GEMStat", "Global", "Freshwater quality (170+ countries)", "https://gemstat.org"),
         "uk_ea": (
-          "UK Environment Agency",
-          "UK",
-          "Water Quality and Water Level readings",
-          "https://environment.data.gov.uk/hydrology"
+            "UK Environment Agency",
+            "UK",
+            "Water Quality and Water Level readings",
+            "https://environment.data.gov.uk/hydrology",
         ),
         "aquastat": (
             "FAO AQUASTAT",
@@ -547,7 +563,12 @@ def cmd_list_sources(args: argparse.Namespace) -> None:
             "Water levels from waterlevel.ie",
             "[https://waterlevel.ie](https://waterlevel.ie)",
         ),
-        "noaa_nwps": ("NOAA NWPS", "USA", " Streamflow forecasts, stream observations, streamflow output, crest history, flood impacts, low water history, flood category levels, and location metadata.", "https://www.water.noaa.gov"),
+        "noaa_nwps": (
+            "NOAA NWPS",
+            "USA",
+            " Streamflow forecasts, stream observations, streamflow output, crest history, flood impacts, low water history, flood category levels, and location metadata.",
+            "https://www.water.noaa.gov",
+        ),
         "pegelonline": ("PEGELONLINE", "Germany", "River water level and discharge", "https://www.pegelonline.wsv.de"),
         "camels_cl": (
             "CAMELS-CL",
@@ -575,6 +596,7 @@ def cmd_list_sources(args: argparse.Namespace) -> None:
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
+
     print(shellcode(["aquascope"], shell=args.shell))
 
 
@@ -1147,11 +1169,14 @@ def main() -> None:
             "ireland_opw",
             "pegelonline",
             "uk_ea",
+            "bom",
         ],
         help="Data source to collect from",
     )
     p_collect.add_argument("--api-key", default=None, help="API key (if required)")
-    p_collect.add_argument("--days", type=int, default=None, help="Number of days (USGS/UKEA/PEGELONLINE; PEGELONLINE max: 31)")
+    p_collect.add_argument(
+        "--days", type=int, default=None, help="Number of days (USGS/UKEA/PEGELONLINE/BOM; PEGELONLINE max: 31)"
+    )
     p_collect.add_argument("--max-stations", type=int, default=None, help="Cap stations to fetch (Ireland OPW)")
     p_collect.add_argument("--country", default="all", help="ISO3 country code or 'all' (AQUASTAT)")
     p_collect.add_argument("--countries", default=None, help="ISO3 country codes, comma-separated (SDG6)")
@@ -1160,11 +1185,16 @@ def main() -> None:
     p_collect.add_argument("--station-wiski-id", default=None, help="Station Wiski ID (UKEA)")
     p_collect.add_argument("--observed-property", default=None, help="Observed property (UKEA)")
     p_collect.add_argument("--measure", default=None, help="Measure identifier (UKEA)")
+    p_collect.add_argument(
+        "--parameter-type",
+        default=None,
+        help='BOM parameter type, e.g. "Water Course Discharge", "Water Course Level" (BOM). Defaults to "Water Course Discharge".',
+    )
     p_collect.add_argument("--variables", default=None, help="Comma-separated variable IDs (AQUASTAT)")
     p_collect.add_argument(
-      "--bbox",
-      default=None,
-      help="Bounding box west,south,east,north (WaPOR), or min_lon, min_lat, max_lon, max_lat (USGS/UKEA)"
+        "--bbox",
+        default=None,
+        help="Bounding box west,south,east,north (WaPOR), or min_lon, min_lat, max_lon, max_lat (USGS/UKEA)",
     )
     p_collect.add_argument(
         "--mode", default=None, help="Collector mode (openmeteo: weather/forecast/flood; grdc: in_situ/satellite)"
@@ -1173,8 +1203,8 @@ def main() -> None:
     p_collect.add_argument("--lid", default=None, help="A unique 5-character alphanumeric code e.g. ANAW1 (NOAA_NWPS)")
     p_collect.add_argument("--lat", type=float, default=None, help="Latitude (openmeteo/copernicus)")
     p_collect.add_argument("--lon", type=float, default=None, help="Longitude (openmeteo/copernicus)")
-    p_collect.add_argument("--start-date", default=None, help="Start date YYYY-MM-DD (openmeteo/copernicus/UKEA)")
-    p_collect.add_argument("--end-date", default=None, help="End date YYYY-MM-DD (openmeteo/copernicus/UKEA)")
+    p_collect.add_argument("--start-date", default=None, help="Start date YYYY-MM-DD (openmeteo/copernicus/UKEA/BOM)")
+    p_collect.add_argument("--end-date", default=None, help="End date YYYY-MM-DD (openmeteo/copernicus/UKEA/BOM)")
     p_collect.add_argument("--start-year", type=int, default=2000, help="Start year (AQUASTAT)")
     p_collect.add_argument("--end-year", type=int, default=2023, help="End year (AQUASTAT)")
     p_collect.add_argument("--format", default="json", choices=["json", "csv", "geojson"], help="Output format")
@@ -1182,7 +1212,9 @@ def main() -> None:
     p_collect.add_argument(
         "--station-ids", default=None, help="Comma-separated gauge codes to filter (camels_cl, camels_br)"
     )
-    p_collect.add_argument("--station", default=None, help="Station UUID/SUID (PEGELONLINE/UKEA)")
+    p_collect.add_argument(
+        "--station", default=None, help="Station UUID/SUID (PEGELONLINE/UKEA), or AWRC station number (BOM)"
+    )
     p_collect.add_argument("--station-id", default=None, help="USGS monitoring station identifier")
     p_collect.add_argument("--parameter", default=None, help="USGS parameter code, e.g. 00060 for discharge")
     p_collect.add_argument("--state-code", default=None, help="USGS state code filter, e.g. MD")

@@ -40,6 +40,7 @@ def collect(source: str, **kwargs):
 
     from aquascope.collectors import (
         AquastatCollector,
+        BOMCollector,
         CopernicusCollector,
         EUWFDCollector,
         GEMStatCollector,
@@ -73,6 +74,7 @@ def collect(source: str, **kwargs):
         "eu_wfd": EUWFDCollector,
         "japan_mlit": JapanMLITCollector,
         "korea_wamis": KoreaWAMISCollector,
+        "bom": BOMCollector,
     }
 
     factory = collector_map.get(source)
