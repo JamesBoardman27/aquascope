@@ -276,7 +276,11 @@ def cmd_collect(args: argparse.Namespace) -> None:
 
 def cmd_recommend(args: argparse.Namespace) -> None:
     """Generate methodology recommendations."""
-    from aquascope.ai_engine.recommender import DatasetProfile, recommend, recommend_with_llm
+    from aquascope.ai_engine.recommender import (
+        DatasetProfile,
+        recommend,
+        recommend_with_llm_detailed,
+    )
 
     # Build profile from CLI args or from a data file
     parameters = [p.strip() for p in args.parameters.split(",")] if args.parameters else []
@@ -304,14 +308,22 @@ def cmd_recommend(args: argparse.Namespace) -> None:
                 sources = {r.get("source", "") for r in data if r.get("source")}
                 profile.data_sources = list(sources)
 
+    engine_note = ""
     if args.use_llm:
-        recs = recommend_with_llm(
+        result = recommend_with_llm_detailed(
             profile,
             top_k=args.top_k,
             model=args.model or "gpt-4o-mini",
             api_key=args.llm_api_key,
             base_url=args.llm_base_url,
         )
+        recs = result.recommendations
+        if result.mode == "llm":
+            engine_note = f"  Engine: {result.provider} · {result.model}"
+        else:
+            # Never degrade silently: say the LLM was skipped and why.
+            print(f"⚠️  LLM unavailable — showing rule-based results. {result.error}")
+            engine_note = "  Engine: rule-based (LLM fallback)"
     else:
         recs = recommend(profile, top_k=args.top_k)
 
@@ -321,6 +333,8 @@ def cmd_recommend(args: argparse.Namespace) -> None:
 
     print(f"\n{'=' * 70}")
     print(f"  AquaScope — Top {len(recs)} Research Methodology Recommendations")
+    if engine_note:
+        print(engine_note)
     print(f"{'=' * 70}\n")
     for i, rec in enumerate(recs, 1):
         m = rec.methodology
