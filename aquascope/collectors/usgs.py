@@ -344,6 +344,8 @@ class USGSCollector(BaseCollector):
         if variable and not codes:
             return []
         params: dict[str, Any] = {"f": "json", "limit": 10_000, "computation_identifier": "Mean"}
+        if self.api_key and self.api_key != "DEMO_KEY":
+            params["api_key"] = self.api_key  # keyed calls are not throttled like the shared demo path
         if bbox:
             params["bbox"] = ",".join(str(v) for v in bbox)
         if codes and len(codes) == 1:
@@ -370,15 +372,26 @@ class USGSCollector(BaseCollector):
             entry["begin"] = _min_date(entry["begin"], props.get("begin"))
             entry["end"] = _max_date(entry["end"], props.get("end"))
 
+        # Names come from monitoring-locations. That collection holds every
+        # site type nationwide (wells, springs, ...), so restrict it to
+        # streams for the hydrology variables and never let a rate-limited
+        # names pass sink the catalog: stations without names beat no stations.
         names: dict[str, str] = {}
         if by_site:
             loc_params: dict[str, Any] = {"f": "json", "limit": 10_000}
+            if "api_key" in params:
+                loc_params["api_key"] = params["api_key"]
             if bbox:
                 loc_params["bbox"] = params["bbox"]
-            for feat in self._paginate("collections/monitoring-locations/items", loc_params, max_items):
-                props = feat.get("properties", {})
-                if props.get("id") in by_site:
-                    names[props["id"]] = props.get("monitoring_location_name")
+            if variable in (None, "discharge", "water_level"):
+                loc_params["site_type_code"] = "ST"
+            try:
+                for feat in self._paginate("collections/monitoring-locations/items", loc_params, max_items):
+                    props = feat.get("properties", {})
+                    if props.get("id") in by_site:
+                        names[props["id"]] = props.get("monitoring_location_name")
+            except RuntimeError as exc:
+                logger.warning("USGS monitoring-locations lookup failed (%s); returning stations without names.", exc)
 
         stations: list[Station] = []
         for site, entry in by_site.items():

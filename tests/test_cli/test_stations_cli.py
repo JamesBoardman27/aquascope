@@ -85,3 +85,35 @@ def test_stations_rejects_unknown_variable(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["aquascope", "stations", "--variable", "lava"])
     with pytest.raises(SystemExit):
         cli.main()
+
+
+def test_harvest_cli_calls_harvest_and_publish(tmp_path, monkeypatch, capsys):
+    from aquascope.archive.harvest import HarvestReport, SourceHealth
+
+    report = HarvestReport(run_at="2026-08-16T00:00:00+00:00", aquascope_version="t", n_stations=3, sources=[
+        SourceHealth("ireland_opw", True, 3, 1.0, None, "CC-BY-4.0", True, "OPW"),
+        SourceHealth("uk_ea", False, 0, 2.0, "RuntimeError: 503", "OGL-UK-3.0", True, "EA"),
+    ])
+    calls = {}
+    monkeypatch.setattr("aquascope.archive.harvest_stations", lambda out, **kw: calls.update(out=out, **kw) or report)
+    monkeypatch.setattr("aquascope.archive.publish_folder", lambda out, repo, **kw: calls.update(repo=repo) or "url")
+    monkeypatch.setattr(sys, "argv", ["aquascope", "harvest", "stations", "--out", str(tmp_path), "--source", "uk_ea",
+                                      "--max-items", "9", "--publish", "me/ds"])
+    cli.main()
+    out = capsys.readouterr().out
+    assert calls["out"] == str(tmp_path) and calls["sources"] == ["uk_ea"] and calls["max_items"] == 9
+    assert calls["repo"] == "me/ds"
+    assert "FAILED: RuntimeError: 503" in out and "published: url" in out
+
+
+def test_harvest_cli_exits_nonzero_when_all_failed(tmp_path, monkeypatch):
+    from aquascope.archive.harvest import HarvestReport, SourceHealth
+
+    report = HarvestReport(run_at="x", aquascope_version="t", n_stations=0, sources=[
+        SourceHealth("uk_ea", False, 0, 2.0, "RuntimeError: 503", "OGL-UK-3.0", True, "EA"),
+    ])
+    monkeypatch.setattr("aquascope.archive.harvest_stations", lambda out, **kw: report)
+    monkeypatch.setattr(sys, "argv", ["aquascope", "harvest", "stations", "--out", str(tmp_path)])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 1

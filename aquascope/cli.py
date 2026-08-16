@@ -485,6 +485,38 @@ def cmd_stations(args: argparse.Namespace) -> None:
     logger.info("Saved %d stations to %s", len(stations), out_path)
 
 
+def cmd_harvest(args: argparse.Namespace) -> None:
+    """Harvest station catalogs into GeoParquet (+ GeoJSON, health.json) and optionally publish."""
+    from aquascope.archive import harvest_stations, publish_folder
+
+    if args.what != "stations":
+        logger.error("Only 'stations' is harvestable in this version (observations come with #188 Phase 1).")
+        sys.exit(2)
+
+    report = harvest_stations(
+        args.out,
+        sources=args.source or None,
+        max_items=args.max_items,
+        api_key=args.api_key,
+        max_workers=args.workers,
+        write_geojson=not args.no_geojson,
+    )
+    for s in report.sources:
+        status = f"{s.n_stations:>6} stations" if s.ok else f"FAILED: {s.error}"
+        print(f"  {s.source:<24} {status}  ({s.seconds:.1f}s)")
+    print(f"\n  {report.n_stations} stations, {report.n_ok}/{len(report.sources)} sources OK -> {args.out}")
+
+    if args.publish:
+        if report.n_ok == 0:
+            logger.error("Every source failed; not publishing an empty catalog.")
+            sys.exit(1)
+        url = publish_folder(args.out, args.publish, commit_message=f"harvest stations {report.run_at}")
+        print(f"  published: {url}")
+
+    if report.n_ok == 0:
+        sys.exit(1)
+
+
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
@@ -1155,6 +1187,18 @@ def main() -> None:
     p_stations.add_argument("--format", choices=["json", "csv", "geojson"], default="geojson")
     p_stations.add_argument("--output", "-o", default=None, help="Output path (default: data/stations_<sources>.<ext>)")
 
+    # ── harvest ──────────────────────────────────────────────────────
+    p_harvest = sub.add_parser("harvest", help="Harvest catalogs into GeoParquet for the open archive (#188)")
+    p_harvest.add_argument("what", choices=["stations"], help="What to harvest (Phase 0: stations)")
+    p_harvest.add_argument("--out", default="archive", help="Output folder (default: ./archive)")
+    p_harvest.add_argument("--source", action="append", choices=source_keys(), help="Restrict to a source (repeatable)")
+    p_harvest.add_argument("--max-items", type=int, default=None, help="Cap per source (for smoke tests)")
+    p_harvest.add_argument("--api-key", default=None)
+    p_harvest.add_argument("--workers", type=int, default=4)
+    p_harvest.add_argument("--no-geojson", action="store_true", help="Skip stations.geojson")
+    p_harvest.add_argument("--publish", default=None, metavar="REPO_ID",
+                           help="Upload the folder to this Hugging Face dataset (needs HF_TOKEN)")
+
     # ── solve ─────────────────────────────────────────────────────────
     p_solve = sub.add_parser("solve", help="Solve a water challenge from a natural-language description")
     p_solve.add_argument(
@@ -1341,6 +1385,7 @@ def main() -> None:
         "list-methods": cmd_list_methods,
         "list-sources": cmd_list_sources,
         "stations": cmd_stations,
+        "harvest": cmd_harvest,
         "solve": cmd_solve,
         "forecast": cmd_forecast,
         "plot": cmd_plot,

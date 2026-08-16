@@ -1,0 +1,94 @@
+name: Harvest station catalogs
+
+# The Archive, Phase 0 (#188): every station-capable source is asked for its
+# catalog, the result is written as GeoParquet + GeoJSON + health.json and
+# published to the public Hugging Face dataset. Per-source failures are
+# recorded in health.json and shown in the job summary; the run only fails
+# when every source failed (nothing to publish).
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"  # Mondays 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to the Hugging Face dataset"
+        type: boolean
+        default: true
+      max_items:
+        description: "Cap per source (leave empty for the full catalog)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harvest
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_DATASET: Rekin226/aquascope-gauges
+      # Optional: a free USGS API key lifts the shared demo-key throttling on
+      # the national catalog walk (https://api.waterdata.usgs.gov/signup/).
+      USGS_API_KEY: ${{ secrets.USGS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install aquascope with the archive extra
+        run: python -m pip install -q ".[archive]"
+
+      - name: Harvest station catalogs
+        id: harvest
+        run: |
+          set +e
+          ARGS="--out archive"
+          if [ -n "${{ inputs.max_items }}" ]; then ARGS="$ARGS --max-items ${{ inputs.max_items }}"; fi
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.publish }}" = "true" ]; then
+            if [ -n "$HF_TOKEN" ]; then ARGS="$ARGS --publish $HF_DATASET"; else echo "::warning::HF_TOKEN not set, skipping publish"; fi
+          fi
+          aquascope harvest stations $ARGS
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Job summary
+        if: always()
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          p = pathlib.Path("archive/health.json")
+          if not p.exists():
+              print("## Harvest\n\nno health.json written (harvest crashed before writing)")
+              raise SystemExit
+          h = json.loads(p.read_text())
+          print(f"## Harvest {h['run_at']}\n")
+          print(f"**{h['n_stations']:,} stations**, {h['n_ok']}/{len(h['sources'])} sources OK\n")
+          print("| source | status | stations | seconds |\n| --- | --- | ---: | ---: |")
+          for s in h["sources"]:
+              status = "ok" if s["ok"] else f"FAILED: `{s['error']}`"
+              print(f"| `{s['source']}` | {status} | {s['n_stations']:,} | {s['seconds']} |")
+          EOF
+
+      - name: Upload the harvest as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harvest-${{ github.run_id }}
+          path: archive/
+          retention-days: 30
+
+      - name: Fail only if every source failed
+        run: |
+          if [ "${{ steps.harvest.outputs.exit }}" != "0" ]; then
+            echo "harvest exited ${{ steps.harvest.outputs.exit }} (all sources failed or publish failed)"; exit 1
+          fi
