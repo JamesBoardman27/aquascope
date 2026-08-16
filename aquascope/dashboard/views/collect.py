@@ -9,76 +9,21 @@ import pandas as pd
 import streamlit as st
 
 from aquascope.dashboard import _insights, _state
+from aquascope.registry import SOURCES as _REGISTRY
 
 logger = logging.getLogger(__name__)
 
 # key -> (label, region, one-line description)
+# Display metadata comes straight from the shared registry (#163, #187), so a
+# source registered once shows up here with the same label, region and terms.
 SOURCES: dict[str, tuple[str, str, str]] = {
-    "usgs": (
-        "USGS Water Services",
-        "United States",
-        "Real-time discharge, gauge height, temperature from thousands of US gauges",
-    ),
-    "grdc": ("GRDC river discharge", "Global", "In-situ gauges (Zenodo subset) + RSEG satellite discharge estimates"),
-    "openmeteo": ("Open-Meteo", "Global", "Weather history, forecasts and GloFAS flood discharge for any coordinate"),
-    "sdg6": ("UN SDG 6 indicators", "Global", "Country-level water & sanitation indicators (water stress, IWRM, …)"),
-    "gemstat": (
-        "GEMStat water quality",
-        "Global",
-        "UNEP global surface & groundwater quality archive (~200 MB, cached locally)",
-    ),
-    "aquastat": ("FAO AQUASTAT", "Global", "National water resources and agricultural water-use statistics"),
-    "wapor": ("FAO WaPOR", "Africa & Near East", "Remote-sensing evapotranspiration and biomass productivity rasters"),
-    "copernicus": ("Copernicus CDS", "Global", "ERA5 / GloFAS climate reanalysis (requires free CDS key)"),
-    "wqp": ("Water Quality Portal", "United States", "EPA/USGS harmonised water-quality samples by state"),
-    "hubeau_hydrometrie": (
-        "Hub'Eau hydrométrie",
-        "France",
-        "Real-time water level & discharge from French national gauges",
-    ),
-    "eu_wfd": (
-        "EU Water Framework Directive",
-        "Europe",
-        "EEA DiscoData ecological/chemical status of European water bodies",
-    ),
-    "taiwan_cwa": (
-        "Taiwan CWA climate",
-        "Taiwan",
-        "Daily station climate: rainfall, temperature, humidity, radiation, wind (CODIS archive, decades deep)",
-    ),
-    "taiwan_moenv": ("Taiwan MOENV", "Taiwan", "River water-quality monitoring (requires free MOENV key)"),
-    "taiwan_wra_level": ("Taiwan WRA water level", "Taiwan", "Real-time river stage snapshot across all WRA stations"),
-    "taiwan_wra_reservoir": ("Taiwan WRA reservoirs", "Taiwan", "Daily reservoir storage and operations"),
-    "taiwan_wra_fhy": (
-        "Taiwan WRA FHY real-time",
-        "Taiwan",
-        "Real-time water level / rainfall / discharge (FHY portal)",
-    ),
-    "taiwan_wra_iot": ("Taiwan WRA IoT", "Taiwan", "Real-time groundwater level and rainfall accumulation"),
-    "taiwan_datagov": ("Taiwan data.gov.tw", "Taiwan", "Open-government real-time river & groundwater levels"),
-    "taiwan_civil_iot": ("Taiwan Civil IoT", "Taiwan", "SensorThings water observations (flood sensors etc.)"),
-    "japan_mlit": ("Japan MLIT", "Japan", "Water level, discharge, quality and rainfall by prefecture"),
-    "korea_wamis": ("Korea WAMIS", "South Korea", "Water level, discharge, quality and dam storage by basin"),
-    "india_wris": ("India WRIS", "India", "River water level by state / district / agency"),
-    "noaa_nwps": ("NOAA NWPS", "United States", "River stage and discharge forecasts across US stream gauges"),
-    "ireland_opw": ("Ireland OPW", "Ireland", "Real-time river & lake water levels from waterlevel.ie"),
-    "pegelonline": (
-        "PEGELONLINE",
-        "Germany",
-        "Real-time river stage and discharge from German federal waterways (WSV)",
-    ),
-    "camels_cl": ("CAMELS-CL", "Chile", "Daily observed streamflow & catchment attributes for 516 Chilean catchments"),
-    "camels_br": ("CAMELS-BR", "Brazil", "Daily observed streamflow & catchment attributes for Brazilian catchments"),
-    "uk_ea": (
-        "UK Environment Agency",
-        "United Kingdom",
-        "Real-time river level, flow, rainfall, and groundwater observations from UK EA telemetry",
-    ),
+    key: (meta.label, meta.region, meta.description) for key, meta in _REGISTRY.items()
 }
 
 _API_KEY_SOURCES: dict[str, tuple[str, str]] = {
-    "taiwan_moenv": ("Taiwan MOENV", "https://data.moenv.gov.tw/en/apikey"),
-    "copernicus": ("Copernicus CDS", "https://cds.climate.copernicus.eu/how-to-api"),
+    key: (meta.label, meta.api_key_signup_url or "")
+    for key, meta in _REGISTRY.items()
+    if meta.requires_api_key
 }
 
 _REGION_ORDER = [
@@ -196,6 +141,16 @@ def _source_form(source_key: str, ctor: dict, fetch: dict) -> None:  # noqa: C90
 
     elif source_key == "taiwan_wra_reservoir":
         st.info("Daily snapshot — returns the most recent day's reservoir data.")
+
+    elif source_key == "taiwan_wra_groundwater":
+        st.info("Annual groundwater levels for the WRA well network (1992 to present), joined with well metadata.")
+
+    elif source_key == "taiwan_wra_groundwater_daily":
+        st.info("Groundwater levels per WRA groundwater zone (HydroInfo portal). Large pulls: pick a zone.")
+        zone = st.text_input("Zone name or code (optional, e.g. 濁水溪沖積扇)", value="")
+        if zone.strip():
+            ctor["zones"] = [zone.strip()]
+        ctor["aggregate"] = st.selectbox("Aggregate", ["monthly", "daily"])
 
     elif source_key == "taiwan_wra_fhy":
         ctor["data_type"] = st.selectbox(
