@@ -5,6 +5,7 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
+- **BOM (Australia) collector** (`collectors/bom.py`): streamflow, water level, storage, and groundwater level from the Bureau of Meteorology's Water Data Online portal (KISTERS WISKI/KiWIS API), covering ~8,000 stations. No API key required. (closes #4)
 - **CI CHANGELOG enforcement** (`.github/workflows/ci.yml` and `.github/scripts/check_changelog.py`): added a CI workflow check that enforces a `CHANGELOG.md` entry on pull requests unless the `no-changelog` opt-out label is present (#144).
 - **Taiwan CWA climate collector** (`collectors/taiwan_cwa.py`): daily station climate observations (rainfall, temperature mean/max/min, humidity, solar radiation, wind, Class-A pan evaporation) from Taiwan's official weather network via the keyless CODIS archive, with history verified back to 1960. Records use the new `ClimateReading` schema, which pivots through the existing xarray interop path unchanged. This is the observed-forcing layer for the CAMELS-TW epic. (#177, closes #177; contributes to #100)
 - **`relax_strict_tls` option on `CachedHTTPClient`**: Taiwan government certificate chains lack the Subject Key Identifier extension that Python 3.13+ requires by default; the new flag relaxes only the strict profile check while keeping full chain and hostname verification, replacing any need for `verify=False` on these hosts. Root cause and the one-line fix for `taiwan_wra_iot` are documented in #169.

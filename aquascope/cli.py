@@ -476,7 +476,12 @@ def cmd_list_sources(args: argparse.Namespace) -> None:
 
     source_info = {
         "taiwan_moenv": ("Taiwan MOENV", "Taiwan", "River/tap water quality, RPI", "https://data.moenv.gov.tw"),
-        "taiwan_cwa": ("Taiwan CWA climate", "Taiwan", "Daily station climate: rain, temp, RH, radiation, wind", "https://codis.cwa.gov.tw"),
+        "taiwan_cwa": (
+            "Taiwan CWA climate",
+            "Taiwan",
+            "Daily station climate: rain, temp, RH, radiation, wind",
+            "https://codis.cwa.gov.tw",
+        ),
         "taiwan_wra": ("Taiwan WRA", "Taiwan", "Water levels, reservoir status", "https://opendata.wra.gov.tw"),
         "taiwan_civil_iot": (
             "Taiwan Civil IoT",

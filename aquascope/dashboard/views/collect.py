@@ -74,6 +74,11 @@ SOURCES: dict[str, tuple[str, str, str]] = {
         "United Kingdom",
         "Real-time river level, flow, rainfall, and groundwater observations from UK EA telemetry",
     ),
+    "bom": (
+        "BOM Water Data Online",
+        "Australia",
+        "Streamflow, water level, storage, and groundwater level from ~8,000 Australian gauging stations",
+    ),
 }
 
 _API_KEY_SOURCES: dict[str, tuple[str, str]] = {
@@ -674,6 +679,31 @@ def _source_form(source_key: str, ctor: dict, fetch: dict) -> None:  # noqa: C90
             fetch["bbox"] = bbox_str.strip()
         fetch["days"] = st.slider("Days of history", 1, 30, 7)
 
+    elif source_key == "bom":
+        st.caption(
+            "BOM Water Data Online (Australia) — not every station has a populated discharge series; "
+            "check Water Course Level if discharge comes back empty."
+        )
+        station = st.text_input("AWRC station number", placeholder="e.g. 410001")
+        if station.strip():
+            fetch["station_id"] = station.strip()
+        fetch["parameter_type"] = st.selectbox(
+            "Parameter type",
+            [
+                "Water Course Discharge",
+                "Water Course Level",
+                "Storage Level",
+                "Storage Volume",
+                "Ground Water Level",
+                "Rainfall",
+                "Water Temperature",
+                "Electrical Conductivity At 25C",
+                "Turbidity",
+                "pH",
+            ],
+        )
+        fetch["days"] = st.slider("Days of history", 1, 90, 30, key="bom_days")
+
 
 def _records_to_df(records: list) -> pd.DataFrame:
     """Convert schema objects to a DataFrame, flattening nested locations.
@@ -723,6 +753,7 @@ _FACTORIES = {
     "camels_cl": lambda api_key, ctor, c: c.CAMELSCLCollector(),
     "camels_br": lambda api_key, ctor, c: c.CAMELSBRCollector(),
     "uk_ea": lambda api_key, ctor, c: c.UKEACollector(),
+    "bom": lambda api_key, ctor, c: c.BOMCollector(),
 }
 
 

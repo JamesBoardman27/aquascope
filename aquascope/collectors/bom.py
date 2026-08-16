@@ -4,19 +4,19 @@ Collector for the Australian Bureau of Meteorology (BOM) Water Data Online porta
 BOM publishes real-time and historical streamflow, water-level, storage, and
 groundwater data through a KISTERS WISKI (KiWIS) endpoint:
 
-    http://www.bom.gov.au/waterdata/services
+    https://www.bom.gov.au/waterdata/services
 
-No authentication key is required. The collector works in three steps,
-all against the same ``QueryServices`` endpoint:
+No authentication key is required. The collector works in two steps, both
+against the same ``QueryServices`` endpoint:
 
-1. ``getStationList`` — resolve station name and coordinates.
-2. ``getTimeseriesList`` — resolve the ``ts_id`` for a station/parameter/
-   time-series-name combination (also returns the parameter's unit).
-3. ``getTimeseriesValues`` — fetch the actual observations for that ``ts_id``
-   over a date range.
+1. ``getTimeseriesList`` — resolve the ``ts_id`` for a station/parameter/
+   time-series-name combination.
+2. ``getTimeseriesValues`` (with ``metadata=true``) — fetch observations for
+   that ``ts_id`` over a date range. ``metadata=true`` also returns the
+   station's coordinates and the parameter's real unit alongside the data,
+   so no separate station lookup is needed.
 
-Station coordinates are fetched separately from the timeseries lookup, and
-the timeseries lookup omits ``returnfields`` entirely: BOM's KiWIS instance
+The timeseries lookup omits ``returnfields`` entirely: BOM's KiWIS instance
 returns an HTTP 500 for *any* ``returnfields`` value on a
 ``getTimeseriesList`` request. This matches the reference ``bomWater`` R
 client, which never passes ``returnfields`` to that request type either.
@@ -34,6 +34,7 @@ from aquascope.collectors.base import BaseCollector
 from aquascope.schemas.water_data import (
     DataSource,
     GeoLocation,
+    StreamflowReading,
     WaterLevelReading,
     WaterQualitySample,
 )
@@ -41,15 +42,16 @@ from aquascope.utils.http_client import CachedHTTPClient, RateLimiter
 
 logger = logging.getLogger(__name__)
 
-BOM_BASE = "http://www.bom.gov.au/waterdata/services"
+BOM_BASE = "https://www.bom.gov.au/waterdata/services"
 
 #: Default BOM time-series name — quality-checked, merged daily mean.
 DEFAULT_TS_NAME = "DMQaQc.Merged.DailyMean.24HR"
 
-#: Typical unit for each BOM parameter type (used when the API does not
-#: report ``parametertype_unitname`` for a station/timeseries combination).
+#: Typical unit for each BOM parameter type (fallback for when neither
+#: ``getTimeseriesValues``'s ``metadata=true`` response nor
+#: ``getTimeseriesList`` report a unit for a station/timeseries combination).
 PARAMETER_UNITS: dict[str, str] = {
-    "Water Course Discharge": "m^3/s",
+    "Water Course Discharge": "m3/s",
     "Water Course Level": "m",
     "Storage Level": "m",
     "Storage Volume": "ML",
@@ -76,9 +78,10 @@ class BOMCollector(BaseCollector):
     Collect streamflow, water-level, and storage data from BOM Water Data
     Online (Australia).
 
-    Results are normalised to ``WaterQualitySample`` records (e.g. discharge,
-    turbidity, temperature) or ``WaterLevelReading`` records (gauge/storage/
-    groundwater level), both with ``source = DataSource.BOM``.
+    Results are normalised to ``StreamflowReading`` (discharge),
+    ``WaterLevelReading`` (gauge/storage/groundwater level), or
+    ``WaterQualitySample`` (everything else), all with
+    ``source = DataSource.BOM``.
     """
 
     name: str = "bom"
@@ -111,7 +114,7 @@ class BOMCollector(BaseCollector):
         Parameters
         ----------
         station_id : str
-            AWRC station number (e.g. ``"410730"`` for Murrumbidgee River
+            AWRC station number (e.g. ``"410001"`` for Murrumbidgee River
             at Wagga Wagga).
         parameter_type : str
             BOM parameter type name, e.g. ``"Water Course Discharge"``,
@@ -146,7 +149,6 @@ class BOMCollector(BaseCollector):
             if end_date is None:
                 end_date = end.strftime("%Y-%m-%d")
 
-        station_meta = self._resolve_station(station_id)
         ts_meta = self._resolve_timeseries(station_id, parameter_type, ts_name)
         if ts_meta is None:
             logger.warning(
@@ -157,11 +159,12 @@ class BOMCollector(BaseCollector):
             )
             return []
 
-        values = self._fetch_timeseries_values(ts_meta["ts_id"], start_date, end_date)
+        metadata, values = self._fetch_timeseries_values(ts_meta["ts_id"], start_date, end_date)
 
-        station_name = ts_meta.get("station_name") or (station_meta or {}).get("station_name")
-        latitude = (station_meta or {}).get("latitude")
-        longitude = (station_meta or {}).get("longitude")
+        station_name = ts_meta.get("station_name")
+        latitude = metadata.get("latitude")
+        longitude = metadata.get("longitude")
+        unit = metadata.get("unit") or ts_meta.get("unit") or PARAMETER_UNITS.get(parameter_type, "")
 
         rows: list[dict] = []
         for timestamp, value, quality_code in values:
@@ -170,7 +173,7 @@ class BOMCollector(BaseCollector):
                     "station_no": ts_meta.get("station_no", station_id),
                     "station_name": station_name,
                     "parameter_type": parameter_type,
-                    "unit": ts_meta.get("unit") or PARAMETER_UNITS.get(parameter_type, ""),
+                    "unit": unit,
                     "latitude": latitude,
                     "longitude": longitude,
                     "timestamp": timestamp,
@@ -180,53 +183,14 @@ class BOMCollector(BaseCollector):
             )
         return rows
 
-    def _resolve_station(self, station_id: str) -> dict | None:
-        """Look up station name and coordinates via ``getStationList``.
-
-        Coordinates are fetched separately from ``getTimeseriesList`` because
-        BOM's KiWIS instance returns an HTTP 500 when ``station_latitude``/
-        ``station_longitude`` are requested as ``getTimeseriesList``
-        returnfields -- those fields are only valid on ``getStationList``.
-        """
-        params = {
-            "service": "kisters",
-            "type": "QueryServices",
-            "format": "json",
-            "request": "getStationList",
-            "station_no": station_id,
-            "returnfields": "station_name,station_no,station_latitude,station_longitude",
-        }
-        try:
-            data = self.client.get_json(BOM_BASE, params=params)
-        except Exception:
-            logger.warning("BOM getStationList request failed for station %s", station_id, exc_info=True)
-            return None
-
-        row = self._first_data_row(data)
-        if row is None:
-            return None
-
-        def _float_or_none(val: Any) -> float | None:
-            try:
-                return float(val)
-            except (TypeError, ValueError):
-                return None
-
-        return {
-            "station_name": row.get("station_name"),
-            "latitude": _float_or_none(row.get("station_latitude")),
-            "longitude": _float_or_none(row.get("station_longitude")),
-        }
-
     def _resolve_timeseries(self, station_id: str, parameter_type: str, ts_name: str) -> dict | None:
-        """Look up the ``ts_id`` (and parameter unit) for a station/parameter.
+        """Look up the ``ts_id`` for a station/parameter.
 
         Deliberately omits ``returnfields``: BOM's KiWIS instance returns an
         HTTP 500 for *any* ``returnfields`` value on a ``getTimeseriesList``
-        request (not just ``station_latitude``/``station_longitude`` -- see
-        ``_resolve_station`` for that field-specific case). The reference
-        ``bomWater`` R client never passes ``returnfields`` to this request
-        type either, relying on the server's default columns instead.
+        request. The reference ``bomWater`` R client never passes
+        ``returnfields`` to this request type either, relying on the
+        server's default columns instead.
         """
         params = {
             "service": "kisters",
@@ -256,8 +220,16 @@ class BOMCollector(BaseCollector):
 
     def _fetch_timeseries_values(
         self, ts_id: str, start_date: str, end_date: str | None
-    ) -> list[tuple[str, str, str | None]]:
-        """Fetch ``(timestamp, value, quality_code)`` tuples for a ``ts_id``."""
+    ) -> tuple[dict, list[tuple[str, str, str | None]]]:
+        """Fetch ``(timestamp, value, quality_code)`` tuples plus station metadata.
+
+        Requests ``metadata=true``, which returns ``station_latitude``,
+        ``station_longitude``, and ``ts_unitsymbol`` alongside the data in
+        the same response -- avoiding a separate ``getStationList`` call.
+        It also fixes a real unit gap: the default ``getTimeseriesList``
+        columns never include ``parametertype_unitname``, so without this,
+        unit always fell through to the ``PARAMETER_UNITS`` table.
+        """
         params = {
             "service": "kisters",
             "type": "QueryServices",
@@ -266,6 +238,7 @@ class BOMCollector(BaseCollector):
             "ts_id": ts_id,
             "from": start_date,
             "returnfields": "Timestamp,Value,Quality Code",
+            "metadata": "true",
         }
         if end_date:
             params["to"] = end_date
@@ -274,11 +247,23 @@ class BOMCollector(BaseCollector):
             data = self.client.get_json(BOM_BASE, params=params)
         except Exception:
             logger.warning("BOM getTimeseriesValues request failed for ts_id %s", ts_id, exc_info=True)
-            return []
+            return {}, []
 
         series = self._first_series(data)
         if series is None:
-            return []
+            return {}, []
+
+        def _float_or_none(val: Any) -> float | None:
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                return None
+
+        metadata = {
+            "latitude": _float_or_none(series.get("station_latitude")),
+            "longitude": _float_or_none(series.get("station_longitude")),
+            "unit": series.get("ts_unitsymbol"),
+        }
 
         columns = [c.strip() for c in series.get("columns", "").split(",")]
         out: list[tuple[str, str, str | None]] = []
@@ -289,11 +274,11 @@ class BOMCollector(BaseCollector):
             if timestamp is None or value is None:
                 continue
             out.append((timestamp, value, row.get("Quality Code")))
-        return out
+        return metadata, out
 
     @staticmethod
     def _first_data_row(data: Any) -> dict | None:
-        """Parse a ``getTimeseriesList``/``getStationList``-style response.
+        """Parse a ``getTimeseriesList``-style response.
 
         BOM returns either ``["No matches."]`` (no results) or a list of
         lists where the first row is the header and subsequent rows are data.
@@ -319,15 +304,17 @@ class BOMCollector(BaseCollector):
     # ------------------------------------------------------------------ #
     # normalise
     # ------------------------------------------------------------------ #
-    def normalise(self, raw: list[dict]) -> list[WaterQualitySample | WaterLevelReading]:
+    def normalise(self, raw: list[dict]) -> list[WaterQualitySample | WaterLevelReading | StreamflowReading]:
         """
-        Normalise raw BOM rows into ``WaterQualitySample`` or
-        ``WaterLevelReading`` records, depending on ``parameter_type``.
+        Normalise raw BOM rows into ``StreamflowReading`` (discharge),
+        ``WaterLevelReading`` (level-type parameters), or
+        ``WaterQualitySample`` (everything else).
         """
         if not raw:
             return []
 
-        records: list[WaterQualitySample | WaterLevelReading] = []
+        records: list[WaterQualitySample | WaterLevelReading | StreamflowReading] = []
+        skipped = 0
         for row in raw:
             try:
                 value = row.get("value")
@@ -338,7 +325,7 @@ class BOMCollector(BaseCollector):
                 dt_str = row.get("timestamp")
                 if not dt_str:
                     continue
-                sample_dt = datetime.fromisoformat(str(dt_str))
+                sample_dt = datetime.fromisoformat(str(dt_str)).replace(tzinfo=None)
 
                 location = None
                 lat, lon = row.get("latitude"), row.get("longitude")
@@ -363,6 +350,20 @@ class BOMCollector(BaseCollector):
                             remark=remark,
                         )
                     )
+                elif parameter_type == "Water Course Discharge":
+                    records.append(
+                        StreamflowReading(
+                            source=DataSource.BOM,
+                            station_id=str(row.get("station_no", "unknown")),
+                            station_name=row.get("station_name"),
+                            location=location,
+                            reading_datetime=sample_dt,
+                            discharge_cms=value,
+                            source_type="in_situ",
+                            unit=unit or "m3/s",
+                            remark=remark,
+                        )
+                    )
                 else:
                     records.append(
                         WaterQualitySample(
@@ -377,7 +378,12 @@ class BOMCollector(BaseCollector):
                             remark=remark,
                         )
                     )
+
             except (ValueError, KeyError, TypeError) as exc:
+                skipped += 1
                 logger.debug("Skipping BOM row: %s", exc)
+
+        if skipped:
+            logger.warning("BOM normalise: skipped %d of %d row(s) that failed to parse.", skipped, len(raw))
 
         return records
