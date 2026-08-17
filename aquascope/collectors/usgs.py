@@ -128,6 +128,8 @@ def _max_date(current: date | None, value: str | None) -> date | None:
     if parsed is None:
         return current
     return parsed if current is None or parsed > current else current
+
+
 class USGSCollector(BaseCollector):
     """
     Collect daily-value water data from USGS via OGC API.
