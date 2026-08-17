@@ -23,6 +23,7 @@ _INSTALL_MAP = {
     "openai": "llm",
     "pyarrow": "archive",
     "huggingface_hub": "archive",
+    "mcp": "mcp",
 }
 
 
