@@ -56,6 +56,27 @@ METHODS: dict[str, dict[str, str]] = {
         "citation": "Vogel, R. M., & Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and "
         "confidence intervals. J. Water Resour. Plann. Manage., 120(4), 485-504.",
     },
+    "era5": {
+        "name": "ERA5 reanalysis via Open-Meteo",
+        "text": "Daily precipitation, 2 m temperature and FAO-56 reference evapotranspiration for the grid cell "
+        "(about 9 km) containing the point, from ECMWF's ERA5 reanalysis served by Open-Meteo.",
+        "citation": "Hersbach, H. et al. (2020). The ERA5 global reanalysis. Q. J. R. Meteorol. Soc., 146, "
+        "1999-2049; Open-Meteo.com (CC BY 4.0).",
+    },
+    "glofas": {
+        "name": "GloFAS modelled discharge via Open-Meteo",
+        "text": "Daily river discharge simulated by the Global Flood Awareness System (LISFLOOD, ~5 km grid) "
+        "for the cell containing the point. Modelled, not observed: use it for context, not for design values.",
+        "citation": "Harrigan, S. et al. (2020). GloFAS-ERA5 operational global river discharge reanalysis "
+        "1979-present. Earth Syst. Sci. Data, 12, 2043-2060.",
+    },
+    "fao56": {
+        "name": "FAO-56 reference evapotranspiration and aridity index",
+        "text": "ET0 after Allen et al. (1998); aridity index = mean annual precipitation / mean annual ET0 "
+        "(UNEP classes: hyper-arid < 0.05, arid < 0.2, semi-arid < 0.5, dry sub-humid < 0.65, humid otherwise).",
+        "citation": "Allen, R. G., Pereira, L. S., Raes, D., & Smith, M. (1998). Crop evapotranspiration. "
+        "FAO Irrigation and Drainage Paper 56.",
+    },
     "trend": {
         "name": "Mann-Kendall trend on annual means",
         "text": "Non-parametric Mann-Kendall test with Sen's slope on the annual mean series.",
@@ -130,17 +151,41 @@ def _records_to_series(records: list, prefer: str | None = None) -> tuple[pd.Ser
     return s, variable, unit
 
 
-def fetch_series(source: str, station_id: str, *, years: int = 40) -> dict[str, Any]:
-    """Fetch the observed record for one station through aquascope's collectors.
+def fetch_series(source: str, station_id: str, *, years: int = 40, prefer_archive: bool = True) -> dict[str, Any]:
+    """Fetch the observed record for one station.
 
-    Returns ``{"series": pd.Series | None, "variable": str, "unit": str,
-    "note": str}``. ``note`` explains record-length limits of the source.
+    The Archive is tried first (a harvested daily-mean file, one HTTPS GET,
+    no agency load) when ``prefer_archive`` is set and the source is one the
+    harvest mirrors; otherwise, or when the archive has no file for the
+    station, the record comes straight from the agency through aquascope's
+    collector. Returns ``{"series": pd.Series | None, "variable": str,
+    "unit": str, "note": str}``; ``note`` says where the data came from and
+    any record-length limit of the source.
     """
     if source not in SOURCES:
         raise ValueError(f"Unknown source {source!r}")
     end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=int(years * 365.25))
     note = ""
+
+    if prefer_archive:
+        from aquascope.archive.observations import HARVESTABLE, fetch_archived_series
+
+        var = HARVESTABLE.get(source)
+        if var:
+            archived = fetch_archived_series(source, station_id, var)
+            if archived is not None and not archived.empty:
+                archived = archived[archived.index >= pd.Timestamp(start)]
+                unit = {"discharge": "m3/s", "precipitation": "mm", "water_level": "m"}.get(var, "")
+                return {
+                    "series": archived,
+                    "variable": var,
+                    "unit": unit,
+                    "note": (
+                        f"From the AquaScope archive (daily means harvested from {SOURCES[source].agency}; "
+                        f"{archived.index.min().date()} to {archived.index.max().date()})."
+                    ),
+                }
 
     if source == "usgs":
         number = station_id.split("-", 1)[-1]
@@ -402,6 +447,108 @@ def analyze_station(
         return result
     result.update(analyze_series(s, fetched["variable"], fetched["unit"]))
     return result
+
+
+def _aridity_class(index: float | None) -> str | None:
+    if index is None:
+        return None
+    if index < 0.05:
+        return "hyper-arid"
+    if index < 0.2:
+        return "arid"
+    if index < 0.5:
+        return "semi-arid"
+    if index < 0.65:
+        return "dry sub-humid"
+    return "humid"
+
+
+def anywhere(lat: float, lon: float, *, years: int = 10) -> dict[str, Any]:
+    """The "hydrology of anywhere" card: ERA5 climate + FAO-56 ET0 + GloFAS modelled discharge for a point.
+
+    Uses Open-Meteo (keyless, CORS-enabled) through the OpenMeteo collector,
+    so it works from the browser worker too. Returns JSON only.
+    """
+    end = datetime.now(timezone.utc).date() - timedelta(days=7)  # ERA5 lags a few days
+    start = end - timedelta(days=int(years * 365.25))
+    out: dict[str, Any] = {
+        "latitude": round(float(lat), 5),
+        "longitude": round(float(lon), 5),
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "years": years,
+        "methods": [],
+        "notes": [],
+    }
+
+    weather = build_collector("openmeteo", mode="weather")
+    try:
+        raw = weather.fetch_raw(
+            latitude=lat, longitude=lon, start_date=start.isoformat(), end_date=end.isoformat(),
+            daily=["precipitation_sum", "temperature_2m_mean", "et0_fao_evapotranspiration"],
+        )
+        daily = raw.get("daily", {})
+        idx = pd.to_datetime(daily.get("time", []))
+        p = pd.Series(daily.get("precipitation_sum", []), index=idx, dtype="float64")
+        t = pd.Series(daily.get("temperature_2m_mean", []), index=idx, dtype="float64")
+        et0 = pd.Series(daily.get("et0_fao_evapotranspiration", []), index=idx, dtype="float64")
+        annual_p = p.resample("YS").sum(min_count=300)
+        annual_et0 = et0.resample("YS").sum(min_count=300)
+        monthly_p = p.groupby(p.index.month).mean() * 30.44
+        monthly_et0 = et0.groupby(et0.index.month).mean() * 30.44
+        mean_p = float(annual_p.dropna().mean()) if annual_p.notna().any() else None
+        mean_et0 = float(annual_et0.dropna().mean()) if annual_et0.notna().any() else None
+        aridity = (mean_p / mean_et0) if (mean_p is not None and mean_et0) else None
+        out["climate"] = {
+            "source": "ERA5 via Open-Meteo",
+            "precipitation_mm_per_year": _clean(mean_p),
+            "et0_mm_per_year": _clean(mean_et0),
+            "temperature_mean_c": _clean(float(t.mean())) if len(t) else None,
+            "aridity_index": _clean(aridity),
+            "aridity_class": _aridity_class(aridity),
+            "monthly_precipitation_mm": [_clean(float(monthly_p.get(m, float("nan")))) for m in range(1, 13)],
+            "monthly_et0_mm": [_clean(float(monthly_et0.get(m, float("nan")))) for m in range(1, 13)],
+            "annual_precipitation": {
+                "year": [int(y) for y in annual_p.dropna().index.year],
+                "mm": [_clean(float(v)) for v in annual_p.dropna().values],
+            },
+            "wettest_day_mm": _clean(float(p.max())) if len(p) else None,
+        }
+        out["methods"].extend([METHODS["era5"], METHODS["fao56"]])
+    except Exception as exc:  # noqa: BLE001
+        out["notes"].append(f"ERA5 climate unavailable: {exc}")
+
+    flood = build_collector("openmeteo", mode="flood")
+    try:
+        # GloFAS goes back to 1984 and is cheap: ask for at least 20 years so
+        # the (indicative) flood frequency has enough complete years.
+        flood_start = end - timedelta(days=int(max(years, 20) * 365.25))
+        raw = flood.fetch_raw(latitude=lat, longitude=lon, start_date=flood_start.isoformat(),
+                              end_date=end.isoformat(), daily=["river_discharge"])
+        daily = raw.get("daily", {})
+        idx = pd.to_datetime(daily.get("time", []))
+        q = pd.Series(daily.get("river_discharge", []), index=idx, dtype="float64").dropna()
+        if len(q):
+            summary = analyze_series(q, "discharge", "m3/s")
+            summary.pop("series", None)
+            summary.pop("methods", None)
+            summary["source"] = "GloFAS v4 (modelled) via Open-Meteo"
+            summary["modelled"] = True
+            out["glofas"] = summary
+            out["notes"].append(
+                "GloFAS discharge is a model output for the grid cell (about 5 km), not a gauge reading; "
+                "return levels from it are indicative only."
+            )
+            out["methods"].append(METHODS["glofas"])
+            if "ffa" in summary:
+                out["methods"].extend([METHODS["gev_lmoments"], METHODS["lp3"]])
+    except Exception as exc:  # noqa: BLE001
+        out["notes"].append(f"GloFAS discharge unavailable: {exc}")
+
+    out["attribution"] = (
+        "Open-Meteo.com (CC BY 4.0); ERA5 and GloFAS: Copernicus Climate Change and Emergency Management Services."
+    )
+    return out
 
 
 def to_csv(result: dict[str, Any]) -> str:

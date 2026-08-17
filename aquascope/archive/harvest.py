@@ -268,6 +268,40 @@ def harvest_stations(
     return report
 
 
+def _obs_section(out_dir: Path, repo_id: str) -> str:
+    """Describe harvested observations from obs/manifest.json when present."""
+    manifest_path = out_dir / "obs" / "manifest.json"
+    if not manifest_path.exists():
+        return ""
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    lines = [
+        "",
+        "## Observations (Phase 1, filling up week by week)",
+        "",
+        "Daily means per station as `obs/<variable>/<source>/<station_id>.csv.gz` (`date,value`), only for "
+        "sources whose terms allow mirroring. `obs/manifest.json` lists every harvested station with its "
+        "period, count and unit. Read one station:",
+        "",
+        "```python",
+        f'pd.read_csv("hf://datasets/{repo_id}/obs/discharge/usgs/USGS-01646500.csv.gz")',
+        "```",
+        "",
+        "or a whole source with DuckDB: "
+        f"`SELECT * FROM read_csv('hf://datasets/{repo_id}/obs/discharge/hubeau_hydrometrie/*.csv.gz')`.",
+        "",
+        "| source | variable | stations harvested | licence |",
+        "| --- | --- | ---: | --- |",
+    ]
+    for key in sorted(manifest.get("sources", {})):
+        entry = manifest["sources"][key]
+        n = entry.get("n_stations", sum(1 for v in entry.get("stations", {}).values() if v.get("n")))
+        lines.append(f"| `{key}` | {entry.get('variable', '')} | {n:,} | {entry.get('license', '')} |")
+    return "\n".join(lines) + "\n"
+
+
 def write_dataset_card(path: Path, report: HarvestReport, repo_id: str = "Rekin226/aquascope-gauges") -> Path:
     """Write the Hugging Face dataset card (YAML front matter + per-source table)."""
     rows = []
@@ -336,6 +370,7 @@ link back to the agency. Attribution for each source is in the AquaScope registr
 | --- | --- | --- | --- | --- | --- | --- |
 {table}
 
+{_obs_section(path.parent, repo_id)}
 ## How it is built
 
 `aquascope harvest stations --out archive --publish {repo_id}` runs weekly from

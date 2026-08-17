@@ -21,7 +21,7 @@ const $ = (id) => document.getElementById(id);
 // Debug hooks (harmless in production): window.__aq.state, window.__aq.log
 const dbg = (window.__aq = { log: [], state: null });
 const trace = (msg) => { dbg.log.push(`${new Date().toISOString().slice(11, 19)} ${msg}`); };
-const state = { stations: [], byKey: new Map(), hidden: new Set(), selected: null, result: null, workerReady: false, pending: new Map(), reqId: 0, mapOk: false };
+const state = { stations: [], byKey: new Map(), hidden: new Set(), selected: null, result: null, workerReady: false, pending: new Map(), reqId: 0, mapOk: false, marker: null, point: null };
 dbg.state = state;
 
 // ── catalog ─────────────────────────────────────────────────────────────────
@@ -177,6 +177,11 @@ function addStationLayers(fc) {
     popup.setLngLat(e.features[0].geometry.coordinates).setHTML(`<strong>${escapeHtml(p.name || p.key.split("/")[1])}</strong><br><span class="muted">${(SOURCE_STYLE[p.source] || {}).label || p.source}</span>`).addTo(map);
   });
   map.on("mouseleave", "points", () => { map.getCanvas().style.cursor = ""; popup.remove(); });
+  map.on("click", (e) => {
+    const hit = map.queryRenderedFeatures(e.point, { layers: ["points", "clusters"] });
+    if (hit.length) return; // handled by the layer handlers
+    selectPoint(e.lngLat.lat, e.lngLat.lng);
+  });
   map.on("mouseenter", "clusters", () => (map.getCanvas().style.cursor = "pointer"));
   map.on("mouseleave", "clusters", () => (map.getCanvas().style.cursor = ""));
 }
@@ -253,7 +258,9 @@ function selectStation(key, { fly } = { fly: false }) {
   history.replaceState(null, "", `#s=${encodeURIComponent(key)}`);
 
   $("panel-empty").hidden = true;
+  $("panel-point").hidden = true;
   $("panel-station").hidden = false;
+  if (state.marker) { state.marker.remove(); state.marker = null; }
   const st = SOURCE_STYLE[r.source] || { label: r.source, color: FALLBACK_COLOR };
   const badge = $("st-source");
   badge.textContent = st.label; badge.style.background = st.color;
@@ -275,6 +282,97 @@ function setStatus(text, kind = "info") {
   el.textContent = text;
   el.className = `status ${kind}`;
   el.hidden = !text;
+}
+
+// ── click anywhere ──────────────────────────────────────────────────────────
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371, d2r = Math.PI / 180;
+  const dLat = (lat2 - lat1) * d2r, dLon = (lon2 - lon1) * d2r;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * d2r) * Math.cos(lat2 * d2r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function nearestStations(lat, lon, n = 6) {
+  const out = [];
+  for (const r of state.stations) {
+    if (state.hidden.has(r.source)) continue;
+    const d = haversineKm(lat, lon, r.lat, r.lon);
+    if (out.length < n) { out.push([d, r]); out.sort((a, b) => a[0] - b[0]); }
+    else if (d < out[n - 1][0]) { out[n - 1] = [d, r]; out.sort((a, b) => a[0] - b[0]); }
+  }
+  return out;
+}
+
+async function selectPoint(lat, lon) {
+  lat = Math.round(lat * 1e4) / 1e4; lon = Math.round(lon * 1e4) / 1e4;
+  state.selected = null; state.result = null; state.point = { lat, lon };
+  if (state.mapOk) {
+    map.setFilter("selected", ["==", ["get", "key"], "__none__"]);
+    if (state.marker) state.marker.remove();
+    state.marker = new maplibregl.Marker({ color: "#455a64" }).setLngLat([lon, lat]).addTo(map);
+  }
+  history.replaceState(null, "", `#p=${lat},${lon}`);
+  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-point").hidden = false;
+  $("pt-title").textContent = `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
+  $("pt-coords").textContent = `lat ${lat}, lon ${lon}`;
+  for (const id of ["pt-sec-climate", "pt-sec-glofas", "pt-sec-notes", "pt-sec-methods"]) $(id).hidden = true;
+  const near = nearestStations(lat, lon);
+  $("pt-nearest").innerHTML = near.map(([d, r]) => `<li data-key="${escapeHtml(`${r.source}/${r.station_id}`)}"><i style="background:${(SOURCE_STYLE[r.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(r.name || r.station_id)} <span class="muted">${escapeHtml((SOURCE_STYLE[r.source] || {}).label || r.source)}</span><span class="dist">${d < 10 ? d.toFixed(1) : Math.round(d)} km</span></li>`).join("") || `<li class="muted">no gauges in the catalog</li>`;
+  for (const li of $("pt-nearest").querySelectorAll("li[data-key]")) li.addEventListener("click", () => selectStation(li.dataset.key, { fly: true }));
+  $("panel").scrollTop = 0;
+  const statusEl = $("pt-status");
+  const setPt = (t, k = "info") => { statusEl.textContent = t; statusEl.className = `status ${k}`; statusEl.hidden = !t; };
+  setPt(state.workerReady ? "Asking Open-Meteo about this point…" : "Loading Python in your browser (once, ~15 MB)…");
+  try {
+    const res = await call("anywhere", { lat, lon, years: 10 });
+    if (!state.point || state.point.lat !== lat || state.point.lon !== lon) return;
+    setPt("");
+    renderPoint(res);
+  } catch (err) {
+    setPt(`Could not describe this point: ${err.message}`, "error");
+  }
+}
+
+function renderPoint(res) {
+  const c = res.climate;
+  if (c) {
+    $("pt-sec-climate").hidden = false;
+    $("pt-kpis").innerHTML = [
+      ["rainfall", `${fmt(c.precipitation_mm_per_year, 0)} mm/yr`, "ERA5, 10-yr mean"],
+      ["reference ET0", `${fmt(c.et0_mm_per_year, 0)} mm/yr`, "FAO-56"],
+      ["aridity", `${fmt(c.aridity_index, 2)}`, c.aridity_class || "P / ET0"],
+      ["temperature", `${fmt(c.temperature_mean_c, 1)} °C`, `wettest day ${fmt(c.wettest_day_mm, 0)} mm`],
+    ].map(([l, v, s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+    const months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+    Plotly.react("plot-climate", [
+      { x: months, y: c.monthly_precipitation_mm, type: "bar", name: "rain (mm)", marker: { color: "#1565c0" } },
+      { x: months, y: c.monthly_et0_mm, type: "scatter", mode: "lines+markers", name: "ET0 (mm)", line: { color: "#ef6c00" } },
+    ], { ...PLOT_LAYOUT, height: 220, yaxis: { title: { text: "mm / month" } }, legend: { orientation: "h", y: 1.15 }, barmode: "group" }, PLOT_CONFIG);
+  }
+  const g = res.glofas;
+  if (g && g.n) {
+    $("pt-sec-glofas").hidden = false;
+    $("pt-glofas-kpis").innerHTML = [
+      ["mean", `${fmt(g.stats.mean)} m³/s`, `${g.start} → ${g.end}`],
+      ["max", `${fmt(g.stats.max)} m³/s`, "modelled daily"],
+    ].map(([l, v, s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+    if (g.ffa && g.ffa.fits) {
+      const rps = g.ffa.return_periods, gv = g.ffa.fits.gev_lmoments || {}, lp = g.ffa.fits.lp3 || {};
+      $("pt-ffa-table").innerHTML = `<thead><tr><th>T (yr)</th><th>GEV L-moments</th><th>LP3 (90 % CI)</th></tr></thead><tbody>` +
+        rps.map((rp, i) => `<tr><td>${rp}</td><td>${gv.q ? fmt(gv.q[i]) : "—"}</td><td>${lp.q ? `${fmt(lp.q[i])} <span class="ci">[${fmt(lp.ci[i][0])}, ${fmt(lp.ci[i][1])}]</span>` : "—"}</td></tr>`).join("") +
+        `</tbody><tfoot><tr><td colspan="3" class="muted">Indicative only: GloFAS grid-cell discharge in m³/s, ${g.ffa.n_years} modelled years.</td></tr></tfoot>`;
+    } else {
+      $("pt-ffa-table").innerHTML = "";
+    }
+  }
+  const notes = res.notes || [];
+  $("pt-notes").innerHTML = notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("");
+  $("pt-sec-notes").hidden = notes.length === 0;
+  const ms = res.methods || [];
+  $("pt-methods").innerHTML = ms.map((m) => `<li><strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span></li>`).join("");
+  $("pt-attribution").textContent = res.attribution ? `Data: ${res.attribution}` : "";
+  $("pt-sec-methods").hidden = ms.length === 0;
 }
 
 // ── worker (Pyodide) ────────────────────────────────────────────────────────
@@ -438,6 +536,10 @@ function renderFfaPlot(ffa, unit, color) {
 // ── buttons ─────────────────────────────────────────────────────────────────
 
 function initButtons() {
+  $("btn-share-pt").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(location.href); $("btn-share-pt").textContent = "Copied!"; setTimeout(() => ($("btn-share-pt").textContent = "Copy link"), 1500); }
+    catch { prompt("Copy this link", location.href); }
+  });
   $("btn-share").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(location.href); $("btn-share").textContent = "Copied!"; setTimeout(() => ($("btn-share").textContent = "Copy link"), 1500); }
     catch { prompt("Copy this link", location.href); }
@@ -500,4 +602,10 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&a
   ensureWorker(); // warm Python in the background so the first click is quicker
   const m = location.hash.match(/#s=(.+)$/);
   if (m) selectStation(decodeURIComponent(m[1]), { fly: true });
+  const pm = location.hash.match(/#p=(-?[\d.]+),(-?[\d.]+)$/);
+  if (pm) {
+    const lat = Number(pm[1]), lon = Number(pm[2]);
+    if (state.mapOk) map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 7) });
+    selectPoint(lat, lon);
+  }
 })();

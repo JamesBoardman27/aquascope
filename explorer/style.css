@@ -82,3 +82,9 @@ table.ffa .ci { color: var(--muted); font-size: .74rem; }
   #search { width: 160px; }
   .legend { display: none; }
 }
+
+.nearest { list-style: none; padding: 0; margin: 0; font-size: .85rem; }
+.nearest li { display: flex; gap: .5rem; align-items: center; padding: .3rem 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.nearest li:hover { background: #f4f7fb; }
+.nearest li i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.nearest .dist { margin-left: auto; color: var(--muted); font-size: .78rem; white-space: nowrap; }

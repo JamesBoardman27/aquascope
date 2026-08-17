@@ -10,6 +10,14 @@ Requires the ``archive`` extra (``pip install "aquascope[archive]"``).
 """
 
 from aquascope.archive.harvest import HarvestReport, harvest_stations, write_dataset_card
+from aquascope.archive.observations import fetch_archived_series, harvest_observations
 from aquascope.archive.publish import publish_folder
 
-__all__ = ["HarvestReport", "harvest_stations", "publish_folder", "write_dataset_card"]
+__all__ = [
+    "HarvestReport",
+    "fetch_archived_series",
+    "harvest_observations",
+    "harvest_stations",
+    "publish_folder",
+    "write_dataset_card",
+]
