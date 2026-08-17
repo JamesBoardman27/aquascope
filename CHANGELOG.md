@@ -11,11 +11,47 @@ All notable changes to AquaScope are documented here.
 - **Taiwan CWA climate collector** (`collectors/taiwan_cwa.py`): daily station climate observations (rainfall, temperature mean/max/min, humidity, solar radiation, wind, Class-A pan evaporation) from Taiwan's official weather network via the keyless CODIS archive, with history verified back to 1960. Records use the new `ClimateReading` schema, which pivots through the existing xarray interop path unchanged. This is the observed-forcing layer for the CAMELS-TW epic. (#177, closes #177; contributes to #100)
 - **`relax_strict_tls` option on `CachedHTTPClient`**: Taiwan government certificate chains lack the Subject Key Identifier extension that Python 3.13+ requires by default; the new flag relaxes only the strict profile check while keeping full chain and hostname verification, replacing any need for `verify=False` on these hosts. Root cause and the one-line fix for `taiwan_wra_iot` are documented in #169.
 - **Flow Duration Curve (FDC) slope signature** (`aquascope.hydrology.fdc_slope`): added log-space percentile slope signature function and `fdc_slope` field on `SignatureReport` (#45).
+- **Deployment-supplied free AI.** `hosted_llm_config()` reads one API token
+  from the environment (`HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, or
+  `AQUASCOPE_LLM_API_KEY` with `AQUASCOPE_LLM_BASE_URL` / `AQUASCOPE_LLM_MODEL`).
+  When present, the dashboard offers **✨ Free AI — hosted for this demo, no key
+  needed** as the default provider, so visitors to a public deployment get
+  LLM-backed recommendations without an account. On Streamlit Community Cloud
+  the same names work as `st.secrets`. No credential is ever bundled in the
+  package, and when none is configured the recommender stays rule-based
+  exactly as before.
+- `RecommendationResult` and `recommend_with_llm_detailed()` in
+  `aquascope.ai_engine.recommender`: recommendations plus `mode`
+  (`"llm"` / `"rule_based"`), `provider`, `model`, and a human-readable
+  `error`. `recommend_with_llm()` keeps its existing signature and return type.
+- Troubleshooting guide section for the AI recommender.
 
 ### Fixed
 - **USGS discharge now normalises into `StreamflowReading`** (`collectors/usgs.py`): discharge (00060) values from both API endpoints are emitted as `StreamflowReading` instead of `WaterQualitySample`, with unit conversion (ft³/s → m³/s for discharge, miles² → km² for catchment area), significant-figure preservation, and a helper to fetch catchment area when not already present. Water quality sample normalisation for non-discharge parameters is unchanged. (#155, contributes to #97 and #104)
 - **USGS CLI `--days` and kwarg handling fixed** (`cli`): corrected bugs in how `--days` and other USGS-specific parameters were passed through as kwargs to the collector, with new test coverage for valid-parameter acceptance, rejection of unrecognised parameters, and implicit/explicit API key selection. (#159)
 - **Hub'Eau water level and discharge now normalise into `WaterLevelReading` and `StreamflowReading`** (`collectors/france_hubeau.py`): both reading types are migrated off `WaterQualitySample` — water level (H) is emitted in metres, and discharge (Q) as `discharge_cms` (converted from L/s via an integer divisor that avoids a floating-point rounding error) tagged `source_type="in_situ"` with `catchment_area_km2` populated, so `runoff_mm_day` works for Hub'Eau. Catchment areas come from a single batched `referentiel/sites` lookup (one call no matter how many stations are requested, and only made when discharge rows actually need it), degrading gracefully to `None` with a warning when site metadata is missing. Station-filtered fetches now send `code_entite` (Hub'Eau v2's only accepted station parameter) instead of `code_station`, which the API silently ignored — a "single station" request was quietly returning data from across the whole national network. Multi-page pagination also no longer contaminates results: after page one the collector passed `params={}`, which httpx interprets as "rebuild the query string", stripping the cursor, station and grandeur filters off Hub'Eau's absolute `next` link so every subsequent page silently hit the unfiltered national dataset (39M+ records); it now passes `params=None` and sends the `next` URL as-is. Other Hub'Eau grandeurs still fall back to `WaterQualitySample`. (#164, closes #97 and #104)
+- **AI recommender no longer degrades silently.** `recommend_with_llm` caught
+  every exception, logged a warning, and returned rule-based results, so a
+  missing `openai` package, a bad API key, a dead endpoint, or an unparseable
+  reply all looked identical to a successful LLM call. The dashboard and CLI
+  now say which engine produced the list and, when the LLM was requested but
+  not used, why.
+- **HuggingFace provider could never work.** `PROVIDER_BASE_URLS["huggingface"]`
+  pointed at `api-inference.huggingface.co`, a host that has been retired and no
+  longer resolves. Now points at `router.huggingface.co/v1`.
+- **LLM output contract was self-contradictory.** The prompt asked for a bare
+  JSON array while `response_format={"type": "json_object"}` forced an object,
+  so valid replies were often dropped. The prompt now asks for
+  `{"recommendations": [...]}`, and parsing accepts arrays, the documented
+  wrapper, arbitrary wrapper keys, and JSON embedded in prose. A missing `id`
+  no longer raises `KeyError` into the silent fallback.
+
+- **Every shipped HuggingFace model was unserved.** `Mistral-7B-Instruct-v0.3`,
+  `zephyr-7b-beta`, and `Meta-Llama-3-8B-Instruct` are not in
+  `router.huggingface.co`'s catalogue, so the HuggingFace provider returned 404
+  for every request even with a valid token. Replaced with models verified
+  against the live `/v1/models` list. Groq's decommissioned
+  `mixtral-8x7b-32768` likewise replaced with `llama-3.3-70b-versatile`.
 
 ## [0.10.0] - 2026-08-12
 
