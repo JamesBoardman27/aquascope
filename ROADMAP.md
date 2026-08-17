@@ -2,6 +2,15 @@
 
 The roadmap reflects what's shipped, what's in-flight, and what's planned. Open items are reordered each release based on community demand in [Discussions](https://github.com/Rekin226/aquascope/discussions/categories/ideas).
 
+## Where this is going (August 2026 direction review)
+
+AquaScope is becoming **the open, continuously updated, citable record of the world's public water gauges, plus the zero-install place to look at them**; the Python library is the harvester and method engine underneath. Four layers, all on free infrastructure:
+
+1. **The Archive** ([`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges)): every station catalog as GeoParquet, daily observations mirrored per station for sources whose terms allow it, harvested weekly by CI, DuckDB-readable in place. [#188](https://github.com/Rekin226/aquascope/issues/188)
+2. **The Explorer** ([live](https://rekin226-aquascope-explorer.static.hf.space/)): click any gauge on Earth (or anywhere at all) and get the record, flood frequency with confidence limits, flow duration, trend and citations, computed in your browser. [#189](https://github.com/Rekin226/aquascope/issues/189)
+3. **The Analyst**: the same tools for assistants (`aquascope mcp`, [#113](https://github.com/Rekin226/aquascope/issues/113)) and for people who ask in plain language (`aquascope ask`), plus `aquascope ingest` for any agency export.
+4. **Ecosystem**: the GeoLibre plugin (`integrations/geolibre`), QGIS/R readers of the archive, a data paper.
+
 ## Shipped
 
 - [x] 26 data source collectors (Taiwan ×7, USA ×2, Global ×5, FAO ×2, EU, France, Japan, Korea, India, Chile, UK)
@@ -25,6 +34,11 @@ The roadmap reflects what's shipped, what's in-flight, and what's planned. Open 
 - [x] Climate projection workflows (CMIP6, downscaling, PDSI, scenario analysis)
 - [x] JOSS paper submission (`paper.md` + `paper.bib`)
 - [x] PyPI release (sdist + wheel + GitHub Actions publish workflow)
+- [x] Shared source registry with licence and station-catalog metadata; `find_stations()` and `aquascope stations` over six catalogs (#187)
+- [x] The Archive, Phase 0 + 1: 45,919-station GeoParquet catalog and per-station daily observations on Hugging Face, weekly harvest with collector-health issues (#188)
+- [x] The Explorer: static MapLibre + DuckDB-WASM + Pyodide page with click-any-gauge analysis and click-anywhere climate cards (#189)
+- [x] MCP server (`aquascope mcp`), the Analyst (`aquascope ask`) and `aquascope ingest` (#113)
+- [x] GeoLibre plugin: AquaScope Gauges (`integrations/geolibre`)
 
 ## In progress
 
@@ -42,6 +56,9 @@ The roadmap reflects what's shipped, what's in-flight, and what's planned. Open 
 
 Ambitious, high-impact work that takes AquaScope to the next level. These are [`major feature`](https://github.com/Rekin226/aquascope/labels/major%20feature) · `help wanted` — larger than a weekend, mentorship available. Comment on the issue to discuss scope before starting.
 
+- [ ] Archive Phase 2: groundwater / reservoir / quality variables, yearly parquet bundles for bulk users, a data paper ([#188](https://github.com/Rekin226/aquascope/issues/188))
+- [ ] Explorer Phase 2: catchment polygons (HydroBASINS PMTiles), Analyst panel in the page, GR4J once it runs in seconds ([#189](https://github.com/Rekin226/aquascope/issues/189))
+- [ ] CAMELS-TW / Caravan Asia extension built from the archive ([#100](https://github.com/Rekin226/aquascope/issues/100), [#99](https://github.com/Rekin226/aquascope/issues/99))
 - [ ] Prediction in Ungauged Basins — regionalize signatures/parameters ([#53](https://github.com/Rekin226/aquascope/issues/53)) — *now unblocked by the shipped GR4J keystone*
 - [ ] Declarative, reproducible study runner `aquascope run study.yaml` with provenance ([#54](https://github.com/Rekin226/aquascope/issues/54))
 - [ ] Plugin architecture — third-party collectors & methodologies via entry points ([#55](https://github.com/Rekin226/aquascope/issues/55))

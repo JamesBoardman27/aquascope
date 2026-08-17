@@ -13,7 +13,6 @@ Usage
     aquascope list-sources
     aquascope completion bash
 """
-
 # PYTHON_ARGCOMPLETE_OK
 from __future__ import annotations
 
@@ -27,7 +26,6 @@ from pathlib import Path
 import argcomplete
 
 # ----------------------------------------------------------
-from aquascope.collectors.india_wris import IndiaWRISCollector
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,76 +67,18 @@ def _parse_bbox(value: str | None) -> tuple[float, float, float, float] | None:
 
 def cmd_collect(args: argparse.Namespace) -> None:
     """Run a data collector and save results."""
-    from aquascope.collectors import (
-        AquastatCollector,
-        BOMCollector,
-        CAMELSBRCollector,
-        CAMELSCLCollector,
-        CopernicusCollector,
-        EUWFDCollector,
-        GEMStatCollector,
-        GRDCCollector,
-        HubeauHydrometrieCollector,
-        IrelandOPWCollector,
-        JapanMLITCollector,
-        KoreaWAMISCollector,
-        NOAANWPSCollector,
-        OpenMeteoCollector,
-        PegelonlineCollector,
-        SDG6Collector,
-        TaiwanCivilIoTCollector,
-        TaiwanCWACollector,
-        TaiwanDataGovCollector,
-        TaiwanMOENVCollector,
-        TaiwanWRAFhyCollector,
-        TaiwanWRAIoTCollector,
-        TaiwanWRAReservoirCollector,
-        TaiwanWRAWaterLevelCollector,
-        UKEACollector,
-        USGSCollector,
-        WaPORCollector,
-        WQPCollector,
-    )
+    from aquascope.registry import build_collector, source_keys
     from aquascope.utils.storage import save_records
 
     source = args.source.lower()
-    collector_map = {
-        "taiwan_moenv": lambda: TaiwanMOENVCollector(api_key=args.api_key or ""),
-        "taiwan_cwa": lambda: TaiwanCWACollector(),
-        "taiwan_wra_level": lambda: TaiwanWRAWaterLevelCollector(),
-        "taiwan_wra_reservoir": lambda: TaiwanWRAReservoirCollector(),
-        "usgs": lambda: USGSCollector(api_key=args.api_key),
-        "sdg6": lambda: SDG6Collector(),
-        "gemstat": lambda: GEMStatCollector(),
-        "aquastat": lambda: AquastatCollector(),
-        "taiwan_civil_iot": lambda: TaiwanCivilIoTCollector(),
-        "taiwan_wra_fhy": lambda: TaiwanWRAFhyCollector(),
-        "taiwan_wra_iot": lambda: TaiwanWRAIoTCollector(),
-        "taiwan_datagov": lambda: TaiwanDataGovCollector(),
-        "uk_ea": lambda: UKEACollector(),
-        "wqp": lambda: WQPCollector(),
-        "openmeteo": lambda: OpenMeteoCollector(mode=args.mode or "weather"),
-        "copernicus": lambda: CopernicusCollector(),
-        "wapor": lambda: WaPORCollector(),
-        "eu_wfd": lambda: EUWFDCollector(),
-        "japan_mlit": lambda: JapanMLITCollector(),
-        "korea_wamis": lambda: KoreaWAMISCollector(),
-        "india_wris": lambda: IndiaWRISCollector(),
-        "ireland_opw": lambda: IrelandOPWCollector(),
-        "hubeau_hydrometrie": lambda: HubeauHydrometrieCollector(),
-        "grdc": lambda: GRDCCollector(),
-        "camels_cl": lambda: CAMELSCLCollector(),
-        "camels_br": lambda: CAMELSBRCollector(),
-        "noaa_nwps": lambda: NOAANWPSCollector(),
-        "pegelonline": lambda: PegelonlineCollector(),
-        "bom": lambda: BOMCollector(),
-    }
-
-    if source not in collector_map:
-        logger.error("Unknown source '%s'. Available: %s", source, list(collector_map.keys()))
+    if source not in source_keys():
+        logger.error("Unknown source '%s'. Available: %s", source, source_keys())
         sys.exit(1)
 
-    collector = collector_map[source]()
+    ctor_kwargs = {}
+    if source == "openmeteo" and args.mode:
+        ctor_kwargs["mode"] = args.mode
+    collector = build_collector(source, api_key=args.api_key, **ctor_kwargs)
 
     kwargs = {}
     if source == "usgs":
@@ -292,7 +232,11 @@ def cmd_collect(args: argparse.Namespace) -> None:
 
 def cmd_recommend(args: argparse.Namespace) -> None:
     """Generate methodology recommendations."""
-    from aquascope.ai_engine.recommender import DatasetProfile, recommend, recommend_with_llm
+    from aquascope.ai_engine.recommender import (
+        DatasetProfile,
+        recommend,
+        recommend_with_llm_detailed,
+    )
 
     # Build profile from CLI args or from a data file
     parameters = [p.strip() for p in args.parameters.split(",")] if args.parameters else []
@@ -320,14 +264,22 @@ def cmd_recommend(args: argparse.Namespace) -> None:
                 sources = {r.get("source", "") for r in data if r.get("source")}
                 profile.data_sources = list(sources)
 
+    engine_note = ""
     if args.use_llm:
-        recs = recommend_with_llm(
+        result = recommend_with_llm_detailed(
             profile,
             top_k=args.top_k,
             model=args.model or "gpt-4o-mini",
             api_key=args.llm_api_key,
             base_url=args.llm_base_url,
         )
+        recs = result.recommendations
+        if result.mode == "llm":
+            engine_note = f"  Engine: {result.provider} · {result.model}"
+        else:
+            # Never degrade silently: say the LLM was skipped and why.
+            print(f"⚠️  LLM unavailable — showing rule-based results. {result.error}")
+            engine_note = "  Engine: rule-based (LLM fallback)"
     else:
         recs = recommend(profile, top_k=args.top_k)
 
@@ -337,6 +289,8 @@ def cmd_recommend(args: argparse.Namespace) -> None:
 
     print(f"\n{'=' * 70}")
     print(f"  AquaScope — Top {len(recs)} Research Methodology Recommendations")
+    if engine_note:
+        print(engine_note)
     print(f"{'=' * 70}\n")
     for i, rec in enumerate(recs, 1):
         m = rec.methodology
@@ -467,141 +421,243 @@ def cmd_list_methods(args: argparse.Namespace) -> None:
 
 
 def cmd_list_sources(args: argparse.Namespace) -> None:
-    """List all available data sources."""
-    from aquascope.schemas.water_data import DataSource
+    """List every registered data source (driven by aquascope.registry)."""
+    from aquascope.registry import SOURCES
 
     print(f"\n{'=' * 70}")
-    print(f"  AquaScope — {len(DataSource)} Data Sources")
+    print(f"  AquaScope — {len(SOURCES)} Data Sources")
     print(f"{'=' * 70}\n")
 
-    source_info = {
-        "taiwan_moenv": ("Taiwan MOENV", "Taiwan", "River/tap water quality, RPI", "https://data.moenv.gov.tw"),
-        "taiwan_cwa": (
-            "Taiwan CWA climate",
-            "Taiwan",
-            "Daily station climate: rain, temp, RH, radiation, wind",
-            "https://codis.cwa.gov.tw",
-        ),
-        "taiwan_wra": ("Taiwan WRA", "Taiwan", "Water levels, reservoir status", "https://opendata.wra.gov.tw"),
-        "taiwan_civil_iot": (
-            "Taiwan Civil IoT",
-            "Taiwan",
-            "Real-time sensor data (water level, flow, rain)",
-            "https://sta.ci.taiwan.gov.tw",
-        ),
-        "taiwan_wra_fhy": (
-            "Taiwan WRA Fhy",
-            "Taiwan",
-            "Real-time water level, rainfall, flow (防災資訊網)",
-            "https://fhy.wra.gov.tw/WraApi",
-        ),
-        "taiwan_wra_iot": (
-            "Taiwan WRA IoT",
-            "Taiwan",
-            "Real-time groundwater level, rainfall accumulation",
-            "https://iot.wra.gov.tw",
-        ),
-        "taiwan_datagov": (
-            "Taiwan Data.gov.tw",
-            "Taiwan",
-            "Real-time river & groundwater level (open gov data)",
-            "https://data.gov.tw",
-        ),
-        "usgs": ("USGS", "USA", "Streamflow, water quality, gage height", "https://api.waterdata.usgs.gov"),
-        "sdg6": ("UN SDG 6", "Global", "SDG 6 indicators (6.1.1 – 6.6.1)", "https://sdg6data.org"),
-        "gemstat": ("GEMStat", "Global", "Freshwater quality (170+ countries)", "https://gemstat.org"),
-        "uk_ea": (
-            "UK Environment Agency",
-            "UK",
-            "Water Quality and Water Level readings",
-            "https://environment.data.gov.uk/hydrology",
-        ),
-        "aquastat": (
-            "FAO AQUASTAT",
-            "Global",
-            "Country-level water withdrawal and irrigation",
-            "https://www.fao.org/aquastat",
-        ),
-        "wqp": (
-            "Water Quality Portal",
-            "USA",
-            "Integrated WQ from USGS+EPA+400 agencies",
-            "https://waterqualitydata.us",
-        ),
-        "openmeteo": (
-            "Open-Meteo",
-            "Global",
-            "ERA5 reanalysis, weather forecasts, GloFAS discharge",
-            "https://open-meteo.com",
-        ),
-        "copernicus": (
-            "Copernicus CDS",
-            "Global",
-            "GloFAS river discharge forecasts",
-            "https://cds.climate.copernicus.eu",
-        ),
-        "wapor": (
-            "FAO WaPOR",
-            "Global",
-            "Satellite ET, biomass, and water productivity",
-            "https://www.fao.org/in-action/remote-sensing-for-water-productivity",
-        ),
-        "eu_wfd": ("EU WFD", "Europe", "Water Framework Directive status", "https://www.eea.europa.eu"),
-        "france_hubeau": (
-            "Hub'Eau",
-            "France",
-            "River water level and discharge (hydrométrie)",
-            "https://hubeau.eaufrance.fr/api/v2/hydrometrie",
-        ),
-        "grdc": (
-            "GRDC",
-            "Global",
-            "River discharge: in-situ gauges + RSEG satellite estimates",
-            "https://zenodo.org/records/19126732",
-        ),
-        "japan_mlit": ("Japan MLIT", "Japan", "Hydrometeorology, river observations", "https://www.mlit.go.jp"),
-        "korea_wamis": ("Korea WAMIS", "Korea", "Hydrology, dam operations", "https://www.wamis.go.kr"),
-        "india_wris": ("India WRIS", "India", "River water level", "https://indiawris.gov.in"),
-        "ireland_opw": (
-            "Ireland OPW",
-            "Ireland",
-            "Water levels from waterlevel.ie",
-            "[https://waterlevel.ie](https://waterlevel.ie)",
-        ),
-        "noaa_nwps": (
-            "NOAA NWPS",
-            "USA",
-            " Streamflow forecasts, stream observations, streamflow output, crest history, flood impacts, low water history, flood category levels, and location metadata.",
-            "https://www.water.noaa.gov",
-        ),
-        "pegelonline": ("PEGELONLINE", "Germany", "River water level and discharge", "https://www.pegelonline.wsv.de"),
-        "camels_cl": (
-            "CAMELS-CL",
-            "Chile",
-            "Observed streamflow, meteorological forcing, attributes",
-            "https://www.cr2.cl/camels-cl",
-        ),
-        "camels_br": (
-            "CAMELS-BR",
-            "Brazil",
-            "Observed streamflow, meteorological forcing, attributes",
-            "https://doi.org/10.5281/zenodo.3709337",
-        ),
-    }
-
-    for src in DataSource:
-        info = source_info.get(src.value, (src.value, "—", "—", "—"))
-        print(f"  {info[0]}")
-        print(f"    Region : {info[1]}")
-        print(f"    Data   : {info[2]}")
-        print(f"    URL    : {info[3]}")
+    for key in sorted(SOURCES):
+        meta = SOURCES[key]
+        flags = []
+        if meta.supports_station_lookup:
+            flags.append("station catalog")
+        if meta.supports_bbox:
+            flags.append("bbox")
+        if meta.requires_api_key:
+            flags.append("API key")
+        print(f"  {key}  ({meta.label})")
+        print(f"    Region    : {meta.region}")
+        print(f"    Agency    : {meta.agency or '—'}")
+        print(f"    Data      : {meta.description}")
+        print(f"    Variables : {', '.join(meta.variables) or '—'}")
+        print(f"    License   : {meta.license}{' (redistributable)' if meta.redistributable else ''}")
+        if flags:
+            print(f"    Supports  : {', '.join(flags)}")
+        print(f"    URL       : {meta.homepage or '—'}")
         print()
+
+
+def cmd_stations(args: argparse.Namespace) -> None:
+    """Search station catalogs across sources and save the result."""
+    from aquascope.registry import station_catalogs, station_sources
+
+    bbox = _parse_bbox(args.bbox) if args.bbox else None
+    sources = args.source or None
+    if sources is None and args.variable is None:
+        logger.info("Searching every station-capable source: %s", station_sources())
+
+    catalogs = station_catalogs(
+        bbox=bbox,
+        variable=args.variable,
+        sources=sources,
+        max_items=args.max_items,
+        api_key=args.api_key,
+    )
+    if not catalogs:
+        logger.error(
+            "No station-capable source matches. Sources with a catalog: %s", station_sources(args.variable)
+        )
+        sys.exit(1)
+
+    stations = [s for key in sorted(catalogs) for s in catalogs[key].stations]
+    for key in sorted(catalogs):
+        cat = catalogs[key]
+        status = f"{len(cat.stations)} stations" if cat.ok else f"FAILED: {cat.error}"
+        logger.info("[%s] %s (%.1fs)", key, status, cat.seconds)
+
+    if not stations:
+        logger.warning("No stations found.")
+        if any(not c.ok for c in catalogs.values()):
+            sys.exit(1)
+        return
+
+    fmt = args.format
+    out_path = Path(args.output) if args.output else Path("data") / f"stations_{'_'.join(sorted(catalogs))}.{fmt}"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [st.model_dump(mode="json") for st in stations]
+
+    if fmt == "geojson":
+        features = []
+        for props in rows:
+            lon, lat = props.pop("longitude"), props.pop("latitude")
+            features.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]}, "properties": props})
+        out_path.write_text(json.dumps({"type": "FeatureCollection", "features": features}, ensure_ascii=False, indent=2))
+    elif fmt == "json":
+        out_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2))
+    else:
+        import csv
+
+        fields = ["source", "station_id", "name", "latitude", "longitude", "variables", "period_start", "period_end",
+                  "url", "river", "country", "extra"]
+        with out_path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields)
+            writer.writeheader()
+            for row in rows:
+                row = dict(row)
+                row["variables"] = "|".join(row.get("variables") or ())
+                row["extra"] = json.dumps(row.get("extra") or {}, ensure_ascii=False)
+                writer.writerow({k: row.get(k) for k in fields})
+    logger.info("Saved %d stations to %s", len(stations), out_path)
+
+
+def cmd_harvest(args: argparse.Namespace) -> None:
+    """Harvest station catalogs into GeoParquet (+ GeoJSON, health.json) and optionally publish."""
+    from aquascope.archive import harvest_stations, publish_folder
+
+    if args.what == "obs":
+        _cmd_harvest_obs(args)
+        return
+
+    report = harvest_stations(
+        args.out,
+        sources=args.source or None,
+        max_items=args.max_items,
+        api_key=args.api_key,
+        max_workers=args.workers,
+        write_geojson=not args.no_geojson,
+    )
+    for s in report.sources:
+        status = f"{s.n_stations:>6} stations" if s.ok else f"FAILED: {s.error}"
+        print(f"  {s.source:<24} {status}  ({s.seconds:.1f}s)")
+    print(f"\n  {report.n_stations} stations, {report.n_ok}/{len(report.sources)} sources OK -> {args.out}")
+
+    if args.publish:
+        if report.n_ok == 0:
+            logger.error("Every source failed; not publishing an empty catalog.")
+            sys.exit(1)
+        url = publish_folder(args.out, args.publish, commit_message=f"harvest stations {report.run_at}")
+        print(f"  published: {url}")
+
+    if report.n_ok == 0:
+        sys.exit(1)
+
+
+def _cmd_harvest_obs(args: argparse.Namespace) -> None:
+    """`aquascope harvest obs`: budgeted, incremental per-station daily series (#188 Phase 1)."""
+    from aquascope.archive import publish_folder
+    from aquascope.archive.observations import HARVESTABLE, harvest_observations, sync_from_hub
+
+    if args.sync_from:
+        sync_from_hub(args.out, args.sync_from)
+    sources = args.source or None
+    if sources:
+        bad = [s for s in sources if s not in HARVESTABLE]
+        if bad:
+            logger.error("Not harvestable yet: %s. Choose from %s", bad, list(HARVESTABLE))
+            sys.exit(2)
+    report = harvest_observations(
+        args.out,
+        sources=sources,
+        variable=args.variable,
+        years=args.years,
+        max_stations=args.max_stations,
+        refresh_days=args.refresh_days,
+        only_stations=args.station or None,
+    )
+    for h in report.sources:
+        print(
+            f"  {h.source:<20} {h.variable:<14} harvested {h.harvested:>4}  empty {h.empty:>4}  "
+            f"failed {h.failed:>3}  of {h.attempted:>4} picked  ({h.seconds:.0f}s)"
+        )
+        for err in h.errors[:3]:
+            print(f"      {err}")
+    total = sum(h.harvested for h in report.sources)
+    print(f"\n  {total} station files written under {args.out}/obs")
+
+    if args.publish:
+        url = publish_folder(args.out, args.publish, commit_message=f"harvest obs {report.run_at}")
+        print(f"  published: {url}")
+
+
+def cmd_ask(args: argparse.Namespace) -> None:
+    """Ask a water question; the analyst calls aquascope tools and writes a cited answer."""
+    from aquascope.ai_engine.analyst import ask
+
+    def on_event(msg: str) -> None:
+        if not args.quiet:
+            print(f"  · {msg}", file=sys.stderr)
+
+    try:
+        result = ask(
+            args.question, provider=args.provider, model=args.model, api_key=args.api_key, base_url=args.base_url,
+            max_steps=args.max_steps, on_event=on_event,
+        )
+    except (RuntimeError, ValueError, ImportError) as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    md = result.to_markdown()
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(md, encoding="utf-8")
+        print(f"\n  Report saved to {args.out}")
+        print(result.answer)
+    else:
+        print(md)
+
+
+def cmd_ingest(args: argparse.Namespace) -> None:
+    """Map + QA an arbitrary CSV/Excel export into a clean series with a report."""
+    from aquascope.ingest import ingest, write_outputs
+
+    client = model = None
+    if args.llm:
+        try:
+            from openai import OpenAI
+
+            from aquascope.ai_engine.analyst import resolve_llm
+
+            cfg = resolve_llm(args.provider, args.model, args.api_key)
+            client, model = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"]), cfg["model"]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM mapping unavailable (%s); using heuristics", exc)
+    try:
+        result = ingest(
+            args.file, variable=args.variable, date_column=args.date_column, value_column=args.value_column,
+            unit=args.unit, station=args.station, sheet=args.sheet, llm_client=client, llm_model=model,
+            description=args.describe or "",
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    m, q = result["mapping"], result["qa"]
+    print(f"  mapping  : {m['datetime_column']} + {m['value_column']} -> {m['variable']} [{m['unit']}] "
+          f"(x{m['to_si_factor']}, {m['method']}, confidence {m['confidence']:.0%})")
+    print(f"  values   : {q['n_values']:,} kept of {q['n_rows_in']:,} rows; {q['start']} -> {q['end']}; "
+          f"coverage {q['coverage_pct']}%")
+    print(f"  dropped  : {q['n_duplicates_dropped']} duplicates, {q['n_sentinels_dropped']} sentinels; "
+          f"flagged {q['n_negative']} negative, {q['n_spikes_flagged']} spikes")
+    for w in q["warnings"]:
+        print(f"  warning  : {w}")
+    stem = args.out or str(Path(args.file).with_suffix("")) + "_clean"
+    paths = write_outputs(result, stem)
+    print(f"  written  : {paths['csv']}, {paths['qa_md']}")
+
+
+def cmd_mcp(args: argparse.Namespace) -> None:
+    """Serve aquascope's tools over the Model Context Protocol (stdio by default)."""
+    try:
+        from aquascope.mcp_server import main as mcp_main
+    except ImportError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    mcp_main(transport=args.transport)
 
 
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
-
     print(shellcode(["aquascope"], shell=args.shell))
 
 
@@ -1135,52 +1191,31 @@ def cmd_agri_productivity(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    from aquascope.registry import source_keys
+    from aquascope.schemas.station import VARIABLES
+
     parser = argparse.ArgumentParser(
-        prog="aquascope",
-        description="AquaScope — Water data collection, analysis & AI research recommender",
+        description="AquaScope — Water data collection, analysis & AI research recomm..."
     )
     sub = parser.add_subparsers(dest="command")
 
-    # ── collect ──────────────────────────────────────────────────────
+    # — collect ——————————————————————————————
     p_collect = sub.add_parser("collect", help="Collect water data from an API source")
     p_collect.add_argument(
         "--source",
         required=True,
-        choices=[
-            "taiwan_moenv",
-            "taiwan_cwa",
-            "taiwan_wra_level",
-            "taiwan_wra_reservoir",
-            "taiwan_wra_fhy",
-            "taiwan_wra_iot",
-            "taiwan_datagov",
-            "usgs",
-            "sdg6",
-            "gemstat",
-            "aquastat",
-            "taiwan_civil_iot",
-            "wqp",
-            "openmeteo",
-            "copernicus",
-            "wapor",
-            "eu_wfd",
-            "hubeau_hydrometrie",
-            "japan_mlit",
-            "korea_wamis",
-            "grdc",
-            "camels_cl",
-            "camels_br",
-            "noaa_nwps",
-            "ireland_opw",
-            "pegelonline",
-            "uk_ea",
-            "bom",
-        ],
+        choices=source_keys(),
         help="Data source to collect from",
     )
     p_collect.add_argument("--api-key", default=None, help="API key (if required)")
     p_collect.add_argument(
         "--days", type=int, default=None, help="Number of days (USGS/UKEA/PEGELONLINE/BOM; PEGELONLINE max: 31)"
+    )
+    p_collect.add_argument(
+        "--parameter-type",
+        default=None,
+        help='BOM parameter type, e.g. "Water Course Discharge", "Water Course Level" (BOM). '
+        'Defaults to "Water Course Discharge".',
     )
     p_collect.add_argument("--max-stations", type=int, default=None, help="Cap stations to fetch (Ireland OPW)")
     p_collect.add_argument("--country", default="all", help="ISO3 country code or 'all' (AQUASTAT)")
@@ -1190,16 +1225,11 @@ def main() -> None:
     p_collect.add_argument("--station-wiski-id", default=None, help="Station Wiski ID (UKEA)")
     p_collect.add_argument("--observed-property", default=None, help="Observed property (UKEA)")
     p_collect.add_argument("--measure", default=None, help="Measure identifier (UKEA)")
-    p_collect.add_argument(
-        "--parameter-type",
-        default=None,
-        help='BOM parameter type, e.g. "Water Course Discharge", "Water Course Level" (BOM). Defaults to "Water Course Discharge".',
-    )
     p_collect.add_argument("--variables", default=None, help="Comma-separated variable IDs (AQUASTAT)")
     p_collect.add_argument(
-        "--bbox",
-        default=None,
-        help="Bounding box west,south,east,north (WaPOR), or min_lon, min_lat, max_lon, max_lat (USGS/UKEA)",
+      "--bbox",
+      default=None,
+      help="Bounding box west,south,east,north (WaPOR), or min_lon, min_lat, max_lon, max_lat (USGS/UKEA)"
     )
     p_collect.add_argument(
         "--mode", default=None, help="Collector mode (openmeteo: weather/forecast/flood; grdc: in_situ/satellite)"
@@ -1281,6 +1311,79 @@ def main() -> None:
 
     # ── list-sources ─────────────────────────────────────────────────
     sub.add_parser("list-sources", help="List all available data sources")
+
+    # ── stations ─────────────────────────────────────────────────────
+    p_stations = sub.add_parser("stations", help="Search station catalogs across sources")
+    p_stations.add_argument(
+        "--source",
+        action="append",
+        choices=source_keys(),
+        help="Source to search (repeatable). Default: every source with a station catalog",
+    )
+    p_stations.add_argument(
+        "--bbox", default=None,
+        help="Bounding box west,south,east,north (WGS84). Write --bbox=-77,38,-76,39 when it starts with a minus",
+    )
+    p_stations.add_argument(
+        "--variable",
+        default=None,
+        choices=list(VARIABLES),
+        help="Only stations measuring this variable",
+    )
+    p_stations.add_argument("--max-items", type=int, default=None, help="Cap per source")
+    p_stations.add_argument("--api-key", default=None, help="API key for sources that take one")
+    p_stations.add_argument("--format", choices=["json", "csv", "geojson"], default="geojson")
+    p_stations.add_argument("--output", "-o", default=None, help="Output path (default: data/stations_<sources>.<ext>)")
+
+    # ── harvest ──────────────────────────────────────────────────────
+    p_harvest = sub.add_parser("harvest", help="Harvest catalogs into GeoParquet for the open archive (#188)")
+    p_harvest.add_argument("what", choices=["stations", "obs"], help="stations: the catalog; obs: daily series")
+    p_harvest.add_argument("--out", default="archive", help="Output folder (default: ./archive)")
+    p_harvest.add_argument("--source", action="append", choices=source_keys(), help="Restrict to a source (repeatable)")
+    p_harvest.add_argument("--max-items", type=int, default=None, help="stations: cap per source (for smoke tests)")
+    p_harvest.add_argument("--variable", default=None, help="obs: variable to harvest (default per source)")
+    p_harvest.add_argument("--years", type=int, default=40, help="obs: how far back to ask (default 40)")
+    p_harvest.add_argument("--max-stations", type=int, default=100, help="obs: stations per source per run")
+    p_harvest.add_argument("--refresh-days", type=int, default=30, help="obs: re-harvest a station older than this")
+    p_harvest.add_argument("--station", action="append", help="obs: only these station ids (repeatable)")
+    p_harvest.add_argument("--sync-from", default=None, metavar="REPO_ID",
+                           help="obs: download the existing obs/ tree from this dataset first (incremental runs)")
+    p_harvest.add_argument("--api-key", default=None)
+    p_harvest.add_argument("--workers", type=int, default=4)
+    p_harvest.add_argument("--no-geojson", action="store_true", help="Skip stations.geojson")
+    p_harvest.add_argument("--publish", default=None, metavar="REPO_ID",
+                           help="Upload the folder to this Hugging Face dataset (needs HF_TOKEN)")
+
+    # ── ask ──────────────────────────────────────────────────────────
+    p_ask = sub.add_parser("ask", help="Ask a water question in plain language; get a cited answer from real data")
+    p_ask.add_argument("question")
+    p_ask.add_argument("--provider", choices=["openai", "groq", "huggingface", "ollama"], default=None)
+    p_ask.add_argument("--model", default=None)
+    p_ask.add_argument("--api-key", default=None)
+    p_ask.add_argument("--base-url", default=None, help="Any OpenAI-compatible endpoint")
+    p_ask.add_argument("--max-steps", type=int, default=8, help="Tool-call rounds allowed (default 8)")
+    p_ask.add_argument("--out", "-o", default=None, help="Save the Markdown report here")
+    p_ask.add_argument("--quiet", "-q", action="store_true", help="Do not print tool calls as they happen")
+
+    # ── ingest ───────────────────────────────────────────────────────
+    p_ingest = sub.add_parser("ingest", help="Map + QA any CSV/Excel export into a clean daily series with a report")
+    p_ingest.add_argument("file")
+    p_ingest.add_argument("--variable", default=None, choices=list(VARIABLES))
+    p_ingest.add_argument("--date-column", default=None)
+    p_ingest.add_argument("--value-column", default=None)
+    p_ingest.add_argument("--unit", default=None, help="Unit of the value column (cfs, m3/s, l/s, mm, cm, ft, in)")
+    p_ingest.add_argument("--station", default=None, help="Keep only this station id when the file holds several")
+    p_ingest.add_argument("--sheet", default=None, help="Excel sheet name or index")
+    p_ingest.add_argument("--describe", default=None, help="A sentence about the file (helps the LLM mapping)")
+    p_ingest.add_argument("--llm", action="store_true", help="Let a configured LLM propose the column mapping")
+    p_ingest.add_argument("--provider", choices=["openai", "groq", "huggingface", "ollama"], default=None)
+    p_ingest.add_argument("--model", default=None)
+    p_ingest.add_argument("--api-key", default=None)
+    p_ingest.add_argument("--out", "-o", default=None, help="Output stem (default: <file>_clean)")
+
+    # ── mcp ──────────────────────────────────────────────────────────
+    p_mcp = sub.add_parser("mcp", help="Serve find_stations / get_timeseries / analyze_station over MCP (#113)")
+    p_mcp.add_argument("--transport", choices=["stdio", "sse", "streamable-http"], default="stdio")
 
     # ── solve ─────────────────────────────────────────────────────────
     p_solve = sub.add_parser("solve", help="Solve a water challenge from a natural-language description")
@@ -1467,6 +1570,11 @@ def main() -> None:
         "run": cmd_run_pipeline,
         "list-methods": cmd_list_methods,
         "list-sources": cmd_list_sources,
+        "stations": cmd_stations,
+        "harvest": cmd_harvest,
+        "mcp": cmd_mcp,
+        "ask": cmd_ask,
+        "ingest": cmd_ingest,
         "solve": cmd_solve,
         "forecast": cmd_forecast,
         "plot": cmd_plot,

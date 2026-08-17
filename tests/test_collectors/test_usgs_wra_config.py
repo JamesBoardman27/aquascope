@@ -336,3 +336,76 @@ class TestUSGSCollectorKeyed:
         mock_get_json.assert_called_once()
         args, kwargs = mock_get_json.call_args
         assert args[0] == "collections/daily/items"
+
+
+class TestUSGSKeyedFiltersReachTheOGCPath:
+    """#160: with an API key the OGC path must filter, not crawl the nation."""
+
+    def test_station_parameter_and_area_filters_are_mapped(self):
+        from unittest.mock import MagicMock
+
+        from aquascope.collectors.usgs import USGSCollector
+
+        c = USGSCollector(api_key="a-real-key")
+        c.client = MagicMock()
+        c.client.get_json.return_value = {"features": [], "links": []}
+        c.fetch_raw(station_id="01646500", days=30, collection="daily", parameter="00060", max_items=None)
+        params = c.client.get_json.call_args.kwargs["params"]
+        assert params["monitoring_location_id"] == "USGS-01646500"
+        assert params["parameter_code"] == "00060" and params["api_key"] == "a-real-key"
+        assert c.client.get_json.call_args.args[0] == "collections/daily/items"
+
+        c.fetch_raw(collection="daily", days=1, stateCd="24", huc="02070008", countyCd="031",
+                    station_id=["01646500", "USGS-01646000"])
+        params = c.client.get_json.call_args.kwargs["params"]
+        assert params["monitoring_location_id"] == "USGS-01646500,USGS-01646000"
+        assert params["state_code"] == "24" and params["county_code"] == "031"
+        assert params["hydrologic_unit_code"] == "02070008"
+
+
+class TestUSGSOGCPagination:
+    def test_next_link_is_fetched_as_is_and_loops_are_guarded(self):
+        from unittest.mock import MagicMock
+
+        from aquascope.collectors.usgs import USGSCollector
+
+        c = USGSCollector(api_key="a-real-key")
+        c.client = MagicMock()
+        page1 = {"features": [{"a": 1}], "links": [{"rel": "next", "href": "https://x/items?cursor=abc&f=json"}]}
+        page2 = {"features": [{"a": 2}], "links": [{"rel": "next", "href": "https://x/items?cursor=abc&f=json"}]}
+        c.client.get_json.side_effect = [page1, page2, page2, page2]
+        out = c.fetch_raw(station_id="01646500", days=3, collection="daily", parameter="00060", max_items=None)
+        assert len(out) == 2  # page1 + page2; the repeated cursor stops the loop
+        second_call = c.client.get_json.call_args_list[1]
+        assert second_call.args[0] == "https://x/items?cursor=abc&f=json"
+        assert second_call.kwargs["params"] is None
+
+
+class TestUSGSAgencyPrefixedIds:
+    def test_keyed_path_keeps_other_agency_prefixes(self):
+        from unittest.mock import MagicMock
+
+        from aquascope.collectors.usgs import USGSCollector
+
+        c = USGSCollector(api_key="a-real-key")
+        c.client = MagicMock()
+        c.client.get_json.return_value = {"features": [], "links": []}
+        c.fetch_raw(station_id="CA574-09527500", days=3, collection="daily", parameter="00060", max_items=None)
+        assert c.client.get_json.call_args.kwargs["params"]["monitoring_location_id"] == "CA574-09527500"
+        c.fetch_raw(station_id="01646500", days=3, collection="daily", max_items=None)
+        assert c.client.get_json.call_args.kwargs["params"]["monitoring_location_id"] == "USGS-01646500"
+
+    def test_keyless_path_splits_agency_and_number(self):
+        from unittest.mock import MagicMock
+
+        from aquascope.collectors.usgs import USGSCollector
+
+        c = USGSCollector(api_key="DEMO_KEY")
+        c.client = MagicMock()
+        c.client.get_json.return_value = {"value": {"timeSeries": []}}
+        c.fetch_raw(station_id="CA574-09527500", days=3, collection="daily", parameter="00060", max_items=None)
+        params = c.client.get_json.call_args.kwargs["params"]
+        assert params["sites"] == "09527500" and params["agencyCd"] == "CA574"
+        c.fetch_raw(station_id="USGS-01646500", days=3, collection="daily", max_items=None)
+        params = c.client.get_json.call_args.kwargs["params"]
+        assert params["sites"] == "01646500" and "agencyCd" not in params

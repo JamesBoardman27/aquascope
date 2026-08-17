@@ -17,10 +17,11 @@ import logging
 import math
 import os
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from aquascope.collectors.base import BaseCollector
+from aquascope.schemas.station import Station
 from aquascope.schemas.water_data import (
     DataSource,
     GeoLocation,
@@ -53,6 +54,65 @@ PARAM_LABELS: dict[str, str] = {
 
 MILES2_TO_KM2 = 2.589988110336
 FT3S_TO_M3S = 0.028316846592
+
+# Registry variable -> USGS parameter codes advertised in time-series-metadata.
+STATION_VARIABLE_CODES: dict[str, tuple[str, ...]] = {
+    "discharge": ("00060",),
+    "water_level": ("00065",),
+    "water_quality": ("00010", "00095", "00300", "00400"),
+}
+
+# 50 states + DC + territories, as the NWIS site service's stateCd expects.
+NWIS_STATE_CODES: tuple[str, ...] = (
+    "al", "ak", "az", "ar", "ca", "co", "ct", "de", "dc", "fl", "ga", "hi", "id", "il", "in", "ia", "ks", "ky",
+    "la", "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh",
+    "ok", "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "pr", "vi", "gu",
+    "as", "mp",
+)
+
+
+def _parse_nwis_rdb_sites(text: str) -> list[tuple[str, str]]:
+    """Yield ``(site_no, station_nm)`` from an NWIS RDB site listing."""
+    out: list[tuple[str, str]] = []
+    header: list[str] | None = None
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        cols = line.split("\t")
+        if header is None:
+            header = cols
+            continue
+        if cols and cols[0].endswith("s") and cols[0][:-1].isdigit():  # the RDB dtype row, e.g. "5s\t15s\t50s"
+            continue
+        row = dict(zip(header, cols))
+        site_no, name = row.get("site_no", "").strip(), row.get("station_nm", "").strip()
+        if site_no and name:
+            out.append((site_no, name))
+    return out
+
+
+def _parse_ogc_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _min_date(current: date | None, value: str | None) -> date | None:
+    parsed = _parse_ogc_date(value)
+    if parsed is None:
+        return current
+    return parsed if current is None or parsed < current else current
+
+
+def _max_date(current: date | None, value: str | None) -> date | None:
+    parsed = _parse_ogc_date(value)
+    if parsed is None:
+        return current
+    return parsed if current is None or parsed > current else current
+
 
 class USGSCollector(BaseCollector):
     """
@@ -169,7 +229,21 @@ class USGSCollector(BaseCollector):
                 "format": "json",
             }
             if sites:
-                params["sites"] = sites
+                # Accept "01646500", "USGS-01646500" or another agency's "CA574-09527500":
+                # NWIS wants the bare number plus agencyCd for non-USGS sites.
+                site_str = ",".join(sites) if isinstance(sites, (list, tuple)) else str(sites)
+                numbers, agencies = [], set()
+                for part in site_str.split(","):
+                    part = part.strip()
+                    if "-" in part:
+                        agency, number = part.split("-", 1)
+                        agencies.add(agency.upper())
+                        numbers.append(number)
+                    elif part:
+                        numbers.append(part)
+                params["sites"] = ",".join(numbers)
+                if len(agencies) == 1 and next(iter(agencies)) != "USGS":
+                    params["agencyCd"] = next(iter(agencies))
             if parameter_cd:
                 params["parameterCd"] = parameter_cd
             if bbox_val:
@@ -251,15 +325,6 @@ class USGSCollector(BaseCollector):
 
             return all_features
 
-        if any([sites, parameter_cd, state_cd, county_cd, huc_val]) or (kwargs.get("bBox") and not bbox):
-            logger.warning(
-                "The USGS OGC (keyed) path does not accept filter parameters (station_id, stateCd, countyCd, or huc) "
-                "or queries based on parameter code (parameter). Any instances of the mentioned kwargs being passed "
-                "are ignored by the OGC path. To fetch data using these parameters, set your api key for USGS queries "
-                "to 'DEMO_KEY' explicitly or pass None to the USGSCollector constructor to fall back to the DEMO_KEY. "
-                "Note that the shared DEMO_KEY is heavily rate-limited and may fail under load."
-            )
-
         all_features: list[dict] = []
         params: dict[str, Any] = {
             "f": "json",
@@ -269,8 +334,24 @@ class USGSCollector(BaseCollector):
         }
         if bbox:
             params["bbox"] = bbox
+        elif kwargs.get("bBox"):
+            params["bbox"] = kwargs["bBox"]
+        # The OGC collections filter on their own property names (#160): map the
+        # legacy NWIS kwargs onto them instead of silently crawling the nation.
+        if sites:
+            site_list = [str(x).strip() for x in (sites if isinstance(sites, (list, tuple)) else str(sites).split(","))]
+            params["monitoring_location_id"] = ",".join(x if "-" in x else f"USGS-{x}" for x in site_list if x)
+        if parameter_cd:
+            params["parameter_code"] = parameter_cd
+        if state_cd:
+            params["state_code"] = state_cd
+        if county_cd:
+            params["county_code"] = county_cd
+        if huc_val:
+            params["hydrologic_unit_code"] = huc_val
 
         url = f"collections/{collection}/items"
+        seen_links: set[str] = set()
         while True:
             data = self.client.get_json(url, params=params)
             features = data.get("features", [])
@@ -286,13 +367,152 @@ class USGSCollector(BaseCollector):
                 (lnk["href"] for lnk in data.get("links", []) if lnk.get("rel") == "next"),
                 None,
             )
-            if not next_link or len(features) == 0:
+            if not next_link or len(features) == 0 or next_link in seen_links:
                 break
-            # next_link is absolute; switch to direct fetch
+            seen_links.add(next_link)
+            # next_link is absolute and already carries the cursor. params must be
+            # None, not {}: httpx rebuilds the query string from an empty dict and
+            # drops the cursor, which re-fetches page one from the disk cache
+            # forever (silent infinite loop, seen in the first CI harvest runs).
             url = next_link
-            params = {}
+            params = None
 
         return all_features
+
+    def stations(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        variable: str | None = None,
+        max_items: int | None = 20_000,
+    ) -> list[Station]:
+        """USGS monitoring locations with daily-value time series.
+
+        Built from the keyless OGC ``time-series-metadata`` collection (one
+        feature per daily series, with geometry, parameter code and period of
+        record), joined to ``monitoring-locations`` for names. Without a
+        ``bbox`` this walks the whole national network; keep ``max_items``
+        unless you mean it.
+        """
+        codes = STATION_VARIABLE_CODES.get(variable) if variable else None
+        if variable and not codes:
+            return []
+        params: dict[str, Any] = {"f": "json", "limit": 10_000, "computation_identifier": "Mean"}
+        if self.api_key and self.api_key != "DEMO_KEY":
+            params["api_key"] = self.api_key  # keyed calls are not throttled like the shared demo path
+        if bbox:
+            params["bbox"] = ",".join(str(v) for v in bbox)
+        if codes and len(codes) == 1:
+            params["parameter_code"] = codes[0]
+
+        series = self._paginate("collections/time-series-metadata/items", params, max_items)
+
+        by_site: dict[str, dict[str, Any]] = {}
+        for feat in series:
+            props = feat.get("properties", {})
+            site = props.get("monitoring_location_id")
+            code = props.get("parameter_code")
+            geom = feat.get("geometry") or {}
+            coords = geom.get("coordinates") or [None, None]
+            if not site or coords[0] is None or coords[1] is None:
+                continue
+            var = next((v for v, cs in STATION_VARIABLE_CODES.items() if code in cs), None)
+            if var is None or (codes and code not in codes):
+                continue
+            entry = by_site.setdefault(
+                site, {"lon": float(coords[0]), "lat": float(coords[1]), "vars": set(), "begin": None, "end": None}
+            )
+            entry["vars"].add(var)
+            entry["begin"] = _min_date(entry["begin"], props.get("begin"))
+            entry["end"] = _max_date(entry["end"], props.get("end"))
+
+        # Names come from monitoring-locations. That collection holds every
+        # site type nationwide (wells, springs, ...), so restrict it to
+        # streams for the hydrology variables and never let a rate-limited
+        # names pass sink the catalog: stations without names beat no stations.
+        names: dict[str, str] = {}
+        if by_site:
+            loc_params: dict[str, Any] = {"f": "json", "limit": 10_000}
+            if "api_key" in params:
+                loc_params["api_key"] = params["api_key"]
+            if bbox:
+                loc_params["bbox"] = params["bbox"]
+            if variable in (None, "discharge", "water_level"):
+                loc_params["site_type_code"] = "ST"
+            try:
+                for feat in self._paginate("collections/monitoring-locations/items", loc_params, max_items):
+                    props = feat.get("properties", {})
+                    if props.get("id") in by_site:
+                        names[props["id"]] = props.get("monitoring_location_name")
+            except RuntimeError as exc:
+                logger.warning("USGS monitoring-locations lookup failed (%s); trying the NWIS site service.", exc)
+                try:
+                    names = self._nwis_site_names(bbox, wanted=set(by_site))
+                except Exception as exc2:  # noqa: BLE001 - names are nice to have, not required
+                    logger.warning("NWIS site service lookup failed too (%s); returning stations without names.", exc2)
+
+        stations: list[Station] = []
+        for site, entry in by_site.items():
+            number = site.split("-", 1)[-1]
+            stations.append(
+                Station(
+                    source="usgs",
+                    station_id=site,
+                    name=names.get(site),
+                    latitude=entry["lat"],
+                    longitude=entry["lon"],
+                    variables=tuple(sorted(entry["vars"])),
+                    period_start=entry["begin"],
+                    period_end=entry["end"],
+                    url=f"https://waterdata.usgs.gov/monitoring-location/{number}/",
+                    country="USA",
+                )
+            )
+        stations.sort(key=lambda s: s.station_id)
+        return stations
+
+    def _nwis_site_names(
+        self, bbox: tuple[float, float, float, float] | None, *, wanted: set[str] | None = None
+    ) -> dict[str, str]:
+        """Station names from the keyless NWIS site service (RDB), as a fallback.
+
+        One request for a ``bbox``; otherwise one per state/territory (~56
+        requests of ~50 KB). Only stream sites with daily values are asked for.
+        """
+        names: dict[str, str] = {}
+        base = "https://waterservices.usgs.gov/nwis/site/"
+        common = {"format": "rdb", "siteType": "ST", "siteStatus": "all", "hasDataTypeCd": "dv"}
+        if bbox:
+            queries = [{**common, "bBox": ",".join(f"{v:.6f}" for v in bbox)}]
+        else:
+            queries = [{**common, "stateCd": st} for st in NWIS_STATE_CODES]
+        for params in queries:
+            try:
+                text = self.client.get_text(base, params=params)
+            except RuntimeError as exc:
+                logger.debug("NWIS site query %s failed: %s", params.get("stateCd") or "bbox", exc)
+                continue
+            for site_no, name in _parse_nwis_rdb_sites(text):
+                key = f"USGS-{site_no}"
+                if wanted is None or key in wanted:
+                    names[key] = name
+        return names
+
+    def _paginate(self, path: str, params: dict[str, Any], max_items: int | None) -> list[dict]:
+        """Follow OGC ``next`` links, capping at ``max_items`` features."""
+        features: list[dict] = []
+        url: str = path
+        page_params: dict[str, Any] | None = params
+        while True:
+            data = self.client.get_json(url, params=page_params)
+            page = data.get("features", [])
+            features.extend(page)
+            if max_items is not None and len(features) >= max_items:
+                return features[:max_items]
+            next_link = next((lnk["href"] for lnk in data.get("links", []) if lnk.get("rel") == "next"), None)
+            if not next_link or not page:
+                return features
+            url, page_params = next_link, None
 
     def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample | StreamflowReading]:
         samples: Sequence[WaterQualitySample | StreamflowReading] = []
@@ -364,6 +584,12 @@ class USGSCollector(BaseCollector):
         if not location_id.startswith("USGS-"):
             location_id = f"USGS-{location_id}"
 
+        # One lookup per station per collector instance: a long daily record
+        # would otherwise re-ask (and, when throttled, re-fail) once per row.
+        cache = self.__dict__.setdefault("_area_cache", {})
+        if location_id in cache:
+            return cache[location_id]
+
         try:
             feature = self.client.get_json(
                 f"collections/monitoring-locations/items/{location_id}",
@@ -373,6 +599,7 @@ class USGSCollector(BaseCollector):
             logger.warning(
                 f"Cannot obtain metadata for station {location_id} - catchment area data is unavailable."
             )
+            cache[location_id] = None
             return None
 
         area = feature.get("properties", {}).get("drainage_area", None)
@@ -380,6 +607,7 @@ class USGSCollector(BaseCollector):
             logger.warning(
                 f"Metadata for station {location_id} does not contain catchment area data."
             )
+            cache[location_id] = None
             return None
 
         sig_figs = USGSCollector._count_sig_figs(area)
@@ -387,6 +615,7 @@ class USGSCollector(BaseCollector):
             sig_figs = 3  # default to 3 significant figures if unable to determine
         area_km2 = float(area) * MILES2_TO_KM2
         rounded_catchment_area = USGSCollector._round_to_sig_figs(area_km2, sig_figs)
+        cache[location_id] = rounded_catchment_area
 
         return rounded_catchment_area
 

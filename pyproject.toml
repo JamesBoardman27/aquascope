@@ -94,8 +94,16 @@ interop = [
     "geopandas>=0.14",
     "shapely>=2.0",
 ]
+archive = [
+    "pyarrow>=14",
+    "huggingface_hub>=0.20",
+]
+mcp = [
+    "mcp>=1.2",
+    "pyarrow>=14",
+]
 all = [
-    "aquascope[ml,forecast,copernicus,viz,llm,scientific,dashboard,spatial,interop]",
+    "aquascope[ml,forecast,copernicus,viz,llm,scientific,dashboard,spatial,interop,archive,mcp]",
 ]
 dev = [
     "pytest>=7.0",
@@ -107,6 +115,8 @@ dev = [
 ]
 test = [
     "aquascope[dev]",
+    "pyarrow>=14",
+    "mcp>=1.2",
     "matplotlib>=3.7",
     "seaborn>=0.13",
     "folium>=0.15",

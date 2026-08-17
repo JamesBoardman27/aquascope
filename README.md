@@ -38,6 +38,17 @@ AquaScope unifies **29 global water-data sources** behind one Python schema, the
 
 ---
 
+## 🌍 Try it without installing anything
+
+**[AquaScope Explorer](https://rekin226-aquascope-explorer.static.hf.space/)**: every public gauge we can reach on one map
+(45,919 stations from USGS, UK EA, Hub'Eau, PEGELONLINE, Ireland OPW and Taiwan CWA). Click one and get the observed record,
+flood frequency with confidence limits, flow duration and trend, computed in your browser by aquascope on Pyodide.
+The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
+
+Prefer an assistant? `pip install "aquascope[mcp]"` then `claude mcp add aquascope -- aquascope mcp` gives Claude (or any
+MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_frequency` over the same catalog and methods
+([docs](docs/mcp.md)).
+
 ## ✨ What you can do
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
@@ -127,7 +138,13 @@ print(sig.flashiness_index)    # Richards-Baker flashiness index
 ### 3. Collect data from any of the 29 sources
 
 ```python
+from aquascope import find_stations
 from aquascope.collectors import USGSCollector, AquastatCollector, WaPORCollector
+
+# Which gauges measure discharge around Greater London? (USGS, UK EA, Hub'Eau,
+# PEGELONLINE, Ireland OPW and Taiwan CWA expose station catalogs; more coming)
+gauges = find_stations(bbox=(-0.5, 51.3, 0.3, 51.7), variable="discharge")
+print(gauges[0].name, gauges[0].url)
 
 usgs = USGSCollector()   # pass api_key=... for reliable access
 flow = usgs.collect(days=7, bbox="-77.6,38.7,-76.9,39.1")   # Potomac basin, last week
@@ -240,10 +257,15 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 20-command CLI for the most common workflows:
+AquaScope ships a 25-command CLI for the most common workflows:
 
 ```bash
-# Collect data
+# Find stations, then collect data
+aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
+aquascope harvest stations --out archive          # the open gauge catalog (GeoParquet)
+aquascope mcp                                     # serve the same tools to Claude / Cursor over MCP
+aquascope ask "100-year flood of the Seine at Paris?"   # the analyst: tools + a cited Markdown report
+aquascope ingest agency_export.csv --unit cfs     # any CSV/Excel -> clean daily series + QA report
 aquascope collect --source usgs --days 365
 aquascope collect --source wapor --bbox 30.5,29.8,31.1,30.2 --variable RET --start-date 2026-04-01
 
@@ -369,6 +391,7 @@ Thanks to these wonderful people who make AquaScope possible ([emoji key](CONTRI
       <td align="center" valign="top" width="20%"><a href="https://github.com/aobaruwa"><img src="https://avatars.githubusercontent.com/u/28014016?v=4?s=100" width="100px;" alt="Ahmed Baruwa"/><br /><sub><b>Ahmed Baruwa</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=aobaruwa" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=aobaruwa" title="Tests">⚠️</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/AB1775"><img src="https://avatars.githubusercontent.com/u/66264218?v=4?s=100" width="100px;" alt="Anthony"/><br /><sub><b>Anthony</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=AB1775" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=AB1775" title="Tests">⚠️</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/JamesBoardman27"><img src="https://avatars.githubusercontent.com/u/77696811?v=4?s=100" width="100px;" alt="James Boardman"/><br /><sub><b>James Boardman</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=JamesBoardman27" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=JamesBoardman27" title="Tests">⚠️</a> <a href="https://github.com/Rekin226/aquascope/commits?author=JamesBoardman27" title="Documentation">📖</a> <a href="https://github.com/Rekin226/aquascope/issues?q=author%3AJamesBoardman27" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="20%"><a href="https://github.com/khyahahati"><img src="https://avatars.githubusercontent.com/u/132439126?v=4?s=100" width="100px;" alt="Khyati Tiwari"/><br /><sub><b>Khyati Tiwari</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=khyahahati" title="Code">💻</a> <a href="#data-khyahahati" title="Data">🔣</a></td>
     </tr>
   </tbody>
 </table>

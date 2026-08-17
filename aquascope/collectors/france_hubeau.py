@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from aquascope.collectors.base import BaseCollector
+from aquascope.schemas.station import Station, in_bbox
 from aquascope.schemas.water_data import (
     DataSource,
     GeoLocation,
@@ -46,6 +47,29 @@ GRANDEUR_UNITS: dict[str, str] = {
 
 _LS_PER_M3S = 1_000  # divide L/s by this to get m³/s (avoids 0.001 float rounding)
 _MM_PER_M = 1_000  # divide mm by this to get m (Hub'Eau serves water level in mm)
+
+# Hub'Eau's elaborated ("obs_elab") grandeurs: daily and monthly statistics with
+# multi-decade history, unlike observations_tr (real-time, last month only).
+# Values keep the observations_tr units (Q in L/s, H in mm).
+ELABORATED_GRANDEURS: dict[str, tuple[str, str]] = {
+    "QmnJ": ("Q", "daily mean discharge"),
+    "QmM": ("Q", "monthly mean discharge"),
+    "QIXnJ": ("Q", "daily maximum instantaneous discharge"),
+    "QINnJ": ("Q", "daily minimum instantaneous discharge"),
+    "QixM": ("Q", "monthly maximum instantaneous discharge"),
+    "QINM": ("Q", "monthly minimum instantaneous discharge"),
+    "HIXnJ": ("H", "daily maximum instantaneous level"),
+    "HIXM": ("H", "monthly maximum instantaneous level"),
+}
+
+def _parse_hubeau_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
 
 class HubeauHydrometrieCollector(BaseCollector):
     """
@@ -75,6 +99,71 @@ class HubeauHydrometrieCollector(BaseCollector):
         )
         self.api_key = api_key
 
+    def stations(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        variable: str | None = None,
+        max_items: int | None = None,
+    ) -> list[Station]:
+        """Hub'Eau ``referentiel/stations``: every hydrometric station in service.
+
+        Hub'Eau's referentiel does not say which grandeur (H or Q) a station
+        reports, so ``variables`` is ``("water_level", "discharge")`` for all;
+        the observation endpoints answer that per station. ``bbox`` goes to
+        the API and is re-checked client side.
+        """
+        if variable and variable not in ("water_level", "discharge"):
+            return []
+        params: dict[str, Any] = {
+            "format": "json",
+            "size": 10_000,
+            "en_service": "true",
+            "fields": ",".join(
+                [
+                    "code_station", "libelle_station", "code_site", "libelle_site", "type_station",
+                    "longitude_station", "latitude_station", "libelle_cours_eau", "code_cours_eau",
+                    "date_ouverture_station", "date_fermeture_station", "en_service",
+                ]
+            ),
+        }
+        if bbox:
+            params["bbox"] = ",".join(str(v) for v in bbox)
+        stations: list[Station] = []
+        url: str | None = "referentiel/stations"
+        while url:
+            data = self.client.get_json(url, params=params if url == "referentiel/stations" else None)
+            for rec in data.get("data", []):
+                lat, lon = rec.get("latitude_station"), rec.get("longitude_station")
+                code = rec.get("code_station")
+                if not code or lat is None or lon is None:
+                    continue
+                lat, lon = float(lat), float(lon)
+                if not in_bbox(lat, lon, bbox):
+                    continue
+                stations.append(
+                    Station(
+                        source="hubeau_hydrometrie",
+                        station_id=str(code),
+                        name=rec.get("libelle_station") or rec.get("libelle_site"),
+                        latitude=lat,
+                        longitude=lon,
+                        variables=("discharge", "water_level"),
+                        period_start=_parse_hubeau_date(rec.get("date_ouverture_station")),
+                        period_end=_parse_hubeau_date(rec.get("date_fermeture_station")),
+                        url=f"https://www.hydro.eaufrance.fr/sitehydro/{rec.get('code_site')}/fiche"
+                        if rec.get("code_site")
+                        else None,
+                        river=rec.get("libelle_cours_eau"),
+                        country="FRA",
+                        extra={k: rec[k] for k in ("code_site", "type_station") if rec.get(k) is not None},
+                    )
+                )
+                if max_items is not None and len(stations) >= max_items:
+                    return stations
+            url = data.get("next") or None
+        return stations
+
     def fetch_raw(
         self,
         code_station: str | None = None,
@@ -84,13 +173,21 @@ class HubeauHydrometrieCollector(BaseCollector):
         days: int | None = None,
         size: int = 1000,
         max_items: int | None = 5_000,
+        elaborated: str | None = None,
         **kwargs,
     ) -> list[dict]:
         """
-        Fetch real-time observations from Hub'Eau's ``observations_tr``.
+        Fetch observations from Hub'Eau: real-time ``observations_tr`` (default)
+        or the long elaborated series ``obs_elab`` when ``elaborated`` is set.
 
         Parameters
         ----------
+        elaborated : str, optional
+            An elaborated grandeur code (see ``ELABORATED_GRANDEURS``), e.g.
+            ``"QmnJ"`` for daily mean discharge with multi-decade history.
+            When set, the request goes to ``/obs_elab``; ``grandeur_hydro`` is
+            ignored and ``date_debut_obs`` / ``date_fin_obs`` (or ``days``) bound
+            ``date_obs_elab``.
         code_station : str, optional
             Hydrometric station code (e.g. "K002000101"). Sent to the
             API as ``code_entite``. Without this (or a date/grandeur filter),
@@ -117,15 +214,25 @@ class HubeauHydrometrieCollector(BaseCollector):
         params: dict[str, Any] = {"format": "json", "size": min(size, 20_000)}
         if code_station:
             params["code_entite"] = code_station
-        if grandeur_hydro:
-            params["grandeur_hydro"] = grandeur_hydro
-        if date_debut_obs:
-            params["date_debut_obs"] = date_debut_obs
-        if date_fin_obs:
-            params["date_fin_obs"] = date_fin_obs
+        if elaborated:
+            if elaborated not in ELABORATED_GRANDEURS:
+                raise ValueError(f"Unknown elaborated grandeur {elaborated!r}; choose from {list(ELABORATED_GRANDEURS)}")
+            params["grandeur_hydro_elab"] = elaborated
+            if date_debut_obs:
+                params["date_debut_obs_elab"] = date_debut_obs[:10]
+            if date_fin_obs:
+                params["date_fin_obs_elab"] = date_fin_obs[:10]
+            url = "/obs_elab"
+        else:
+            if grandeur_hydro:
+                params["grandeur_hydro"] = grandeur_hydro
+            if date_debut_obs:
+                params["date_debut_obs"] = date_debut_obs
+            if date_fin_obs:
+                params["date_fin_obs"] = date_fin_obs
+            url = "/observations_tr"
         params.update(kwargs)
 
-        url = "/observations_tr"
         while True:
             resp = self.client.get_json(url, params=params)
             rows = resp.get("data", [])
@@ -155,6 +262,10 @@ class HubeauHydrometrieCollector(BaseCollector):
         # them in a single batched call: Hub'Eau serves the entire hydrometric
         # site referentiel in one page (size=10000), so one call covers every
         # requested site. No referentiel call is made unless a Q row needs it.
+        # obs_elab rows carry grandeur_hydro_elab / date_obs_elab / resultat_obs_elab.
+        # Fold them into the observations_tr shape so one loop handles both.
+        raw = [self._elaborated_to_tr(row) if "grandeur_hydro_elab" in row else row for row in raw]
+
         discharge_sites = {
             row.get("code_site")
             for row in raw
@@ -249,6 +360,21 @@ class HubeauHydrometrieCollector(BaseCollector):
             )
         return samples
 
+
+    @staticmethod
+    def _elaborated_to_tr(row: dict) -> dict:
+        """Map an ``obs_elab`` row onto the ``observations_tr`` field names."""
+        code = row.get("grandeur_hydro_elab", "")
+        base, _ = ELABORATED_GRANDEURS.get(code, (code, ""))
+        date_str = str(row.get("date_obs_elab") or "")
+        if len(date_str) == 10:  # daily/monthly stats come as bare dates
+            date_str = f"{date_str}T00:00:00Z"
+        out = dict(row)
+        out.setdefault("grandeur_hydro", base)
+        out.setdefault("date_obs", date_str)
+        out.setdefault("resultat_obs", row.get("resultat_obs_elab"))
+        out["elaborated"] = code
+        return out
 
     def _get_catchment_areas(self, site_codes: set[str]) -> dict[str, float | None]:
         """
