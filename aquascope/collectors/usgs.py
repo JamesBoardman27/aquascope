@@ -17,10 +17,11 @@ import logging
 import math
 import os
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from aquascope.collectors.base import BaseCollector
+from aquascope.schemas.station import Station
 from aquascope.schemas.water_data import (
     DataSource,
     GeoLocation,
@@ -53,6 +54,36 @@ PARAM_LABELS: dict[str, str] = {
 
 MILES2_TO_KM2 = 2.589988110336
 FT3S_TO_M3S = 0.028316846592
+
+# Registry variable -> USGS parameter codes advertised in time-series-metadata.
+STATION_VARIABLE_CODES: dict[str, tuple[str, ...]] = {
+    "discharge": ("00060",),
+    "water_level": ("00065",),
+    "water_quality": ("00010", "00095", "00300", "00400"),
+}
+
+def _parse_ogc_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _min_date(current: date | None, value: str | None) -> date | None:
+    parsed = _parse_ogc_date(value)
+    if parsed is None:
+        return current
+    return parsed if current is None or parsed < current else current
+
+
+def _max_date(current: date | None, value: str | None) -> date | None:
+    parsed = _parse_ogc_date(value)
+    if parsed is None:
+        return current
+    return parsed if current is None or parsed > current else current
+
 
 class USGSCollector(BaseCollector):
     """
@@ -293,6 +324,97 @@ class USGSCollector(BaseCollector):
             params = {}
 
         return all_features
+
+    def stations(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        variable: str | None = None,
+        max_items: int | None = 20_000,
+    ) -> list[Station]:
+        """USGS monitoring locations with daily-value time series.
+
+        Built from the keyless OGC ``time-series-metadata`` collection (one
+        feature per daily series, with geometry, parameter code and period of
+        record), joined to ``monitoring-locations`` for names. Without a
+        ``bbox`` this walks the whole national network; keep ``max_items``
+        unless you mean it.
+        """
+        codes = STATION_VARIABLE_CODES.get(variable) if variable else None
+        if variable and not codes:
+            return []
+        params: dict[str, Any] = {"f": "json", "limit": 10_000, "computation_identifier": "Mean"}
+        if bbox:
+            params["bbox"] = ",".join(str(v) for v in bbox)
+        if codes and len(codes) == 1:
+            params["parameter_code"] = codes[0]
+
+        series = self._paginate("collections/time-series-metadata/items", params, max_items)
+
+        by_site: dict[str, dict[str, Any]] = {}
+        for feat in series:
+            props = feat.get("properties", {})
+            site = props.get("monitoring_location_id")
+            code = props.get("parameter_code")
+            geom = feat.get("geometry") or {}
+            coords = geom.get("coordinates") or [None, None]
+            if not site or coords[0] is None or coords[1] is None:
+                continue
+            var = next((v for v, cs in STATION_VARIABLE_CODES.items() if code in cs), None)
+            if var is None or (codes and code not in codes):
+                continue
+            entry = by_site.setdefault(
+                site, {"lon": float(coords[0]), "lat": float(coords[1]), "vars": set(), "begin": None, "end": None}
+            )
+            entry["vars"].add(var)
+            entry["begin"] = _min_date(entry["begin"], props.get("begin"))
+            entry["end"] = _max_date(entry["end"], props.get("end"))
+
+        names: dict[str, str] = {}
+        if by_site:
+            loc_params: dict[str, Any] = {"f": "json", "limit": 10_000}
+            if bbox:
+                loc_params["bbox"] = params["bbox"]
+            for feat in self._paginate("collections/monitoring-locations/items", loc_params, max_items):
+                props = feat.get("properties", {})
+                if props.get("id") in by_site:
+                    names[props["id"]] = props.get("monitoring_location_name")
+
+        stations: list[Station] = []
+        for site, entry in by_site.items():
+            number = site.split("-", 1)[-1]
+            stations.append(
+                Station(
+                    source="usgs",
+                    station_id=site,
+                    name=names.get(site),
+                    latitude=entry["lat"],
+                    longitude=entry["lon"],
+                    variables=tuple(sorted(entry["vars"])),
+                    period_start=entry["begin"],
+                    period_end=entry["end"],
+                    url=f"https://waterdata.usgs.gov/monitoring-location/{number}/",
+                    country="USA",
+                )
+            )
+        stations.sort(key=lambda s: s.station_id)
+        return stations
+
+    def _paginate(self, path: str, params: dict[str, Any], max_items: int | None) -> list[dict]:
+        """Follow OGC ``next`` links, capping at ``max_items`` features."""
+        features: list[dict] = []
+        url: str = path
+        page_params: dict[str, Any] | None = params
+        while True:
+            data = self.client.get_json(url, params=page_params)
+            page = data.get("features", [])
+            features.extend(page)
+            if max_items is not None and len(features) >= max_items:
+                return features[:max_items]
+            next_link = next((lnk["href"] for lnk in data.get("links", []) if lnk.get("rel") == "next"), None)
+            if not next_link or not page:
+                return features
+            url, page_params = next_link, None
 
     def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample | StreamflowReading]:
         samples: Sequence[WaterQualitySample | StreamflowReading] = []

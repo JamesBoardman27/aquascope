@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from aquascope.collectors.base import BaseCollector
+from aquascope.schemas.station import Station, in_bbox
 from aquascope.schemas.water_data import (
     DataSource,
     GeoLocation,
@@ -46,6 +47,15 @@ GRANDEUR_UNITS: dict[str, str] = {
 
 _LS_PER_M3S = 1_000  # divide L/s by this to get m³/s (avoids 0.001 float rounding)
 _MM_PER_M = 1_000  # divide mm by this to get m (Hub'Eau serves water level in mm)
+
+def _parse_hubeau_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
 
 class HubeauHydrometrieCollector(BaseCollector):
     """
@@ -74,6 +84,71 @@ class HubeauHydrometrieCollector(BaseCollector):
             )
         )
         self.api_key = api_key
+
+    def stations(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        variable: str | None = None,
+        max_items: int | None = None,
+    ) -> list[Station]:
+        """Hub'Eau ``referentiel/stations``: every hydrometric station in service.
+
+        Hub'Eau's referentiel does not say which grandeur (H or Q) a station
+        reports, so ``variables`` is ``("water_level", "discharge")`` for all;
+        the observation endpoints answer that per station. ``bbox`` goes to
+        the API and is re-checked client side.
+        """
+        if variable and variable not in ("water_level", "discharge"):
+            return []
+        params: dict[str, Any] = {
+            "format": "json",
+            "size": 10_000,
+            "en_service": "true",
+            "fields": ",".join(
+                [
+                    "code_station", "libelle_station", "code_site", "libelle_site", "type_station",
+                    "longitude_station", "latitude_station", "libelle_cours_eau", "code_cours_eau",
+                    "date_ouverture_station", "date_fermeture_station", "en_service",
+                ]
+            ),
+        }
+        if bbox:
+            params["bbox"] = ",".join(str(v) for v in bbox)
+        stations: list[Station] = []
+        url: str | None = "referentiel/stations"
+        while url:
+            data = self.client.get_json(url, params=params if url == "referentiel/stations" else None)
+            for rec in data.get("data", []):
+                lat, lon = rec.get("latitude_station"), rec.get("longitude_station")
+                code = rec.get("code_station")
+                if not code or lat is None or lon is None:
+                    continue
+                lat, lon = float(lat), float(lon)
+                if not in_bbox(lat, lon, bbox):
+                    continue
+                stations.append(
+                    Station(
+                        source="hubeau_hydrometrie",
+                        station_id=str(code),
+                        name=rec.get("libelle_station") or rec.get("libelle_site"),
+                        latitude=lat,
+                        longitude=lon,
+                        variables=("discharge", "water_level"),
+                        period_start=_parse_hubeau_date(rec.get("date_ouverture_station")),
+                        period_end=_parse_hubeau_date(rec.get("date_fermeture_station")),
+                        url=f"https://www.hydro.eaufrance.fr/sitehydro/{rec.get('code_site')}/fiche"
+                        if rec.get("code_site")
+                        else None,
+                        river=rec.get("libelle_cours_eau"),
+                        country="FRA",
+                        extra={k: rec[k] for k in ("code_site", "type_station") if rec.get(k) is not None},
+                    )
+                )
+                if max_items is not None and len(stations) >= max_items:
+                    return stations
+            url = data.get("next") or None
+        return stations
 
     def fetch_raw(
         self,
