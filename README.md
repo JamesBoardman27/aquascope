@@ -393,6 +393,9 @@ Thanks to these wonderful people who make AquaScope possible ([emoji key](CONTRI
       <td align="center" valign="top" width="20%"><a href="https://github.com/JamesBoardman27"><img src="https://avatars.githubusercontent.com/u/77696811?v=4?s=100" width="100px;" alt="James Boardman"/><br /><sub><b>James Boardman</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=JamesBoardman27" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=JamesBoardman27" title="Tests">⚠️</a> <a href="https://github.com/Rekin226/aquascope/commits?author=JamesBoardman27" title="Documentation">📖</a> <a href="https://github.com/Rekin226/aquascope/issues?q=author%3AJamesBoardman27" title="Bug reports">🐛</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/khyahahati"><img src="https://avatars.githubusercontent.com/u/132439126?v=4?s=100" width="100px;" alt="Khyati Tiwari"/><br /><sub><b>Khyati Tiwari</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=khyahahati" title="Code">💻</a> <a href="#data-khyahahati" title="Data">🔣</a></td>
     </tr>
+    <tr>
+      <td align="center" valign="top" width="20%"><a href="https://github.com/Prakshal0809"><img src="https://avatars.githubusercontent.com/u/116380035?v=4?s=100" width="100px;" alt="PRAKSHAL BHAVINKUMAR BHANDARI"/><br /><sub><b>PRAKSHAL BHAVINKUMAR BHANDARI</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=Prakshal0809" title="Documentation">📖</a></td>
+    </tr>
   </tbody>
 </table>
 
