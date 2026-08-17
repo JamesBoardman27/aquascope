@@ -1,0 +1,73 @@
+"""Assemble the static Explorer site: explorer/ files + the aquascope wheel + wheels.json.
+
+Usage::
+
+    python explorer/build.py --out dist-explorer [--wheel dist/aquascope-X.Y.Z-py3-none-any.whl] [--build <token>]
+
+Builds the wheel with ``python -m build`` when ``--wheel`` is not given,
+replaces every ``__BUILD__`` placeholder with the build token (git short sha
+by default) so browsers never serve a stale app.js after a deploy, and writes
+``wheels.json`` for the worker. Pure standard library; runs in CI and locally.
+"""
+
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "explorer"
+TEXT_FILES = ("index.html", "app.js", "worker.js", "config.js", "style.css", "analysis.py")
+
+
+def _git_sha() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()
+    except Exception:  # noqa: BLE001
+        return "dev"
+
+
+def build_wheel() -> Path:
+    dist = ROOT / "dist"
+    for old in glob.glob(str(dist / "aquascope-*.whl")):
+        os.remove(old)
+    subprocess.check_call([sys.executable, "-m", "build", "--wheel", "-o", str(dist)], cwd=ROOT)
+    wheels = sorted(dist.glob("aquascope-*.whl"))
+    if not wheels:
+        raise SystemExit("wheel build produced nothing")
+    return wheels[-1]
+
+
+def assemble(out: Path, wheel: Path, build: str, space_readme: bool = True) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    for name in TEXT_FILES:
+        text = (SRC / name).read_text(encoding="utf-8").replace("__BUILD__", build)
+        (out / name).write_text(text, encoding="utf-8")
+    shutil.copy2(wheel, out / wheel.name)
+    (out / "wheels.json").write_text(json.dumps({"wheel": wheel.name, "build": build}), encoding="utf-8")
+    if space_readme:
+        shutil.copy2(SRC / "SPACE_README.md", out / "README.md")
+    (out / ".nojekyll").write_text("", encoding="utf-8")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    ap.add_argument("--out", default="dist-explorer")
+    ap.add_argument("--wheel", default=None, help="Existing wheel to ship (default: build one)")
+    ap.add_argument("--build", default=None, help="Cache-busting token (default: git short sha)")
+    ap.add_argument("--no-space-readme", action="store_true", help="Skip the Hugging Face Space README")
+    args = ap.parse_args()
+    wheel = Path(args.wheel) if args.wheel else build_wheel()
+    build = args.build or _git_sha()
+    assemble(Path(args.out), wheel, build, space_readme=not args.no_space_readme)
+    print(f"explorer assembled in {args.out} (wheel {wheel.name}, build {build})")
+
+
+if __name__ == "__main__":
+    main()

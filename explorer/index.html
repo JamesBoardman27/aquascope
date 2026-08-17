@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AquaScope Explorer: click any gauge on Earth</title>
+  <meta name="description" content="Every public water gauge AquaScope can reach, on one map. Click a station for the observed record, flood frequency, flow duration and trend, computed in your browser." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌊</text></svg>" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="./style.css?v=__BUILD__" />
+</head>
+<body>
+  <header id="top">
+    <div class="brand">
+      <span class="logo">🌊</span>
+      <div>
+        <h1>AquaScope Explorer</h1>
+        <p class="tagline">Every public gauge we can reach, on one map. Click one. Nothing to install.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search station name or id…" autocomplete="off" />
+      <div id="search-results" class="search-results" hidden></div>
+      <div id="legend" class="legend" title="Toggle sources"></div>
+      <span id="count" class="count">loading catalog…</span>
+    </div>
+  </header>
+
+  <main>
+    <div id="map" role="application" aria-label="World map of water gauges"></div>
+
+    <aside id="panel" class="panel" aria-live="polite">
+      <div id="panel-empty" class="panel-empty">
+        <h2>Pick a gauge</h2>
+        <p>Click any dot on the map, or search by name. You get the observed record straight from the agency,
+        plus flood frequency, flow duration and trend, computed here in your browser by
+        <a href="https://github.com/Rekin226/aquascope" target="_blank" rel="noopener">aquascope</a>.</p>
+        <p class="muted">Catalog: <a id="dataset-link" href="https://huggingface.co/datasets/Rekin226/aquascope-gauges" target="_blank" rel="noopener">Rekin226/aquascope-gauges</a> (GeoParquet, updated weekly).</p>
+        <details class="tips">
+          <summary>What works today</summary>
+          <ul>
+            <li><strong>USGS</strong> and <strong>UK EA</strong>: full daily records (decades) → flood frequency with 90 % CI, FDC, trend.</li>
+            <li><strong>Hub'Eau</strong>, <strong>PEGELONLINE</strong>, <strong>Ireland OPW</strong>: the last ~month (agency real-time feeds) → hydrograph.</li>
+            <li><strong>Taiwan CWA</strong>: daily rainfall, full record.</li>
+            <li>First analysis loads Python in your browser (about 15 MB, once). After that it is quick.</li>
+          </ul>
+        </details>
+      </div>
+
+      <div id="panel-station" hidden>
+        <div class="station-head">
+          <span id="st-source" class="badge"></span>
+          <h2 id="st-name">Station</h2>
+          <div class="st-meta">
+            <span id="st-id"></span> · <span id="st-vars"></span>
+            <span id="st-period"></span>
+          </div>
+          <div class="st-actions">
+            <a id="st-agency" href="#" target="_blank" rel="noopener" class="btn">Agency page ↗</a>
+            <button id="btn-share" class="btn" title="Copy a link to this station">Copy link</button>
+            <button id="btn-csv" class="btn" disabled>Download CSV</button>
+          </div>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <section id="sec-summary" hidden>
+          <div class="kpis" id="kpis"></div>
+        </section>
+
+        <section id="sec-hydro" hidden>
+          <h3>Observed record</h3>
+          <div id="plot-hydro" class="plot"></div>
+        </section>
+
+        <section id="sec-ffa" hidden>
+          <h3>Flood frequency <span class="muted" id="ffa-years"></span></h3>
+          <table class="ffa" id="ffa-table"></table>
+          <button id="btn-ci" class="btn small">Add bootstrap 90 % CI (GEV, slow)</button>
+          <div id="plot-ffa" class="plot"></div>
+        </section>
+
+        <section id="sec-fdc" hidden>
+          <h3>Flow duration</h3>
+          <div id="plot-fdc" class="plot"></div>
+        </section>
+
+        <section id="sec-trend" hidden>
+          <h3>Trend</h3>
+          <p id="trend-text"></p>
+        </section>
+
+        <section id="sec-notes" hidden>
+          <ul id="notes"></ul>
+        </section>
+
+        <section id="sec-methods" hidden>
+          <details>
+            <summary>Methods and citations</summary>
+            <ol id="methods"></ol>
+            <p class="muted" id="attribution"></p>
+          </details>
+        </section>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.0.1/plotly.min.js" charset="utf-8"></script>
+  <script type="module" src="./app.js?v=__BUILD__"></script>
+</body>
+</html>

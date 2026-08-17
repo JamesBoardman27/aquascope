@@ -499,6 +499,12 @@ class USGSCollector(BaseCollector):
         if not location_id.startswith("USGS-"):
             location_id = f"USGS-{location_id}"
 
+        # One lookup per station per collector instance: a long daily record
+        # would otherwise re-ask (and, when throttled, re-fail) once per row.
+        cache = self.__dict__.setdefault("_area_cache", {})
+        if location_id in cache:
+            return cache[location_id]
+
         try:
             feature = self.client.get_json(
                 f"collections/monitoring-locations/items/{location_id}",
@@ -508,6 +514,7 @@ class USGSCollector(BaseCollector):
             logger.warning(
                 f"Cannot obtain metadata for station {location_id} - catchment area data is unavailable."
             )
+            cache[location_id] = None
             return None
 
         area = feature.get("properties", {}).get("drainage_area", None)
@@ -515,6 +522,7 @@ class USGSCollector(BaseCollector):
             logger.warning(
                 f"Metadata for station {location_id} does not contain catchment area data."
             )
+            cache[location_id] = None
             return None
 
         sig_figs = USGSCollector._count_sig_figs(area)
@@ -522,6 +530,7 @@ class USGSCollector(BaseCollector):
             sig_figs = 3  # default to 3 significant figures if unable to determine
         area_km2 = float(area) * MILES2_TO_KM2
         rounded_catchment_area = USGSCollector._round_to_sig_figs(area_km2, sig_figs)
+        cache[location_id] = rounded_catchment_area
 
         return rounded_catchment_area
 
