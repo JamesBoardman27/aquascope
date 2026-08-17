@@ -336,3 +336,28 @@ class TestUSGSCollectorKeyed:
         mock_get_json.assert_called_once()
         args, kwargs = mock_get_json.call_args
         assert args[0] == "collections/daily/items"
+
+
+class TestUSGSKeyedFiltersReachTheOGCPath:
+    """#160: with an API key the OGC path must filter, not crawl the nation."""
+
+    def test_station_parameter_and_area_filters_are_mapped(self):
+        from unittest.mock import MagicMock
+
+        from aquascope.collectors.usgs import USGSCollector
+
+        c = USGSCollector(api_key="a-real-key")
+        c.client = MagicMock()
+        c.client.get_json.return_value = {"features": [], "links": []}
+        c.fetch_raw(station_id="01646500", days=30, collection="daily", parameter="00060", max_items=None)
+        params = c.client.get_json.call_args.kwargs["params"]
+        assert params["monitoring_location_id"] == "USGS-01646500"
+        assert params["parameter_code"] == "00060" and params["api_key"] == "a-real-key"
+        assert c.client.get_json.call_args.args[0] == "collections/daily/items"
+
+        c.fetch_raw(collection="daily", days=1, stateCd="24", huc="02070008", countyCd="031",
+                    station_id=["01646500", "USGS-01646000"])
+        params = c.client.get_json.call_args.kwargs["params"]
+        assert params["monitoring_location_id"] == "USGS-01646500,USGS-01646000"
+        assert params["state_code"] == "24" and params["county_code"] == "031"
+        assert params["hydrologic_unit_code"] == "02070008"

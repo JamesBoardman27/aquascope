@@ -311,15 +311,6 @@ class USGSCollector(BaseCollector):
 
             return all_features
 
-        if any([sites, parameter_cd, state_cd, county_cd, huc_val]) or (kwargs.get("bBox") and not bbox):
-            logger.warning(
-                "The USGS OGC (keyed) path does not accept filter parameters (station_id, stateCd, countyCd, or huc) "
-                "or queries based on parameter code (parameter). Any instances of the mentioned kwargs being passed "
-                "are ignored by the OGC path. To fetch data using these parameters, set your api key for USGS queries "
-                "to 'DEMO_KEY' explicitly or pass None to the USGSCollector constructor to fall back to the DEMO_KEY. "
-                "Note that the shared DEMO_KEY is heavily rate-limited and may fail under load."
-            )
-
         all_features: list[dict] = []
         params: dict[str, Any] = {
             "f": "json",
@@ -329,6 +320,21 @@ class USGSCollector(BaseCollector):
         }
         if bbox:
             params["bbox"] = bbox
+        elif kwargs.get("bBox"):
+            params["bbox"] = kwargs["bBox"]
+        # The OGC collections filter on their own property names (#160): map the
+        # legacy NWIS kwargs onto them instead of silently crawling the nation.
+        if sites:
+            site_list = [str(x).strip() for x in (sites if isinstance(sites, (list, tuple)) else str(sites).split(","))]
+            params["monitoring_location_id"] = ",".join(x if x.startswith("USGS-") else f"USGS-{x}" for x in site_list if x)
+        if parameter_cd:
+            params["parameter_code"] = parameter_cd
+        if state_cd:
+            params["state_code"] = state_cd
+        if county_cd:
+            params["county_code"] = county_cd
+        if huc_val:
+            params["hydrologic_unit_code"] = huc_val
 
         url = f"collections/{collection}/items"
         while True:
