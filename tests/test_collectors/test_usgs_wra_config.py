@@ -361,3 +361,21 @@ class TestUSGSKeyedFiltersReachTheOGCPath:
         assert params["monitoring_location_id"] == "USGS-01646500,USGS-01646000"
         assert params["state_code"] == "24" and params["county_code"] == "031"
         assert params["hydrologic_unit_code"] == "02070008"
+
+
+class TestUSGSOGCPagination:
+    def test_next_link_is_fetched_as_is_and_loops_are_guarded(self):
+        from unittest.mock import MagicMock
+
+        from aquascope.collectors.usgs import USGSCollector
+
+        c = USGSCollector(api_key="a-real-key")
+        c.client = MagicMock()
+        page1 = {"features": [{"a": 1}], "links": [{"rel": "next", "href": "https://x/items?cursor=abc&f=json"}]}
+        page2 = {"features": [{"a": 2}], "links": [{"rel": "next", "href": "https://x/items?cursor=abc&f=json"}]}
+        c.client.get_json.side_effect = [page1, page2, page2, page2]
+        out = c.fetch_raw(station_id="01646500", days=3, collection="daily", parameter="00060", max_items=None)
+        assert len(out) == 2  # page1 + page2; the repeated cursor stops the loop
+        second_call = c.client.get_json.call_args_list[1]
+        assert second_call.args[0] == "https://x/items?cursor=abc&f=json"
+        assert second_call.kwargs["params"] is None
