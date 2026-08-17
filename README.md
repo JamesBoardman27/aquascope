@@ -45,6 +45,10 @@ AquaScope unifies **28 global water-data sources** behind one Python schema, the
 flood frequency with confidence limits, flow duration and trend, computed in your browser by aquascope on Pyodide.
 The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
 
+Prefer an assistant? `pip install "aquascope[mcp]"` then `claude mcp add aquascope -- aquascope mcp` gives Claude (or any
+MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_frequency` over the same catalog and methods
+([docs](docs/mcp.md)).
+
 ## ✨ What you can do
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
@@ -253,12 +257,13 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 22-command CLI for the most common workflows:
+AquaScope ships a 23-command CLI for the most common workflows:
 
 ```bash
 # Find stations, then collect data
 aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
 aquascope harvest stations --out archive          # the open gauge catalog (GeoParquet)
+aquascope mcp                                     # serve the same tools to Claude / Cursor over MCP
 aquascope collect --source usgs --days 365
 aquascope collect --source wapor --bbox 30.5,29.8,31.1,30.2 --variable RET --start-date 2026-04-01
 
