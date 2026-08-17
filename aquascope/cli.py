@@ -1140,7 +1140,10 @@ def main() -> None:
         choices=source_keys(),
         help="Source to search (repeatable). Default: every source with a station catalog",
     )
-    p_stations.add_argument("--bbox", default=None, help="Bounding box west,south,east,north (WGS84)")
+    p_stations.add_argument(
+        "--bbox", default=None,
+        help="Bounding box west,south,east,north (WGS84). Write --bbox=-77,38,-76,39 when it starts with a minus",
+    )
     p_stations.add_argument(
         "--variable",
         default=None,

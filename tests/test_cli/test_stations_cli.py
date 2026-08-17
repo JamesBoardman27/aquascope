@@ -60,7 +60,8 @@ def test_stations_forwards_filters(tmp_path, monkeypatch):
 
     monkeypatch.setattr("aquascope.registry.station_catalogs", fake)
     out = tmp_path / "o.json"
-    monkeypatch.setattr(sys, "argv", ["aquascope", "stations", "--bbox", "-7,53,-6,54", "--variable", "water_level",
+    # A bbox starting with a minus must be passed as --bbox=... (argparse would read it as an option otherwise)
+    monkeypatch.setattr(sys, "argv", ["aquascope", "stations", "--bbox=-7,53,-6,54", "--variable", "water_level",
                                       "--max-items", "5", "--format", "json", "-o", str(out)])
     cli.main()
     assert seen["bbox"] == (-7.0, 53.0, -6.0, 54.0)
