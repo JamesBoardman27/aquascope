@@ -26,10 +26,10 @@ a link to the agency page. Data licence and attribution are shown per source.
 | --- | --- | --- |
 | USGS | daily mean discharge (or gage height), full period requested (40 years) | all of the above |
 | UK Environment Agency | daily mean flow (falls back to level, rainfall, groundwater), full period | all of the above |
-| Hub'Eau (France) | last 30 days of real-time H / Q | hydrograph (long daily series come with #188 Phase 1) |
+| Hub'Eau (France) | daily mean discharge (obs_elab `QmnJ`, multi-decade where computed), else last 30 days real-time | all of the above when the daily series exists |
 | PEGELONLINE (Germany) | last 31 days of W / Q | hydrograph |
 | Ireland OPW | last month of 15-minute levels | hydrograph |
-| Taiwan CWA | daily rainfall, last 10 years (one request per month at the source) | hydrograph, annual maxima, trend |
+| Taiwan CWA | daily rainfall, last 10 years (one request per year at the source, a few seconds each) | hydrograph, annual maxima, trend |
 
 Flood frequency needs at least 10 complete years of daily flow; the page says
 so when a record is shorter.
@@ -42,10 +42,10 @@ so when a record is shorter.
   catalog (DuckDB-WASM over the archive's GeoParquet, GeoJSON fallback), search,
   panel and Plotly charts.
 - `worker.js`: a Web Worker that loads Pyodide, numpy / scipy / pandas, and the
-  aquascope wheel, then runs `analysis.py`.
-- `analysis.py`: the Python half. It uses aquascope's own collectors and
-  hydrology functions and runs unchanged in CPython, which is how it is
-  tested (`tests/test_explorer/`).
+  aquascope wheel, then calls `aquascope.explore`.
+- `aquascope.explore` (in the package): the Python half, the same
+  `(source, station) -> answer` entry point the CLI and the MCP server use.
+  It runs unchanged in CPython, which is how it is tested (`tests/test_explore.py`).
 - `build.py`: assembles the site (wheel + `wheels.json` + cache-busting token).
   `.github/workflows/explorer.yml` publishes it to the Hugging Face static Space
   on every push to `main`; `docs.yml` adds it under `/explorer/` here.

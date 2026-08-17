@@ -62,6 +62,35 @@ STATION_VARIABLE_CODES: dict[str, tuple[str, ...]] = {
     "water_quality": ("00010", "00095", "00300", "00400"),
 }
 
+# 50 states + DC + territories, as the NWIS site service's stateCd expects.
+NWIS_STATE_CODES: tuple[str, ...] = (
+    "al", "ak", "az", "ar", "ca", "co", "ct", "de", "dc", "fl", "ga", "hi", "id", "il", "in", "ia", "ks", "ky",
+    "la", "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh",
+    "ok", "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "pr", "vi", "gu",
+    "as", "mp",
+)
+
+
+def _parse_nwis_rdb_sites(text: str) -> list[tuple[str, str]]:
+    """Yield ``(site_no, station_nm)`` from an NWIS RDB site listing."""
+    out: list[tuple[str, str]] = []
+    header: list[str] | None = None
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        cols = line.split("\t")
+        if header is None:
+            header = cols
+            continue
+        if cols and cols[0].endswith("s") and cols[0][:-1].isdigit():  # the RDB dtype row, e.g. "5s\t15s\t50s"
+            continue
+        row = dict(zip(header, cols))
+        site_no, name = row.get("site_no", "").strip(), row.get("station_nm", "").strip()
+        if site_no and name:
+            out.append((site_no, name))
+    return out
+
+
 def _parse_ogc_date(value: str | None) -> date | None:
     if not value:
         return None
@@ -391,7 +420,11 @@ class USGSCollector(BaseCollector):
                     if props.get("id") in by_site:
                         names[props["id"]] = props.get("monitoring_location_name")
             except RuntimeError as exc:
-                logger.warning("USGS monitoring-locations lookup failed (%s); returning stations without names.", exc)
+                logger.warning("USGS monitoring-locations lookup failed (%s); trying the NWIS site service.", exc)
+                try:
+                    names = self._nwis_site_names(bbox, wanted=set(by_site))
+                except Exception as exc2:  # noqa: BLE001 - names are nice to have, not required
+                    logger.warning("NWIS site service lookup failed too (%s); returning stations without names.", exc2)
 
         stations: list[Station] = []
         for site, entry in by_site.items():
@@ -412,6 +445,33 @@ class USGSCollector(BaseCollector):
             )
         stations.sort(key=lambda s: s.station_id)
         return stations
+
+    def _nwis_site_names(
+        self, bbox: tuple[float, float, float, float] | None, *, wanted: set[str] | None = None
+    ) -> dict[str, str]:
+        """Station names from the keyless NWIS site service (RDB), as a fallback.
+
+        One request for a ``bbox``; otherwise one per state/territory (~56
+        requests of ~50 KB). Only stream sites with daily values are asked for.
+        """
+        names: dict[str, str] = {}
+        base = "https://waterservices.usgs.gov/nwis/site/"
+        common = {"format": "rdb", "siteType": "ST", "siteStatus": "all", "hasDataTypeCd": "dv"}
+        if bbox:
+            queries = [{**common, "bBox": ",".join(f"{v:.6f}" for v in bbox)}]
+        else:
+            queries = [{**common, "stateCd": st} for st in NWIS_STATE_CODES]
+        for params in queries:
+            try:
+                text = self.client.get_text(base, params=params)
+            except RuntimeError as exc:
+                logger.debug("NWIS site query %s failed: %s", params.get("stateCd") or "bbox", exc)
+                continue
+            for site_no, name in _parse_nwis_rdb_sites(text):
+                key = f"USGS-{site_no}"
+                if wanted is None or key in wanted:
+                    names[key] = name
+        return names
 
     def _paginate(self, path: str, params: dict[str, Any], max_items: int | None) -> list[dict]:
         """Follow OGC ``next`` links, capping at ``max_items`` features."""

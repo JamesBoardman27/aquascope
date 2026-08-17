@@ -1,14 +1,14 @@
 // AquaScope Explorer, worker thread: Pyodide + aquascope. Fetches the observed
-// record through aquascope's own collectors and runs the analyses in
-// explorer/analysis.py. Sync XHR (pyodide-http) is allowed in workers, so the
-// page stays responsive while Python is busy.
+// record through aquascope's own collectors and runs aquascope.explore (the
+// same code the CLI and MCP server use). Sync XHR (pyodide-http) is allowed in
+// workers, so the page stays responsive while Python is busy.
 
 let pyodide = null;
 let ready = null;
 
 function post(type, extra = {}) { self.postMessage({ type, ...extra }); }
 
-async function init({ pyodideIndexURL, wheelsJson, build }) {
+async function init({ pyodideIndexURL, wheelsJson }) {
   post("progress", { text: "Loading Python runtime (Pyodide)…" });
   importScripts(`${pyodideIndexURL}pyodide.js`);
   pyodide = await loadPyodide({ indexURL: pyodideIndexURL });
@@ -22,15 +22,12 @@ async function init({ pyodideIndexURL, wheelsJson, build }) {
   const micropip = pyodide.pyimport("micropip");
   await micropip.install(["pyodide-http", wheelUrl]);
 
-  const analysisSrc = await (await fetch(new URL(`./analysis.py?v=${build || ""}`, self.location.href), { cache: "no-store" })).text();
-  pyodide.FS.writeFile("/analysis.py", analysisSrc);
   await pyodide.runPythonAsync(`
-import sys, json, logging
-sys.path.insert(0, "/")
+import json, logging
 logging.basicConfig(level=logging.WARNING)
 import pyodide_http
 pyodide_http.patch_all()
-import analysis
+import aquascope.explore as analysis
 _STORE = {}
 `);
   post("ready");

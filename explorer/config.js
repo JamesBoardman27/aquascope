@@ -11,6 +11,6 @@ export const CONFIG = {
   wheelsJson: "./wheels.json",
   // How far back to ask each agency (years).
   years: 40,
-  // Cache-busting token, replaced at deploy time (git sha); analysis.py is fetched with it too.
+  // Cache-busting token, replaced at deploy time (git sha).
   build: "__BUILD__",
 };

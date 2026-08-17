@@ -48,6 +48,20 @@ GRANDEUR_UNITS: dict[str, str] = {
 _LS_PER_M3S = 1_000  # divide L/s by this to get m³/s (avoids 0.001 float rounding)
 _MM_PER_M = 1_000  # divide mm by this to get m (Hub'Eau serves water level in mm)
 
+# Hub'Eau's elaborated ("obs_elab") grandeurs: daily and monthly statistics with
+# multi-decade history, unlike observations_tr (real-time, last month only).
+# Values keep the observations_tr units (Q in L/s, H in mm).
+ELABORATED_GRANDEURS: dict[str, tuple[str, str]] = {
+    "QmnJ": ("Q", "daily mean discharge"),
+    "QmM": ("Q", "monthly mean discharge"),
+    "QIXnJ": ("Q", "daily maximum instantaneous discharge"),
+    "QINnJ": ("Q", "daily minimum instantaneous discharge"),
+    "QixM": ("Q", "monthly maximum instantaneous discharge"),
+    "QINM": ("Q", "monthly minimum instantaneous discharge"),
+    "HIXnJ": ("H", "daily maximum instantaneous level"),
+    "HIXM": ("H", "monthly maximum instantaneous level"),
+}
+
 def _parse_hubeau_date(value: str | None) -> date | None:
     if not value:
         return None
@@ -159,13 +173,21 @@ class HubeauHydrometrieCollector(BaseCollector):
         days: int | None = None,
         size: int = 1000,
         max_items: int | None = 5_000,
+        elaborated: str | None = None,
         **kwargs,
     ) -> list[dict]:
         """
-        Fetch real-time observations from Hub'Eau's ``observations_tr``.
+        Fetch observations from Hub'Eau: real-time ``observations_tr`` (default)
+        or the long elaborated series ``obs_elab`` when ``elaborated`` is set.
 
         Parameters
         ----------
+        elaborated : str, optional
+            An elaborated grandeur code (see ``ELABORATED_GRANDEURS``), e.g.
+            ``"QmnJ"`` for daily mean discharge with multi-decade history.
+            When set, the request goes to ``/obs_elab``; ``grandeur_hydro`` is
+            ignored and ``date_debut_obs`` / ``date_fin_obs`` (or ``days``) bound
+            ``date_obs_elab``.
         code_station : str, optional
             Hydrometric station code (e.g. "K002000101"). Sent to the
             API as ``code_entite``. Without this (or a date/grandeur filter),
@@ -192,15 +214,25 @@ class HubeauHydrometrieCollector(BaseCollector):
         params: dict[str, Any] = {"format": "json", "size": min(size, 20_000)}
         if code_station:
             params["code_entite"] = code_station
-        if grandeur_hydro:
-            params["grandeur_hydro"] = grandeur_hydro
-        if date_debut_obs:
-            params["date_debut_obs"] = date_debut_obs
-        if date_fin_obs:
-            params["date_fin_obs"] = date_fin_obs
+        if elaborated:
+            if elaborated not in ELABORATED_GRANDEURS:
+                raise ValueError(f"Unknown elaborated grandeur {elaborated!r}; choose from {list(ELABORATED_GRANDEURS)}")
+            params["grandeur_hydro_elab"] = elaborated
+            if date_debut_obs:
+                params["date_debut_obs_elab"] = date_debut_obs[:10]
+            if date_fin_obs:
+                params["date_fin_obs_elab"] = date_fin_obs[:10]
+            url = "/obs_elab"
+        else:
+            if grandeur_hydro:
+                params["grandeur_hydro"] = grandeur_hydro
+            if date_debut_obs:
+                params["date_debut_obs"] = date_debut_obs
+            if date_fin_obs:
+                params["date_fin_obs"] = date_fin_obs
+            url = "/observations_tr"
         params.update(kwargs)
 
-        url = "/observations_tr"
         while True:
             resp = self.client.get_json(url, params=params)
             rows = resp.get("data", [])
@@ -230,6 +262,10 @@ class HubeauHydrometrieCollector(BaseCollector):
         # them in a single batched call: Hub'Eau serves the entire hydrometric
         # site referentiel in one page (size=10000), so one call covers every
         # requested site. No referentiel call is made unless a Q row needs it.
+        # obs_elab rows carry grandeur_hydro_elab / date_obs_elab / resultat_obs_elab.
+        # Fold them into the observations_tr shape so one loop handles both.
+        raw = [self._elaborated_to_tr(row) if "grandeur_hydro_elab" in row else row for row in raw]
+
         discharge_sites = {
             row.get("code_site")
             for row in raw
@@ -324,6 +360,21 @@ class HubeauHydrometrieCollector(BaseCollector):
             )
         return samples
 
+
+    @staticmethod
+    def _elaborated_to_tr(row: dict) -> dict:
+        """Map an ``obs_elab`` row onto the ``observations_tr`` field names."""
+        code = row.get("grandeur_hydro_elab", "")
+        base, _ = ELABORATED_GRANDEURS.get(code, (code, ""))
+        date_str = str(row.get("date_obs_elab") or "")
+        if len(date_str) == 10:  # daily/monthly stats come as bare dates
+            date_str = f"{date_str}T00:00:00Z"
+        out = dict(row)
+        out.setdefault("grandeur_hydro", base)
+        out.setdefault("date_obs", date_str)
+        out.setdefault("resultat_obs", row.get("resultat_obs_elab"))
+        out["elaborated"] = code
+        return out
 
     def _get_catchment_areas(self, site_codes: set[str]) -> dict[str, float | None]:
         """

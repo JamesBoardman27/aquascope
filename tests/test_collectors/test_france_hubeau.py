@@ -516,3 +516,53 @@ class TestFranceHubeauCatchmentAreaMetadata:
         assert samples[0].catchment_area_km2 is None
         collector.client.get_json.assert_not_called()
 
+
+
+class TestFranceHubeauElaborated:
+    """``elaborated="QmnJ"`` fetches /obs_elab (multi-decade daily means) and normalises like Q."""
+
+    def test_fetch_raw_hits_obs_elab_with_date_bounds(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client = Mock()
+        collector.client.get_json.return_value = {"data": [], "next": None}
+        collector.fetch_raw(
+            code_station="F700000103", elaborated="QmnJ", date_debut_obs="1990-01-01T00:00:00Z",
+            date_fin_obs="2026-08-17", size=20000, max_items=None,
+        )
+        url, kwargs = collector.client.get_json.call_args.args[0], collector.client.get_json.call_args.kwargs
+        assert url == "/obs_elab"
+        params = kwargs["params"]
+        assert params["code_entite"] == "F700000103" and params["grandeur_hydro_elab"] == "QmnJ"
+        assert params["date_debut_obs_elab"] == "1990-01-01" and params["date_fin_obs_elab"] == "2026-08-17"
+        assert "grandeur_hydro" not in params and "date_debut_obs" not in params
+
+    def test_unknown_elaborated_code_rejected(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client = Mock()
+        try:
+            collector.fetch_raw(code_station="X", elaborated="QmJ")
+        except ValueError as exc:
+            assert "QmJ" in str(exc)
+        else:
+            raise AssertionError("expected ValueError")
+        collector.client.get_json.assert_not_called()
+
+    def test_normalise_elaborated_rows_to_streamflow(self):
+        collector = HubeauHydrometrieCollector()
+        collector.client = Mock()
+        collector.client.get_json.return_value = {"data": [{"code_site": "F7000001", "surface_bv": 43800.0}]}
+        raw = [
+            {"code_site": "F7000001", "code_station": "F700000103", "date_obs_elab": "2024-01-01",
+             "resultat_obs_elab": 635776.0, "grandeur_hydro_elab": "QmnJ", "longitude": 2.36, "latitude": 48.84},
+            {"code_site": "F7000001", "code_station": "F700000103", "date_obs_elab": "2024-01-02",
+             "resultat_obs_elab": None, "grandeur_hydro_elab": "QmnJ", "longitude": 2.36, "latitude": 48.84},
+            {"code_site": "F7000001", "code_station": "F700000103", "date_obs_elab": "2024-01-01",
+             "resultat_obs_elab": 4500.0, "grandeur_hydro_elab": "HIXnJ", "longitude": 2.36, "latitude": 48.84},
+        ]
+        recs = collector.normalise(raw)
+        flows = [r for r in recs if isinstance(r, StreamflowReading)]
+        levels = [r for r in recs if isinstance(r, WaterLevelReading)]
+        assert len(flows) == 1 and len(levels) == 1
+        assert flows[0].discharge_cms == 635.776 and flows[0].catchment_area_km2 == 43800.0
+        assert flows[0].reading_datetime.isoformat() == "2024-01-01T00:00:00"
+        assert levels[0].water_level == 4.5

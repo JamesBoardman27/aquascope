@@ -1,9 +1,13 @@
-"""AquaScope Explorer: the Python half of "click a gauge, get the numbers".
+"""``(source, station) -> answer``: the entry point behind the Explorer and the MCP server.
 
-This module runs unchanged in CPython (tests) and inside Pyodide in the
-browser (``worker.js`` loads it and calls :func:`analyze_station`). It uses
-only aquascope's public collectors and hydrology functions, so what the page
-shows is exactly what ``pip install aquascope`` computes.
+:func:`analyze_station` fetches one station's observed record through
+aquascope's own collectors and computes the Phase-0 analytics: hydrograph and
+annual maxima, flood frequency (GEV by L-moments, Log-Pearson III with
+confidence limits, an on-demand bootstrap GEV band), the flow-duration curve,
+and a Mann-Kendall trend, plus the method citations. It runs unchanged in
+CPython (tests, CLI, MCP) and inside Pyodide in the browser (the Explorer's
+worker imports it from the wheel), so what any surface shows is exactly what
+``pip install aquascope`` computes.
 
 Everything returned is plain JSON: lists, dicts, numbers, strings, ``None``.
 """
@@ -19,7 +23,7 @@ import pandas as pd
 
 from aquascope.registry import SOURCES, build_collector
 
-logger = logging.getLogger("aquascope.explorer")
+logger = logging.getLogger(__name__)
 
 RETURN_PERIODS = [2, 5, 10, 25, 50, 100]
 MIN_YEARS_FOR_FFA = 10
@@ -159,15 +163,21 @@ def fetch_series(source: str, station_id: str, *, years: int = 40) -> dict[str, 
         note = f"Environment Agency Hydrology API, measure {measure or 'n/a'}."
     elif source == "hubeau_hydrometrie":
         c = build_collector("hubeau_hydrometrie")
-        recs = c.collect(code_station=station_id, grandeur_hydro="Q", days=30)
-        s, var, unit = _records_to_series(recs)
-        if s is None:
-            recs = c.collect(code_station=station_id, grandeur_hydro="H", days=30)
-            s, var, unit = _records_to_series(recs)
-        note = (
-            "Hub'Eau real-time observations cover the last 30 days; long daily records (obs_elab) come with "
-            "#188 Phase 1."
+        # Long record first: obs_elab QmnJ is the daily mean discharge (multi-decade where the
+        # station computes it); fall back to the real-time feed (last 30 days) for H-only stations.
+        recs = c.collect(
+            code_station=station_id, elaborated="QmnJ", date_debut_obs=start.isoformat(),
+            date_fin_obs=end.isoformat(), size=20_000, max_items=None,
         )
+        s, var, unit = _records_to_series(recs)
+        note = "Hub'Eau elaborated daily mean discharge (obs_elab QmnJ), full period requested."
+        if s is None:
+            recs = c.collect(code_station=station_id, grandeur_hydro="Q", days=30)
+            s, var, unit = _records_to_series(recs)
+            if s is None:
+                recs = c.collect(code_station=station_id, grandeur_hydro="H", days=30)
+                s, var, unit = _records_to_series(recs)
+            note = "Hub'Eau real-time observations (last 30 days); this station has no elaborated daily discharge."
     elif source == "pegelonline":
         c = build_collector("pegelonline")
         recs = c.collect(station_id=station_id, timeseries=("Q", "W"), days=31)
@@ -181,14 +191,17 @@ def fetch_series(source: str, station_id: str, *, years: int = 40) -> dict[str, 
         s, var, unit = _records_to_series(recs)
         note = "waterlevel.ie month file (15-minute levels, last month)."
     elif source == "taiwan_cwa":
-        # CODIS answers one month per request, so 40 years is 480 round trips.
-        # Ten years (~120 requests) keeps the click-to-chart wait tolerable.
+        # CODIS answers one calendar year per request and each takes several
+        # seconds at the source; ten years keeps the click-to-chart wait tolerable.
         cwa_years = min(years, 10)
         cwa_start = end - timedelta(days=int(cwa_years * 365.25))
         c = build_collector("taiwan_cwa")
         recs = c.collect(station_ids=[station_id], start=cwa_start.isoformat(), end=end.isoformat())
         s, var, unit = _records_to_series(recs)
-        note = f"CWA CODIS daily rainfall, last {cwa_years} years (one request per month at the source)."
+        note = (
+            f"CWA CODIS daily rainfall, last {cwa_years} years "
+            "(one request per year at the source, a few seconds each)."
+        )
     else:
         raise ValueError(f"{source} has no Explorer fetch path yet")
 

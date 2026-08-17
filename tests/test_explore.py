@@ -1,30 +1,21 @@
-"""Explorer Phase 0 (#189): the Python half runs in CPython exactly as it does in Pyodide.
+"""``aquascope.explore`` (#189): the (source, station) -> answer entry point behind the Explorer and MCP.
 
-``explorer/analysis.py`` is loaded from the repo (it is not part of the
-package on purpose: the page ships it next to the wheel), collectors are
-replaced by fakes, and the JSON contract the browser relies on is checked.
+Collectors are replaced by fakes; the JSON contract the browser and the MCP
+tools rely on is checked in CPython, exactly the code Pyodide runs.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from aquascope import explore as analysis
 from aquascope.schemas.water_data import DataSource, StreamflowReading, WaterLevelReading
-
-ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("explorer_analysis", ROOT / "explorer" / "analysis.py")
-analysis = importlib.util.module_from_spec(SPEC)
-sys.modules["explorer_analysis"] = analysis
-SPEC.loader.exec_module(analysis)
 
 
 def _daily_flow(years: int = 30, seed: int = 7) -> pd.Series:
