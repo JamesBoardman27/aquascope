@@ -359,4 +359,5 @@ class TestUSGSKeyedFiltersReachTheOGCPath:
                     station_id=["01646500", "USGS-01646000"])
         params = c.client.get_json.call_args.kwargs["params"]
         assert params["monitoring_location_id"] == "USGS-01646500,USGS-01646000"
-        assert (params["state_code"], params["county_code"], params["hydrologic_unit_code"]) == ("24", "031", "02070008")
+        assert params["state_code"] == "24" and params["county_code"] == "031"
+        assert params["hydrologic_unit_code"] == "02070008"
