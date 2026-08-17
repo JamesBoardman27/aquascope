@@ -114,8 +114,11 @@ def test_server_registers_tools_and_calls_through_sdk():
     with patch("aquascope.archive.catalog.load_stations", return_value=CATALOG):
         res = asyncio.run(server.call_tool("find_stations", {"query": "potomac"}))
     payload = getattr(res, "structured_content", None) or getattr(res, "structuredContent", None)
+    if payload is None and isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
+        payload = res[1]  # mcp 1.10+: (unstructured content, structured content)
     if payload is None:  # older SDKs return only text content
         import json
 
-        payload = json.loads(res[0].text if isinstance(res, list) else res.content[0].text)
+        blocks = res[0] if isinstance(res, tuple) else res
+        payload = json.loads(blocks[0].text if isinstance(blocks, list) else blocks.content[0].text)
     assert payload["n_returned"] == 1 and payload["stations"][0]["station_id"] == "USGS-1"

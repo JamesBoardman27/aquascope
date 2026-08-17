@@ -93,9 +93,11 @@ def _tool_specs() -> list[ToolSpec]:
         ToolSpec(
             "analyze_station",
             "Fetch one station's record and compute summary, annual maxima, flood frequency (GEV, LP3 with CI), "
-            "FDC percentiles and trend.",
+            "FDC percentiles and trend. variable: discharge (default), water_level, precipitation or "
+            "groundwater_level for stations that have several.",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
-                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"}},
+                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"},
+                                              "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.analyze_station,
         ),
@@ -112,7 +114,7 @@ def _tool_specs() -> list[ToolSpec]:
             "The observed record for a station, resampled (D/W/M/Y) and thinned; use for values, not for statistics.",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
                                               "years": {"type": "integer"}, "resample": {"type": "string"},
-                                              "max_points": {"type": "integer"}},
+                                              "max_points": {"type": "integer"}, "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.get_timeseries,
         ),

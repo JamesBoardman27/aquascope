@@ -519,6 +519,9 @@ def cmd_harvest(args: argparse.Namespace) -> None:
     if args.what == "obs":
         _cmd_harvest_obs(args)
         return
+    if args.what == "bundles":
+        _cmd_harvest_bundles(args)
+        return
 
     report = harvest_stations(
         args.out,
@@ -557,6 +560,12 @@ def _cmd_harvest_obs(args: argparse.Namespace) -> None:
         if bad:
             logger.error("Not harvestable yet: %s. Choose from %s", bad, list(HARVESTABLE))
             sys.exit(2)
+        if args.variable:
+            bad = [s for s in sources if args.variable not in HARVESTABLE[s]]
+            if bad:
+                logger.error("%s is not harvested for %s (they mirror %s)", args.variable, bad,
+                             {s: list(HARVESTABLE[s]) for s in bad})
+                sys.exit(2)
     report = harvest_observations(
         args.out,
         sources=sources,
@@ -578,6 +587,26 @@ def _cmd_harvest_obs(args: argparse.Namespace) -> None:
 
     if args.publish:
         url = publish_folder(args.out, args.publish, commit_message=f"harvest obs {report.run_at}")
+        print(f"  published: {url}")
+
+
+def _cmd_harvest_bundles(args: argparse.Namespace) -> None:
+    """`aquascope harvest bundles`: roll obs/<variable>/<source>/*.csv.gz into one Parquet per pair (Phase 2)."""
+    from aquascope.archive import publish_folder
+    from aquascope.archive.bundles import build_bundles
+
+    infos = build_bundles(args.out, variables=args.variable_list or None, sources=args.source or None)
+    if not infos:
+        print(f"  no observation files under {args.out}/obs; nothing to bundle")
+        return
+    for b in infos:
+        print(
+            f"  {b.file:<44} {b.n_stations:>6} stations {b.n_rows:>10,} rows  {b.bytes / 1e6:6.1f} MB  "
+            f"{b.first} to {b.last}  ({b.seconds:.0f}s)"
+        )
+    print(f"\n  {len(infos)} bundles written")
+    if args.publish:
+        url = publish_folder(args.out, args.publish, commit_message="harvest bundles")
         print(f"  published: {url}")
 
 
@@ -1336,11 +1365,16 @@ def main() -> None:
 
     # ── harvest ──────────────────────────────────────────────────────
     p_harvest = sub.add_parser("harvest", help="Harvest catalogs into GeoParquet for the open archive (#188)")
-    p_harvest.add_argument("what", choices=["stations", "obs"], help="stations: the catalog; obs: daily series")
+    p_harvest.add_argument("what", choices=["stations", "obs", "bundles"],
+                           help="stations: the catalog; obs: daily series per station; bundles: one Parquet per "
+                                "variable and source rolled up from obs/")
     p_harvest.add_argument("--out", default="archive", help="Output folder (default: ./archive)")
     p_harvest.add_argument("--source", action="append", choices=source_keys(), help="Restrict to a source (repeatable)")
     p_harvest.add_argument("--max-items", type=int, default=None, help="stations: cap per source (for smoke tests)")
-    p_harvest.add_argument("--variable", default=None, help="obs: variable to harvest (default per source)")
+    p_harvest.add_argument("--variable", default=None, dest="variable",
+                           help="obs: harvest only this variable (default: every harvestable variable per source)")
+    p_harvest.add_argument("--variables", action="append", dest="variable_list", metavar="VAR",
+                           help="bundles: restrict to these variables (repeatable)")
     p_harvest.add_argument("--years", type=int, default=40, help="obs: how far back to ask (default 40)")
     p_harvest.add_argument("--max-stations", type=int, default=100, help="obs: stations per source per run")
     p_harvest.add_argument("--refresh-days", type=int, default=30, help="obs: re-harvest a station older than this")

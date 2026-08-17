@@ -6,8 +6,10 @@ scheduled harvest writes what the sources answer into cloud-native files and
 publishes them to a public Hugging Face dataset,
 [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges).
 
-Phase 0 is the **station catalog**. Phase 1 (also shipped, filling up week by
-week) mirrors **daily observations** for the sources whose terms allow it. See
+Phase 0 is the **station catalog**. Phase 1 mirrors **daily observations**
+for the sources whose terms allow it, filling up week by week. Phase 2 adds
+**more variables** (water level, rainfall, groundwater level) and **one
+Parquet bundle per variable and source** for whole-source reads. See
 [#188](https://github.com/Rekin226/aquascope/issues/188) for the plan.
 
 ## What is in it
@@ -18,8 +20,9 @@ week) mirrors **daily observations** for the sources whose terms allow it. See
 | `stations.geojson` | the same rows as GeoJSON, for tools and browsers that don't read parquet |
 | `health.json` | per-source status of the last run: station count, seconds, error message if the endpoint failed |
 | `README.md` | the dataset card, regenerated on every run, with the per-source licence table |
-| `obs/<variable>/<source>/<station_id>.csv.gz` | daily means for one station (`date,value`, SI units), only for redistributable sources; today USGS, UK EA, Hub'Eau discharge and Taiwan CWA rainfall |
-| `obs/manifest.json` | every harvested station with period, count, unit and harvest time; `obs/last_run.json` the last run's per-source tallies |
+| `obs/<variable>/<source>/<station_id>.csv.gz` | daily values for one station (`date,value`; discharge m3/s, water and groundwater level m, precipitation mm/day), only for redistributable sources |
+| `obs/<variable>/<source>.parquet` | the folder above as one Parquet bundle: `station_id, date, value`, sorted, snappy; `station_id` joins to `stations.parquet` |
+| `obs/manifest.json` | every harvested station with period, count, unit, measure note and harvest time, keyed by `source/variable`, plus every bundle; `obs/last_run.json` the last run's per-source tallies |
 
 Sources with a station catalog today: USGS, UK Environment Agency, Hub'Eau
 (France), PEGELONLINE (Germany), Ireland OPW, Taiwan CWA. Every source that
@@ -47,28 +50,50 @@ GeoPandas / QGIS open the parquet directly as a point layer.
 
 ## Observations, incrementally
 
-Each weekly run harvests a budget of stations per source (150 for USGS, UK EA
-and Hub'Eau, 15 for CWA) and re-harvests a station once it is older than 30
-days, so the archive grows without ever hammering an agency. Read one station:
+Each weekly run harvests a budget of stations per source and variable and
+re-harvests a station once it is older than 30 days, so the archive grows
+without ever hammering an agency. What is mirrored:
+
+| source | variables | where the daily value comes from |
+| --- | --- | --- |
+| `usgs` | discharge, water_level | NWIS daily values, 00060 and 00065 (gage height converted from feet to metres) |
+| `uk_ea` | discharge, water_level, precipitation, groundwater_level | Hydrology API daily mean flow; daily max level where no daily mean is published; daily rainfall totals; borehole levels in metres above Ordnance Datum (manual dips or logger) |
+| `hubeau_hydrometrie` | discharge | obs_elab QmnJ, the elaborated daily mean discharge |
+| `taiwan_cwa` | precipitation | CODIS daily rainfall |
+
+Read one station:
 
 ```python
 import pandas as pd
 s = pd.read_csv("hf://datasets/Rekin226/aquascope-gauges/obs/discharge/usgs/USGS-01646500.csv.gz")
 ```
 
-or a whole source with DuckDB:
+a whole source and variable in one go (the bundle):
+
+```python
+df = pd.read_parquet("hf://datasets/Rekin226/aquascope-gauges/obs/groundwater_level/uk_ea.parquet")
+# or, with aquascope: from aquascope.archive import load_observations; df = load_observations("uk_ea", "groundwater_level")
+```
+
+or with DuckDB, joined to the catalog:
 
 ```sql
-SELECT * FROM read_csv('hf://datasets/Rekin226/aquascope-gauges/obs/discharge/hubeau_hydrometrie/*.csv.gz');
+SELECT s.name, o.date, o.value
+FROM 'hf://datasets/Rekin226/aquascope-gauges/obs/discharge/uk_ea.parquet' o
+JOIN 'hf://datasets/Rekin226/aquascope-gauges/stations.parquet' s USING (station_id)
+WHERE s.name ILIKE '%thames%';
 ```
 
 The Explorer and `aquascope.explore.fetch_series` read a station's file first
 (one HTTPS GET, no agency load) and only fall back to the agency when the
-archive has no file yet.
+archive has no file yet. `fetch_series(..., variable="water_level")` (and the
+`variable` argument of the MCP `analyze_station` / `get_timeseries` tools)
+picks one variable at stations that have several.
 
-Run it yourself: `aquascope harvest obs --out archive --source usgs --max-stations 50`
+Run it yourself: `aquascope harvest obs --out archive --source uk_ea --variable groundwater_level --max-stations 50`
 (add `--sync-from Rekin226/aquascope-gauges` for an incremental run and
-`--publish` to upload).
+`--publish` to upload), then `aquascope harvest bundles --out archive` to roll
+the folders into Parquet.
 
 ## Terms
 

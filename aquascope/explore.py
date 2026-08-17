@@ -148,19 +148,37 @@ def _records_to_series(records: list, prefer: str | None = None) -> tuple[pd.Ser
     s = pd.Series({t: v for t, v in rows}).sort_index()
     s.index = pd.to_datetime(s.index, utc=True).tz_localize(None)
     s = s[~s.index.duplicated(keep="last")]
+    # SI in, SI out: USGS gage height arrives in feet.
+    if variable == "water_level" and str(unit).lower() in ("ft", "feet", "foot"):
+        s = s * 0.3048
+        unit = "m"
     return s, variable, unit
 
 
-def fetch_series(source: str, station_id: str, *, years: int = 40, prefer_archive: bool = True) -> dict[str, Any]:
+# Which agency parameter serves which archive variable.
+_USGS_CODES = {"discharge": "00060", "water_level": "00065"}
+
+
+def fetch_series(
+    source: str,
+    station_id: str,
+    *,
+    years: int = 40,
+    prefer_archive: bool = True,
+    variable: str | None = None,
+) -> dict[str, Any]:
     """Fetch the observed record for one station.
 
-    The Archive is tried first (a harvested daily-mean file, one HTTPS GET,
-    no agency load) when ``prefer_archive`` is set and the source is one the
+    The Archive is tried first (a harvested daily file, one HTTPS GET, no
+    agency load) when ``prefer_archive`` is set and the source is one the
     harvest mirrors; otherwise, or when the archive has no file for the
     station, the record comes straight from the agency through aquascope's
-    collector. Returns ``{"series": pd.Series | None, "variable": str,
-    "unit": str, "note": str}``; ``note`` says where the data came from and
-    any record-length limit of the source.
+    collector. ``variable`` asks for one variable (``discharge``,
+    ``water_level``, ``precipitation``, ``groundwater_level``); by default the
+    source's variables are tried in its preferred order (discharge first).
+    Returns ``{"series": pd.Series | None, "variable": str, "unit": str,
+    "note": str}``; ``note`` says where the data came from and any
+    record-length limit of the source.
     """
     if source not in SOURCES:
         raise ValueError(f"Unknown source {source!r}")
@@ -169,21 +187,22 @@ def fetch_series(source: str, station_id: str, *, years: int = 40, prefer_archiv
     note = ""
 
     if prefer_archive:
-        from aquascope.archive.observations import HARVESTABLE, fetch_archived_series
+        from aquascope.archive.observations import ARCHIVE_UNITS, fetch_archived_series, harvestable_variables
 
-        var = HARVESTABLE.get(source)
-        if var:
+        candidates = (variable,) if variable else harvestable_variables(source)
+        for var in candidates:
+            if var not in harvestable_variables(source):
+                continue
             archived = fetch_archived_series(source, station_id, var)
             if archived is not None and not archived.empty:
                 archived = archived[archived.index >= pd.Timestamp(start)]
-                unit = {"discharge": "m3/s", "precipitation": "mm", "water_level": "m"}.get(var, "")
                 return {
                     "series": archived,
                     "variable": var,
-                    "unit": unit,
+                    "unit": ARCHIVE_UNITS.get(var, ""),
                     "note": (
-                        f"From the AquaScope archive (daily means harvested from {SOURCES[source].agency}; "
-                        f"{archived.index.min().date()} to {archived.index.max().date()})."
+                        f"From the AquaScope archive (daily {var.replace('_', ' ')} harvested from "
+                        f"{SOURCES[source].agency}; {archived.index.min().date()} to {archived.index.max().date()})."
                     ),
                 }
 
@@ -192,43 +211,52 @@ def fetch_series(source: str, station_id: str, *, years: int = 40, prefer_archiv
         # the collector maps it onto NWIS (number + agencyCd) or the OGC monitoring_location_id.
         c = build_collector("usgs")
         span = int(years * 365.25)
-        recs = c.collect(station_id=station_id, days=span, collection="daily", parameter="00060", max_items=None)
-        s, var, unit = _records_to_series(recs)
-        if s is None:
-            recs = c.collect(station_id=station_id, days=span, collection="daily", parameter="00065", max_items=None)
+        s, var, unit = None, "", ""
+        for want in (variable,) if variable else ("discharge", "water_level"):
+            code = _USGS_CODES.get(want or "")
+            if code is None:
+                continue
+            recs = c.collect(station_id=station_id, days=span, collection="daily", parameter=code, max_items=None)
             s, var, unit = _records_to_series(recs)
+            if s is not None:
+                break
         note = "USGS daily values (NWIS), full period requested."
     elif source == "uk_ea":
         c = build_collector("uk_ea")
-        measure = _uk_ea_pick_measure(c, station_id)
+        measure, measure_var = _uk_ea_pick_measure(c, station_id, variable=variable)
         s = None
         var = unit = ""
         if measure:
             recs = c.collect(measure=measure, min_date=start.isoformat(), max_date=end.isoformat(), max_items=None)
             s, var, unit = _records_to_series(recs)
+            if s is not None and measure_var == "groundwater_level":
+                var = "groundwater_level"  # WaterLevelReading, but the measure is a borehole / tubewell
         note = f"Environment Agency Hydrology API, measure {measure or 'n/a'}."
     elif source == "hubeau_hydrometrie":
         c = build_collector("hubeau_hydrometrie")
-        # Long record first: obs_elab QmnJ is the daily mean discharge (multi-decade where the
-        # station computes it); fall back to the real-time feed (last 30 days) for H-only stations.
-        recs = c.collect(
-            code_station=station_id, elaborated="QmnJ", date_debut_obs=start.isoformat(),
-            date_fin_obs=end.isoformat(), size=20_000, max_items=None,
-        )
-        s, var, unit = _records_to_series(recs)
-        note = "Hub'Eau elaborated daily mean discharge (obs_elab QmnJ), full period requested."
-        if s is None:
+        s, var, unit = None, "", ""
+        if variable in (None, "discharge"):
+            # Long record first: obs_elab QmnJ is the daily mean discharge (multi-decade where the
+            # station computes it); fall back to the real-time feed (last 30 days) for H-only stations.
+            recs = c.collect(
+                code_station=station_id, elaborated="QmnJ", date_debut_obs=start.isoformat(),
+                date_fin_obs=end.isoformat(), size=20_000, max_items=None,
+            )
+            s, var, unit = _records_to_series(recs)
+            note = "Hub'Eau elaborated daily mean discharge (obs_elab QmnJ), full period requested."
+        if s is None and variable in (None, "discharge"):
             recs = c.collect(code_station=station_id, grandeur_hydro="Q", days=30)
             s, var, unit = _records_to_series(recs)
-            if s is None:
-                recs = c.collect(code_station=station_id, grandeur_hydro="H", days=30)
-                s, var, unit = _records_to_series(recs)
             note = "Hub'Eau real-time observations (last 30 days); this station has no elaborated daily discharge."
+        if s is None and variable in (None, "water_level"):
+            recs = c.collect(code_station=station_id, grandeur_hydro="H", days=30)
+            s, var, unit = _records_to_series(recs)
+            note = "Hub'Eau real-time water level (last 30 days)."
     elif source == "pegelonline":
         c = build_collector("pegelonline")
         recs = c.collect(station_id=station_id, timeseries=("Q", "W"), days=31)
-        s, var, unit = _records_to_series(recs, prefer="discharge")
-        if s is None:
+        s, var, unit = _records_to_series(recs, prefer=variable or "discharge")
+        if s is None and not variable:
             s, var, unit = _records_to_series(recs)
         note = "PEGELONLINE serves the last 31 days only."
     elif source == "ireland_opw":
@@ -251,28 +279,48 @@ def fetch_series(source: str, station_id: str, *, years: int = 40, prefer_archiv
     else:
         raise ValueError(f"{source} has no Explorer fetch path yet")
 
+    if variable and s is not None and var != variable:
+        s, var, unit = None, "", ""  # the station has no record of the variable asked for
     return {"series": s, "variable": var, "unit": unit, "note": note}
 
 
 # EA stations publish several measures per property (daily min / mean / max,
-# 15-minute instantaneous). One series at a time: prefer the daily mean flow.
-_UK_EA_PREFERENCE = (
-    ("flow", 86400, "mean"),
-    ("level", 86400, "mean"),
-    ("rainfall", 86400, "total"),
-    ("groundwaterLevel", 86400, "mean"),
-    ("level", 86400, "max"),
-    ("flow", 900, "instantaneous"),
+# 15-minute instantaneous, and for boreholes the manual "dipped" readings).
+# One series at a time: per variable, the daily statistic that best stands
+# for the day comes first; the 15-minute series is the last resort.
+_UK_EA_VARIABLE_ORDER = ("discharge", "water_level", "precipitation", "groundwater_level")
+_UK_EA_STAT_ORDER = (
+    (86400, "mean"), (86400, "total"), (86400, "maximum"), (0, "instantaneous"), (900, "instantaneous"),
 )
 
 
-def _uk_ea_pick_measure(collector, station_id: str) -> str | None:
-    """Return the measure @id to fetch for a station (see ``_UK_EA_PREFERENCE``)."""
+def _uk_ea_measure_variable(m: dict) -> str | None:
+    """Archive variable served by an EA measure, from its parameter, unit and notation."""
+    parameter = str(m.get("parameter") or "")
+    unit = str(m.get("unitName") or m.get("unit") or "")
+    mid = str(m.get("@id") or "")
+    if parameter == "flow":
+        return "discharge"
+    if parameter == "rainfall":
+        return "precipitation"
+    if parameter == "groundwaterLevel" or "-gw-" in mid or unit.startswith("mAOD"):
+        return "groundwater_level"
+    if parameter == "level":
+        return "water_level"
+    return None
+
+
+def _uk_ea_pick_measure(collector, station_id: str, *, variable: str | None = None) -> tuple[str | None, str | None]:
+    """Return ``(measure notation, variable)`` to fetch for a station, or ``(None, None)``.
+
+    ``variable`` restricts the choice to measures serving that archive variable;
+    otherwise variables are tried in ``_UK_EA_VARIABLE_ORDER`` (flow first).
+    """
     try:
         data = collector.client.get_json(f"id/stations/{station_id}.json")
     except Exception as exc:  # noqa: BLE001
         logger.info("uk_ea station lookup failed for %s: %s", station_id, exc)
-        return None
+        return None, None
     items = data.get("items") or []
     station = items[0] if isinstance(items, list) and items else items
     measures = station.get("measures") or []
@@ -288,14 +336,19 @@ def _uk_ea_pick_measure(collector, station_id: str) -> str | None:
         mid = m.get("@id")
         return str(mid).rsplit("/", 1)[-1] if mid else None  # the collector wants the notation, not the URL
 
-    for parameter, period, statistic in _UK_EA_PREFERENCE:
-        for m in measures:
-            if m.get("parameter") == parameter and int(m.get("period") or 0) == period and stat(m) == statistic:
-                return notation(m)
-    daily = [m for m in measures if int(m.get("period") or 0) == 86400 and m.get("@id")]
-    if daily:
-        return notation(daily[0])
-    return notation(measures[0]) if measures else None
+    wanted = (variable,) if variable else _UK_EA_VARIABLE_ORDER
+    for want in wanted:
+        mine = [m for m in measures if _uk_ea_measure_variable(m) == want and m.get("@id")]
+        for period, statistic in _UK_EA_STAT_ORDER:
+            for m in mine:
+                if int(m.get("period") or 0) == period and stat(m) == statistic:
+                    return notation(m), want
+        if mine:
+            daily = [m for m in mine if int(m.get("period") or 0) == 86400]
+            return notation((daily or mine)[0]), want
+    if variable or not measures:
+        return None, None
+    return notation(measures[0]), _uk_ea_measure_variable(measures[0])
 
 
 # ── analytics ───────────────────────────────────────────────────────────────
@@ -384,11 +437,17 @@ def analyze_series(s: pd.Series, variable: str, unit: str) -> dict[str, Any]:
                 f"{len(am)}."
             )
 
-    if len(am) >= 8:
+    # Trend on annual means of the well-covered years. "Well covered" is relative
+    # to the record's own sampling (daily gauges vs monthly borehole dips), so a
+    # 40-year manual groundwater record still gets a trend.
+    counts = s.resample("YS").count()
+    typical = float(counts[counts > 0].median()) if (counts > 0).any() else 0.0
+    covered = counts[counts >= 0.8 * typical].index if typical else counts.index[:0]
+    if len(covered) >= 8:
         try:
             from aquascope.analysis.trends import mann_kendall, sens_slope
 
-            annual_mean = s.resample("YS").mean().dropna()
+            annual_mean = s.resample("YS").mean().reindex(covered).dropna()
             mk = mann_kendall(annual_mean.values)
             slope = sens_slope(annual_mean.values)
             out["trend"] = {
@@ -421,16 +480,22 @@ def flood_ci(s: pd.Series) -> dict[str, Any]:
 
 
 def analyze_station(
-    source: str, station_id: str, *, years: int = 40, store: dict[str, Any] | None = None
+    source: str,
+    station_id: str,
+    *,
+    years: int = 40,
+    store: dict[str, Any] | None = None,
+    variable: str | None = None,
 ) -> dict[str, Any]:
     """Fetch + analyse one station. The entry point the browser worker calls.
 
     Pass ``store`` (any dict) to keep the fetched pandas Series under
     ``store["series"]`` for follow-up calls such as :func:`flood_ci` and
-    :func:`to_csv` without a second fetch.
+    :func:`to_csv` without a second fetch. ``variable`` picks one of the
+    station's variables (default: the source's preferred one, discharge first).
     """
     meta = SOURCES[source]
-    fetched = fetch_series(source, station_id, years=years)
+    fetched = fetch_series(source, station_id, years=years, variable=variable)
     if store is not None:
         store["series"] = fetched["series"]
         store["source"], store["station_id"] = source, station_id
