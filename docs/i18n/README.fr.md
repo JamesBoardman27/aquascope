@@ -1,6 +1,6 @@
 # AquaScope, démarrage rapide
 
-[English](https://github.com/Rekin226/aquascope/blob/main/README.md)
+[English](../index.md)
 
 ## ⚡ Installation
 ```bash
