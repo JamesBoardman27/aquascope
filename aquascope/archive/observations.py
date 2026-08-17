@@ -250,7 +250,8 @@ def harvest_observations(
             previous = json.loads(last_path.read_text(encoding="utf-8"))
             if previous.get("run_at", "")[:10] == merged["run_at"][:10]:
                 mine = {s["source"] for s in merged["sources"]}
-                merged["sources"] = [s for s in previous.get("sources", []) if s["source"] not in mine] + merged["sources"]
+                kept = [s for s in previous.get("sources", []) if s["source"] not in mine]
+                merged["sources"] = kept + merged["sources"]
         except (json.JSONDecodeError, KeyError, TypeError):
             pass
     last_path.write_text(json.dumps(merged, indent=1), encoding="utf-8")
