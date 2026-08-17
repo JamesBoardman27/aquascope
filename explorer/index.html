@@ -42,9 +42,40 @@
             <li><strong>USGS</strong>, <strong>UK EA</strong> and <strong>Hub'Eau</strong> (daily mean discharge, obs_elab): full daily records → flood frequency with 90 % CI, FDC, trend.</li>
             <li><strong>PEGELONLINE</strong>, <strong>Ireland OPW</strong>: the last ~month (that is all those feeds publish) → hydrograph.</li>
             <li><strong>Taiwan CWA</strong>: daily rainfall, last 10 years.</li>
+            <li>Click anywhere that is not a gauge: ERA5 rainfall, temperature, FAO-56 ET0, aridity, and GloFAS modelled discharge for that spot, plus the nearest gauges.</li>
             <li>First analysis loads Python in your browser (about 15 MB, once). After that it is quick.</li>
           </ul>
         </details>
+      </div>
+
+      <div id="panel-point" hidden>
+        <div class="station-head">
+          <span class="badge" style="background:#455a64">Anywhere</span>
+          <h2 id="pt-title">Point</h2>
+          <div class="st-meta"><span id="pt-coords"></span> · ERA5 climate + GloFAS modelled discharge, last 10 years</div>
+          <div class="st-actions">
+            <button id="btn-share-pt" class="btn" title="Copy a link to this point">Copy link</button>
+          </div>
+        </div>
+        <div id="pt-status" class="status"></div>
+        <section id="pt-sec-climate" hidden>
+          <div class="kpis" id="pt-kpis"></div>
+          <h3>Monthly climate</h3>
+          <div id="plot-climate" class="plot"></div>
+        </section>
+        <section id="pt-sec-glofas" hidden>
+          <h3>Modelled river discharge (GloFAS) <span class="muted">grid cell, not a gauge</span></h3>
+          <div id="pt-glofas-kpis" class="kpis"></div>
+          <table class="ffa" id="pt-ffa-table"></table>
+        </section>
+        <section id="pt-sec-nearest">
+          <h3>Nearest gauges</h3>
+          <ul id="pt-nearest" class="nearest"></ul>
+        </section>
+        <section id="pt-sec-notes" hidden><ul id="pt-notes"></ul></section>
+        <section id="pt-sec-methods" hidden>
+          <details><summary>Methods and citations</summary><ol id="pt-methods"></ol><p class="muted" id="pt-attribution"></p></details>
+        </section>
       </div>
 
       <div id="panel-station" hidden>

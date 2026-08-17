@@ -257,13 +257,15 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 23-command CLI for the most common workflows:
+AquaScope ships a 25-command CLI for the most common workflows:
 
 ```bash
 # Find stations, then collect data
 aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
 aquascope harvest stations --out archive          # the open gauge catalog (GeoParquet)
 aquascope mcp                                     # serve the same tools to Claude / Cursor over MCP
+aquascope ask "100-year flood of the Seine at Paris?"   # the analyst: tools + a cited Markdown report
+aquascope ingest agency_export.csv --unit cfs     # any CSV/Excel -> clean daily series + QA report
 aquascope collect --source usgs --days 365
 aquascope collect --source wapor --bbox 30.5,29.8,31.1,30.2 --variable RET --start-date 2026-04-01
 

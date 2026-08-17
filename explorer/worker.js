@@ -46,6 +46,19 @@ json.dumps(_res)
   post("result", { id, result: JSON.parse(out) });
 }
 
+async function anywhere({ id, lat, lon, years }) {
+  post("progress", { text: "Asking Open-Meteo about this point (ERA5 climate, GloFAS discharge)…" });
+  const code = `
+import json
+_STORE.clear()
+_res = analysis.anywhere(${Number(lat)}, ${Number(lon)}, years=${Number(years) || 10})
+_STORE["result"] = _res
+json.dumps(_res)
+`;
+  const out = await pyodide.runPythonAsync(code);
+  post("result", { id, result: JSON.parse(out) });
+}
+
 async function floodCi({ id }) {
   const code = `
 import json
@@ -68,6 +81,7 @@ self.onmessage = async (e) => {
     if (m.type === "init") { ready = init(m); await ready; return; }
     await ready;
     if (m.type === "analyze") return await analyze(m);
+    if (m.type === "anywhere") return await anywhere(m);
     if (m.type === "flood_ci") return await floodCi(m);
     if (m.type === "csv") return await csv(m);
   } catch (err) {
