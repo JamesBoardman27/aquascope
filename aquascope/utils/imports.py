@@ -21,6 +21,9 @@ _INSTALL_MAP = {
     "pyproj": "spatial",
     "streamlit": "dashboard",
     "openai": "llm",
+    "pyarrow": "archive",
+    "huggingface_hub": "archive",
+    "mcp": "mcp",
 }
 
 

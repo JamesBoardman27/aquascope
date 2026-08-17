@@ -499,6 +499,149 @@ def cmd_stations(args: argparse.Namespace) -> None:
     logger.info("Saved %d stations to %s", len(stations), out_path)
 
 
+def cmd_harvest(args: argparse.Namespace) -> None:
+    """Harvest station catalogs into GeoParquet (+ GeoJSON, health.json) and optionally publish."""
+    from aquascope.archive import harvest_stations, publish_folder
+
+    if args.what == "obs":
+        _cmd_harvest_obs(args)
+        return
+
+    report = harvest_stations(
+        args.out,
+        sources=args.source or None,
+        max_items=args.max_items,
+        api_key=args.api_key,
+        max_workers=args.workers,
+        write_geojson=not args.no_geojson,
+    )
+    for s in report.sources:
+        status = f"{s.n_stations:>6} stations" if s.ok else f"FAILED: {s.error}"
+        print(f"  {s.source:<24} {status}  ({s.seconds:.1f}s)")
+    print(f"\n  {report.n_stations} stations, {report.n_ok}/{len(report.sources)} sources OK -> {args.out}")
+
+    if args.publish:
+        if report.n_ok == 0:
+            logger.error("Every source failed; not publishing an empty catalog.")
+            sys.exit(1)
+        url = publish_folder(args.out, args.publish, commit_message=f"harvest stations {report.run_at}")
+        print(f"  published: {url}")
+
+    if report.n_ok == 0:
+        sys.exit(1)
+
+
+def _cmd_harvest_obs(args: argparse.Namespace) -> None:
+    """`aquascope harvest obs`: budgeted, incremental per-station daily series (#188 Phase 1)."""
+    from aquascope.archive import publish_folder
+    from aquascope.archive.observations import HARVESTABLE, harvest_observations, sync_from_hub
+
+    if args.sync_from:
+        sync_from_hub(args.out, args.sync_from)
+    sources = args.source or None
+    if sources:
+        bad = [s for s in sources if s not in HARVESTABLE]
+        if bad:
+            logger.error("Not harvestable yet: %s. Choose from %s", bad, list(HARVESTABLE))
+            sys.exit(2)
+    report = harvest_observations(
+        args.out,
+        sources=sources,
+        variable=args.variable,
+        years=args.years,
+        max_stations=args.max_stations,
+        refresh_days=args.refresh_days,
+        only_stations=args.station or None,
+    )
+    for h in report.sources:
+        print(
+            f"  {h.source:<20} {h.variable:<14} harvested {h.harvested:>4}  empty {h.empty:>4}  "
+            f"failed {h.failed:>3}  of {h.attempted:>4} picked  ({h.seconds:.0f}s)"
+        )
+        for err in h.errors[:3]:
+            print(f"      {err}")
+    total = sum(h.harvested for h in report.sources)
+    print(f"\n  {total} station files written under {args.out}/obs")
+
+    if args.publish:
+        url = publish_folder(args.out, args.publish, commit_message=f"harvest obs {report.run_at}")
+        print(f"  published: {url}")
+
+
+def cmd_ask(args: argparse.Namespace) -> None:
+    """Ask a water question; the analyst calls aquascope tools and writes a cited answer."""
+    from aquascope.ai_engine.analyst import ask
+
+    def on_event(msg: str) -> None:
+        if not args.quiet:
+            print(f"  · {msg}", file=sys.stderr)
+
+    try:
+        result = ask(
+            args.question, provider=args.provider, model=args.model, api_key=args.api_key, base_url=args.base_url,
+            max_steps=args.max_steps, on_event=on_event,
+        )
+    except (RuntimeError, ValueError, ImportError) as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    md = result.to_markdown()
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(md, encoding="utf-8")
+        print(f"\n  Report saved to {args.out}")
+        print(result.answer)
+    else:
+        print(md)
+
+
+def cmd_ingest(args: argparse.Namespace) -> None:
+    """Map + QA an arbitrary CSV/Excel export into a clean series with a report."""
+    from aquascope.ingest import ingest, write_outputs
+
+    client = model = None
+    if args.llm:
+        try:
+            from openai import OpenAI
+
+            from aquascope.ai_engine.analyst import resolve_llm
+
+            cfg = resolve_llm(args.provider, args.model, args.api_key)
+            client, model = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"]), cfg["model"]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM mapping unavailable (%s); using heuristics", exc)
+    try:
+        result = ingest(
+            args.file, variable=args.variable, date_column=args.date_column, value_column=args.value_column,
+            unit=args.unit, station=args.station, sheet=args.sheet, llm_client=client, llm_model=model,
+            description=args.describe or "",
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    m, q = result["mapping"], result["qa"]
+    print(f"  mapping  : {m['datetime_column']} + {m['value_column']} -> {m['variable']} [{m['unit']}] "
+          f"(x{m['to_si_factor']}, {m['method']}, confidence {m['confidence']:.0%})")
+    print(f"  values   : {q['n_values']:,} kept of {q['n_rows_in']:,} rows; {q['start']} -> {q['end']}; "
+          f"coverage {q['coverage_pct']}%")
+    print(f"  dropped  : {q['n_duplicates_dropped']} duplicates, {q['n_sentinels_dropped']} sentinels; "
+          f"flagged {q['n_negative']} negative, {q['n_spikes_flagged']} spikes")
+    for w in q["warnings"]:
+        print(f"  warning  : {w}")
+    stem = args.out or str(Path(args.file).with_suffix("")) + "_clean"
+    paths = write_outputs(result, stem)
+    print(f"  written  : {paths['csv']}, {paths['qa_md']}")
+
+
+def cmd_mcp(args: argparse.Namespace) -> None:
+    """Serve aquascope's tools over the Model Context Protocol (stdio by default)."""
+    try:
+        from aquascope.mcp_server import main as mcp_main
+    except ImportError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    mcp_main(transport=args.transport)
+
+
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
@@ -1169,6 +1312,56 @@ def main() -> None:
     p_stations.add_argument("--format", choices=["json", "csv", "geojson"], default="geojson")
     p_stations.add_argument("--output", "-o", default=None, help="Output path (default: data/stations_<sources>.<ext>)")
 
+    # ── harvest ──────────────────────────────────────────────────────
+    p_harvest = sub.add_parser("harvest", help="Harvest catalogs into GeoParquet for the open archive (#188)")
+    p_harvest.add_argument("what", choices=["stations", "obs"], help="stations: the catalog; obs: daily series")
+    p_harvest.add_argument("--out", default="archive", help="Output folder (default: ./archive)")
+    p_harvest.add_argument("--source", action="append", choices=source_keys(), help="Restrict to a source (repeatable)")
+    p_harvest.add_argument("--max-items", type=int, default=None, help="stations: cap per source (for smoke tests)")
+    p_harvest.add_argument("--variable", default=None, help="obs: variable to harvest (default per source)")
+    p_harvest.add_argument("--years", type=int, default=40, help="obs: how far back to ask (default 40)")
+    p_harvest.add_argument("--max-stations", type=int, default=100, help="obs: stations per source per run")
+    p_harvest.add_argument("--refresh-days", type=int, default=30, help="obs: re-harvest a station older than this")
+    p_harvest.add_argument("--station", action="append", help="obs: only these station ids (repeatable)")
+    p_harvest.add_argument("--sync-from", default=None, metavar="REPO_ID",
+                           help="obs: download the existing obs/ tree from this dataset first (incremental runs)")
+    p_harvest.add_argument("--api-key", default=None)
+    p_harvest.add_argument("--workers", type=int, default=4)
+    p_harvest.add_argument("--no-geojson", action="store_true", help="Skip stations.geojson")
+    p_harvest.add_argument("--publish", default=None, metavar="REPO_ID",
+                           help="Upload the folder to this Hugging Face dataset (needs HF_TOKEN)")
+
+    # ── ask ──────────────────────────────────────────────────────────
+    p_ask = sub.add_parser("ask", help="Ask a water question in plain language; get a cited answer from real data")
+    p_ask.add_argument("question")
+    p_ask.add_argument("--provider", choices=["openai", "groq", "huggingface", "ollama"], default=None)
+    p_ask.add_argument("--model", default=None)
+    p_ask.add_argument("--api-key", default=None)
+    p_ask.add_argument("--base-url", default=None, help="Any OpenAI-compatible endpoint")
+    p_ask.add_argument("--max-steps", type=int, default=8, help="Tool-call rounds allowed (default 8)")
+    p_ask.add_argument("--out", "-o", default=None, help="Save the Markdown report here")
+    p_ask.add_argument("--quiet", "-q", action="store_true", help="Do not print tool calls as they happen")
+
+    # ── ingest ───────────────────────────────────────────────────────
+    p_ingest = sub.add_parser("ingest", help="Map + QA any CSV/Excel export into a clean daily series with a report")
+    p_ingest.add_argument("file")
+    p_ingest.add_argument("--variable", default=None, choices=list(VARIABLES))
+    p_ingest.add_argument("--date-column", default=None)
+    p_ingest.add_argument("--value-column", default=None)
+    p_ingest.add_argument("--unit", default=None, help="Unit of the value column (cfs, m3/s, l/s, mm, cm, ft, in)")
+    p_ingest.add_argument("--station", default=None, help="Keep only this station id when the file holds several")
+    p_ingest.add_argument("--sheet", default=None, help="Excel sheet name or index")
+    p_ingest.add_argument("--describe", default=None, help="A sentence about the file (helps the LLM mapping)")
+    p_ingest.add_argument("--llm", action="store_true", help="Let a configured LLM propose the column mapping")
+    p_ingest.add_argument("--provider", choices=["openai", "groq", "huggingface", "ollama"], default=None)
+    p_ingest.add_argument("--model", default=None)
+    p_ingest.add_argument("--api-key", default=None)
+    p_ingest.add_argument("--out", "-o", default=None, help="Output stem (default: <file>_clean)")
+
+    # ── mcp ──────────────────────────────────────────────────────────
+    p_mcp = sub.add_parser("mcp", help="Serve find_stations / get_timeseries / analyze_station over MCP (#113)")
+    p_mcp.add_argument("--transport", choices=["stdio", "sse", "streamable-http"], default="stdio")
+
     # ── solve ─────────────────────────────────────────────────────────
     p_solve = sub.add_parser("solve", help="Solve a water challenge from a natural-language description")
     p_solve.add_argument(
@@ -1355,6 +1548,10 @@ def main() -> None:
         "list-methods": cmd_list_methods,
         "list-sources": cmd_list_sources,
         "stations": cmd_stations,
+        "harvest": cmd_harvest,
+        "mcp": cmd_mcp,
+        "ask": cmd_ask,
+        "ingest": cmd_ingest,
         "solve": cmd_solve,
         "forecast": cmd_forecast,
         "plot": cmd_plot,
