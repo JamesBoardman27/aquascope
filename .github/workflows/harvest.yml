@@ -3,8 +3,9 @@ name: Harvest station catalogs
 # The Archive (#188). Phase 0: every station-capable source is asked for its
 # catalog (GeoParquet + GeoJSON + health.json). Phase 1: a budget of stations
 # per source gets its daily series harvested into obs/<variable>/<source>/,
-# incrementally (the previous obs/ tree is synced first). Everything is then
-# published to the public Hugging Face dataset. Per-source failures are
+# incrementally (the previous obs/ tree is synced first). Phase 2: more
+# variables (level, rainfall, groundwater) and one Parquet bundle per variable
+# and source. Everything is then published to the public Hugging Face dataset. Per-source failures are
 # recorded and shown in the job summary; the run only fails when every
 # catalog source failed.
 
@@ -74,11 +75,21 @@ jobs:
         timeout-minutes: 120
         run: |
           set +e
-          aquascope harvest obs --out archive --source usgs --source uk_ea --source hubeau_hydrometrie \
-            --max-stations ${{ inputs.obs_budget || 150 }}
-          aquascope harvest obs --out archive --source taiwan_cwa --max-stations 15
+          B=${{ inputs.obs_budget || 150 }}
+          # Phase 1: discharge for the three long-record sources.
+          aquascope harvest obs --out archive --variable discharge \
+            --source usgs --source uk_ea --source hubeau_hydrometrie --max-stations $B
+          # Phase 2: the other variables, smaller budgets (UK EA: 3.6k boreholes, 1k rain gauges, 2.6k level sites).
+          aquascope harvest obs --out archive --variable groundwater_level --source uk_ea --max-stations $((B / 2))
+          aquascope harvest obs --out archive --variable precipitation --source uk_ea --max-stations $((B / 3))
+          aquascope harvest obs --out archive --variable water_level --source uk_ea --max-stations $((B / 3))
+          aquascope harvest obs --out archive --variable water_level --source usgs --max-stations $((B / 5))
+          aquascope harvest obs --out archive --variable precipitation --source taiwan_cwa --max-stations 15
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           set -e
+
+      - name: Roll the per-station files into Parquet bundles (one per variable and source)
+        run: aquascope harvest bundles --out archive
 
       - name: Publish to the Hugging Face dataset
         # inputs.publish is a boolean input: compare it as one (a string compare
