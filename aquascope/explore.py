@@ -188,13 +188,14 @@ def fetch_series(source: str, station_id: str, *, years: int = 40, prefer_archiv
                 }
 
     if source == "usgs":
-        number = station_id.split("-", 1)[-1]
+        # Pass the catalog id as-is ("USGS-01646500" or another agency's "CA574-09527500");
+        # the collector maps it onto NWIS (number + agencyCd) or the OGC monitoring_location_id.
         c = build_collector("usgs")
         span = int(years * 365.25)
-        recs = c.collect(station_id=number, days=span, collection="daily", parameter="00060", max_items=None)
+        recs = c.collect(station_id=station_id, days=span, collection="daily", parameter="00060", max_items=None)
         s, var, unit = _records_to_series(recs)
         if s is None:
-            recs = c.collect(station_id=number, days=span, collection="daily", parameter="00065", max_items=None)
+            recs = c.collect(station_id=station_id, days=span, collection="daily", parameter="00065", max_items=None)
             s, var, unit = _records_to_series(recs)
         note = "USGS daily values (NWIS), full period requested."
     elif source == "uk_ea":

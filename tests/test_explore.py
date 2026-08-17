@@ -105,7 +105,7 @@ def test_analyze_station_usgs_end_to_end_with_fake_collector():
     with patch.object(analysis, "build_collector", return_value=fake):
         store = {}
         out = analysis.analyze_station("usgs", "USGS-01646500", years=15, store=store)
-    assert fake.calls[0]["station_id"] == "01646500"  # prefix stripped for NWIS
+    assert fake.calls[0]["station_id"] == "USGS-01646500"  # the collector maps the id for NWIS / OGC itself
     assert out["source"] == "usgs" and out["agency"].startswith("U.S. Geological")
     assert out["license"] == "US-PD" and "public domain" in out["attribution"]
     assert out["n"] > 5000 and "ffa" in out
