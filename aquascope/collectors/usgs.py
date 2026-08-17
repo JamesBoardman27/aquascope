@@ -229,7 +229,21 @@ class USGSCollector(BaseCollector):
                 "format": "json",
             }
             if sites:
-                params["sites"] = sites
+                # Accept "01646500", "USGS-01646500" or another agency's "CA574-09527500":
+                # NWIS wants the bare number plus agencyCd for non-USGS sites.
+                site_str = ",".join(sites) if isinstance(sites, (list, tuple)) else str(sites)
+                numbers, agencies = [], set()
+                for part in site_str.split(","):
+                    part = part.strip()
+                    if "-" in part:
+                        agency, number = part.split("-", 1)
+                        agencies.add(agency.upper())
+                        numbers.append(number)
+                    elif part:
+                        numbers.append(part)
+                params["sites"] = ",".join(numbers)
+                if len(agencies) == 1 and next(iter(agencies)) != "USGS":
+                    params["agencyCd"] = next(iter(agencies))
             if parameter_cd:
                 params["parameterCd"] = parameter_cd
             if bbox_val:
@@ -326,7 +340,7 @@ class USGSCollector(BaseCollector):
         # legacy NWIS kwargs onto them instead of silently crawling the nation.
         if sites:
             site_list = [str(x).strip() for x in (sites if isinstance(sites, (list, tuple)) else str(sites).split(","))]
-            params["monitoring_location_id"] = ",".join(x if x.startswith("USGS-") else f"USGS-{x}" for x in site_list if x)
+            params["monitoring_location_id"] = ",".join(x if "-" in x else f"USGS-{x}" for x in site_list if x)
         if parameter_cd:
             params["parameter_code"] = parameter_cd
         if state_cd:
