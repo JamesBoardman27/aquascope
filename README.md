@@ -127,7 +127,13 @@ print(sig.flashiness_index)    # Richards-Baker flashiness index
 ### 3. Collect data from any of the 28 sources
 
 ```python
+from aquascope import find_stations
 from aquascope.collectors import USGSCollector, AquastatCollector, WaPORCollector
+
+# Which gauges measure discharge around Greater London? (USGS, UK EA, Hub'Eau,
+# PEGELONLINE, Ireland OPW and Taiwan CWA expose station catalogs; more coming)
+gauges = find_stations(bbox=(-0.5, 51.3, 0.3, 51.7), variable="discharge")
+print(gauges[0].name, gauges[0].url)
 
 usgs = USGSCollector()   # pass api_key=... for reliable access
 flow = usgs.collect(days=7, bbox="-77.6,38.7,-76.9,39.1")   # Potomac basin, last week
@@ -240,10 +246,11 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 20-command CLI for the most common workflows:
+AquaScope ships a 21-command CLI for the most common workflows:
 
 ```bash
-# Collect data
+# Find stations, then collect data
+aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
 aquascope collect --source usgs --days 365
 aquascope collect --source wapor --bbox 30.5,29.8,31.1,30.2 --variable RET --start-date 2026-04-01
 
