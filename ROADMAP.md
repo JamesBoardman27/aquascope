@@ -35,7 +35,7 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 - [x] JOSS paper submission (`paper.md` + `paper.bib`)
 - [x] PyPI release (sdist + wheel + GitHub Actions publish workflow)
 - [x] Shared source registry with licence and station-catalog metadata; `find_stations()` and `aquascope stations` over six catalogs (#187)
-- [x] The Archive, Phase 0 + 1: 45,919-station GeoParquet catalog and per-station daily observations on Hugging Face, weekly harvest with collector-health issues (#188)
+- [x] The Archive, Phase 0 + 1 + 2: 45,919-station GeoParquet catalog, per-station daily observations (discharge, water level, rainfall, groundwater level) and one Parquet bundle per variable and source on Hugging Face, weekly harvest with collector-health issues (#188)
 - [x] The Explorer: static MapLibre + DuckDB-WASM + Pyodide page with click-any-gauge analysis and click-anywhere climate cards (#189)
 - [x] MCP server (`aquascope mcp`), the Analyst (`aquascope ask`) and `aquascope ingest` (#113)
 - [x] GeoLibre plugin: AquaScope Gauges (`integrations/geolibre`)
@@ -56,7 +56,7 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 
 Ambitious, high-impact work that takes AquaScope to the next level. These are [`major feature`](https://github.com/Rekin226/aquascope/labels/major%20feature) · `help wanted` — larger than a weekend, mentorship available. Comment on the issue to discuss scope before starting.
 
-- [ ] Archive Phase 2: groundwater / reservoir / quality variables, yearly parquet bundles for bulk users, a data paper ([#188](https://github.com/Rekin226/aquascope/issues/188))
+- [ ] Archive Phase 3: reservoir storage and water-quality variables, more agencies with a `stations()` catalog (Australia BOM, Taiwan WRA), a data paper ([#188](https://github.com/Rekin226/aquascope/issues/188))
 - [ ] Explorer Phase 2: catchment polygons (HydroBASINS PMTiles), Analyst panel in the page, GR4J once it runs in seconds ([#189](https://github.com/Rekin226/aquascope/issues/189))
 - [ ] CAMELS-TW / Caravan Asia extension built from the archive ([#100](https://github.com/Rekin226/aquascope/issues/100), [#99](https://github.com/Rekin226/aquascope/issues/99))
 - [ ] Prediction in Ungauged Basins — regionalize signatures/parameters ([#53](https://github.com/Rekin226/aquascope/issues/53)) — *now unblocked by the shipped GR4J keystone*

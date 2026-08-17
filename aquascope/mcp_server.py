@@ -140,12 +140,14 @@ def get_timeseries(
     years: int = 10,
     resample: str = "D",
     max_points: int = 400,
+    variable: str | None = None,
 ) -> dict[str, Any]:
-    """Observed record for one station through aquascope's collector, resampled and bounded.
+    """Observed record for one station (archive first, then the agency), resampled and bounded.
 
     resample: 'D' daily, 'W' weekly, 'M' monthly means, 'Y' annual means. Values beyond ``max_points``
-    are thinned evenly (never more than 2,000). Returns unit, variable, stats and the points as
-    [date, value] pairs, plus licence and attribution.
+    are thinned evenly (never more than 2,000). variable: discharge (default), water_level,
+    precipitation or groundwater_level, for stations that have several. Returns unit, variable, stats
+    and the points as [date, value] pairs, plus licence and attribution.
     """
     import pandas as pd
 
@@ -153,8 +155,10 @@ def get_timeseries(
 
     if source not in SOURCES:
         return {"error": f"unknown source {source!r}"}
+    if variable and variable not in VARIABLES:
+        return {"error": f"unknown variable {variable!r}; allowed: {list(VARIABLES)}"}
     meta = SOURCES[source]
-    fetched = fetch_series(source, station_id, years=int(years))
+    fetched = fetch_series(source, station_id, years=int(years), variable=variable)
     s = fetched["series"]
     if s is None or s.empty:
         return {"source": source, "station_id": station_id, "n": 0, "error": "no observations returned",
@@ -183,18 +187,24 @@ def get_timeseries(
     }
 
 
-def analyze_station(source: str, station_id: str, years: int = 40, bootstrap_ci: bool = False) -> dict[str, Any]:
+def analyze_station(
+    source: str, station_id: str, years: int = 40, bootstrap_ci: bool = False, variable: str | None = None
+) -> dict[str, Any]:
     """Fetch and analyse one station: record summary, annual maxima, flood frequency (GEV L-moments and
     Log-Pearson III with 90 % CI; optional bootstrap GEV band), flow-duration percentiles, Mann-Kendall
     trend, and the method citations. Raw daily arrays are omitted; use get_timeseries for those.
+    variable picks one of the station's variables (discharge by default; water_level, precipitation,
+    groundwater_level where the station has them).
     """
     from aquascope.explore import analyze_station as _analyze
     from aquascope.explore import flood_ci
 
     if source not in SOURCES:
         return {"error": f"unknown source {source!r}"}
+    if variable and variable not in VARIABLES:
+        return {"error": f"unknown variable {variable!r}; allowed: {list(VARIABLES)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years), store=store)
+    res = _analyze(source, station_id, years=int(years), store=store, variable=variable)
     res.pop("series", None)
     if "fdc" in res:
         res["fdc"] = {k: res["fdc"][k] for k in ("q95", "q50", "q10")}
