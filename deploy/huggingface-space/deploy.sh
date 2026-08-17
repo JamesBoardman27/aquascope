@@ -19,3 +19,9 @@ hf upload "$SPACE" "$HERE" . --repo-type space --exclude "deploy.sh"
 
 echo "✓ Deployed. The Space builds in a few minutes at:"
 echo "  https://huggingface.co/spaces/$SPACE"
+echo
+echo "To give visitors the free AI recommender (no key needed on their side),"
+echo "add a read token from https://huggingface.co/settings/tokens as a Space"
+echo "secret named HF_TOKEN:"
+echo "  Settings → Variables and secrets → New secret → HF_TOKEN"
+echo "Without it the recommender still works, using the rule-based scorer."
