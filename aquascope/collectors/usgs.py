@@ -337,6 +337,7 @@ class USGSCollector(BaseCollector):
             params["hydrologic_unit_code"] = huc_val
 
         url = f"collections/{collection}/items"
+        seen_links: set[str] = set()
         while True:
             data = self.client.get_json(url, params=params)
             features = data.get("features", [])
@@ -352,11 +353,15 @@ class USGSCollector(BaseCollector):
                 (lnk["href"] for lnk in data.get("links", []) if lnk.get("rel") == "next"),
                 None,
             )
-            if not next_link or len(features) == 0:
+            if not next_link or len(features) == 0 or next_link in seen_links:
                 break
-            # next_link is absolute; switch to direct fetch
+            seen_links.add(next_link)
+            # next_link is absolute and already carries the cursor. params must be
+            # None, not {}: httpx rebuilds the query string from an empty dict and
+            # drops the cursor, which re-fetches page one from the disk cache
+            # forever (silent infinite loop, seen in the first CI harvest runs).
             url = next_link
-            params = {}
+            params = None
 
         return all_features
 
