@@ -81,7 +81,9 @@ jobs:
           set -e
 
       - name: Publish to the Hugging Face dataset
-        if: env.HF_TOKEN != '' && (github.event_name == 'schedule' || inputs.publish == 'true' || inputs.publish == '')
+        # inputs.publish is a boolean input: compare it as one (a string compare
+        # against 'true' is always false and silently skipped the first CI runs).
+        if: env.HF_TOKEN != '' && (github.event_name == 'schedule' || inputs.publish == true)
         run: |
           python - <<'EOF'
           import os
