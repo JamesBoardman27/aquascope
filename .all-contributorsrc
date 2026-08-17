@@ -149,6 +149,16 @@
         "doc",
         "bug"
       ]
+    },
+    {
+      "login": "khyahahati",
+      "name": "Khyati Tiwari",
+      "avatar_url": "https://avatars.githubusercontent.com/u/132439126?v=4",
+      "profile": "https://github.com/khyahahati",
+      "contributions": [
+        "code",
+        "data"
+      ]
     }
   ],
   "commitType": "docs"
