@@ -44,6 +44,8 @@ AquaScope unifies **29 global water-data sources** behind one Python schema, the
 (45,919 stations from USGS, UK EA, Hub'Eau, PEGELONLINE, Ireland OPW and Taiwan CWA). Click one and get the observed record,
 flood frequency with confidence limits, flow duration and trend, computed in your browser by aquascope on Pyodide.
 The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
+Press **Ask ✨** to type a question in plain language (bring your own key, Groq and Hugging Face are free): the model picks the
+tools, aquascope runs them in your browser, and the answer ends with the data used and the methods with citations.
 
 Prefer an assistant? `pip install "aquascope[mcp]"` then `claude mcp add aquascope -- aquascope mcp` gives Claude (or any
 MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_frequency` over the same catalog and methods

@@ -9,12 +9,13 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+body { display: flex; flex-direction: column; }
 a { color: var(--blue); }
 h1, h2, h3 { margin: 0; font-weight: 650; }
 .muted { color: var(--muted); }
 
 header#top {
-  height: var(--head-h); display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  min-height: var(--head-h); flex: none; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   padding: 0 1rem; border-bottom: 1px solid var(--line); background: var(--bg); position: relative; z-index: 5;
 }
 .brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
@@ -33,7 +34,7 @@ header#top {
 .chip.off { opacity: .4; text-decoration: line-through; }
 .count { font-size: .8rem; color: var(--muted); white-space: nowrap; }
 
-main { display: flex; height: calc(100% - var(--head-h)); }
+main { display: flex; flex: 1; min-height: 0; }
 #map { flex: 1; min-width: 0; }
 .panel { width: var(--panel-w); flex: none; overflow: auto; border-left: 1px solid var(--line); padding: 1rem; background: #fff; }
 .panel-empty h2 { font-size: 1.1rem; margin-bottom: .4rem; }
@@ -88,3 +89,40 @@ table.ffa .ci { color: var(--muted); font-size: .74rem; }
 .nearest li:hover { background: #f4f7fb; }
 .nearest li i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .nearest .dist { margin-left: auto; color: var(--muted); font-size: .78rem; white-space: nowrap; }
+
+/* ── Ask panel (the Analyst in the browser) ───────────────────────────────── */
+.ask-toggle { background: #6a1b9a; color: #fff; border-color: #6a1b9a; font-weight: 600; }
+.ask-toggle:hover:not(:disabled) { background: #7b1fa2 !important; }
+.btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: #0d47a1 !important; }
+.ask-settings { border: 1px solid var(--line); border-radius: 8px; padding: .5rem .7rem; margin: .6rem 0; font-size: .85rem; }
+.ask-settings summary { cursor: pointer; color: var(--blue); }
+.ask-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .7rem; margin-top: .5rem; }
+.ask-grid label { display: flex; flex-direction: column; gap: .2rem; font-size: .78rem; color: var(--muted); }
+.ask-grid input, .ask-grid select { font: inherit; font-size: .85rem; color: var(--ink); padding: .35rem .45rem; border: 1px solid var(--line); border-radius: 6px; width: 100%; }
+.ask-grid .ask-remember { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: .4rem; }
+.ask-grid .ask-remember input { width: auto; }
+.ask-privacy { font-size: .76rem; line-height: 1.4; margin: .5rem 0 0; }
+#ask-question { width: 100%; font: inherit; font-size: .9rem; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 8px; resize: vertical; margin-top: .4rem; }
+.ask-examples { display: flex; flex-wrap: wrap; gap: .3rem; margin: .4rem 0 .6rem; }
+.ask-examples .chip { font-size: .72rem; }
+.ask-log { margin: .6rem 0 0; padding-left: 1.2rem; font-size: .78rem; color: var(--muted); line-height: 1.5; max-height: 160px; overflow: auto; }
+.ask-log li code { font-size: .74rem; }
+.ask-log[hidden] { display: none; }
+.ask-stations { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .6rem; }
+.ask-stations[hidden] { display: none; }
+.ask-result { margin-top: .8rem; font-size: .88rem; line-height: 1.5; }
+.ask-result[hidden] { display: none; }
+.ask-result h1 { font-size: 1.05rem; margin: .2rem 0 .5rem; }
+.ask-result h2 { font-size: .95rem; margin: 1rem 0 .3rem; }
+.ask-result h3 { font-size: .9rem; margin: .8rem 0 .3rem; }
+.ask-result p { margin: .35rem 0; }
+.ask-result ul, .ask-result ol { padding-left: 1.2rem; margin: .3rem 0; }
+.ask-result li { margin: .15rem 0; }
+.ask-result code { background: #f4f7fb; padding: 0 .25rem; border-radius: 4px; font-size: .82rem; }
+.ask-result pre { background: #f4f7fb; padding: .5rem .6rem; border-radius: 8px; overflow: auto; font-size: .8rem; }
+.ask-result table { border-collapse: collapse; width: 100%; font-size: .82rem; margin: .4rem 0; }
+.ask-result th, .ask-result td { border: 1px solid var(--line); padding: .25rem .4rem; text-align: left; }
+.ask-result th { background: #f4f7fb; }
+.ask-result hr { border: 0; border-top: 1px solid var(--line); margin: .8rem 0; }
+.ask-result .foot { font-size: .76rem; color: var(--muted); }

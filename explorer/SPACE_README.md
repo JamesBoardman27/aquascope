@@ -21,7 +21,13 @@ Pyodide. Nothing to install, no server, no account.
   (GeoParquet, harvested weekly), read in place with DuckDB-WASM.
 - Sources with a catalog today: USGS, UK Environment Agency, Hub'Eau (France),
   PEGELONLINE (Germany), Ireland OPW, Taiwan CWA.
-- Full daily records: USGS and UK EA. Real-time feeds (last month): Hub'Eau,
-  PEGELONLINE, OPW. Daily rainfall: Taiwan CWA.
+- Full daily records: USGS, UK EA and Hub'Eau (obs_elab). Real-time feeds
+  (last month): PEGELONLINE, OPW. Daily rainfall: Taiwan CWA.
+- Click anywhere else for the hydrology of that point (ERA5, FAO-56 ET0,
+  GloFAS) from Open-Meteo.
+- **Ask ✨**: a plain-language question, answered from real gauges by
+  aquascope's tools running in your browser, with a Data and Methods section.
+  Bring your own key (Groq and Hugging Face have free tiers); it goes from
+  your tab straight to the provider.
 
 Source and issues: https://github.com/Rekin226/aquascope (Explorer epic #189, Archive epic #188).

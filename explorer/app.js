@@ -21,7 +21,7 @@ const $ = (id) => document.getElementById(id);
 // Debug hooks (harmless in production): window.__aq.state, window.__aq.log
 const dbg = (window.__aq = { log: [], state: null });
 const trace = (msg) => { dbg.log.push(`${new Date().toISOString().slice(11, 19)} ${msg}`); };
-const state = { stations: [], byKey: new Map(), hidden: new Set(), selected: null, result: null, workerReady: false, pending: new Map(), reqId: 0, mapOk: false, marker: null, point: null };
+const state = { stations: [], byKey: new Map(), hidden: new Set(), selected: null, result: null, workerReady: false, pending: new Map(), reqId: 0, mapOk: false, marker: null, point: null, ask: { running: false, catalogSent: false, markdown: null, id: null } };
 dbg.state = state;
 
 // ── catalog ─────────────────────────────────────────────────────────────────
@@ -259,6 +259,7 @@ function selectStation(key, { fly } = { fly: false }) {
 
   $("panel-empty").hidden = true;
   $("panel-point").hidden = true;
+  $("panel-ask").hidden = true;
   $("panel-station").hidden = false;
   if (state.marker) { state.marker.remove(); state.marker = null; }
   const st = SOURCE_STYLE[r.source] || { label: r.source, color: FALLBACK_COLOR };
@@ -313,7 +314,7 @@ async function selectPoint(lat, lon) {
     state.marker = new maplibregl.Marker({ color: "#455a64" }).setLngLat([lon, lat]).addTo(map);
   }
   history.replaceState(null, "", `#p=${lat},${lon}`);
-  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-point").hidden = false;
+  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-ask").hidden = true; $("panel-point").hidden = false;
   $("pt-title").textContent = `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
   $("pt-coords").textContent = `lat ${lat}, lon ${lon}`;
   for (const id of ["pt-sec-climate", "pt-sec-glofas", "pt-sec-notes", "pt-sec-methods"]) $(id).hidden = true;
@@ -384,6 +385,7 @@ function ensureWorker() {
   worker.onmessage = (e) => {
     const m = e.data;
     if (m.type === "progress") { if (state.selected && !state.result) setStatus(m.text, "info"); return; }
+    if (m.type === "ask_progress") { askLog(m.text); return; }
     if (m.type === "ready") { state.workerReady = true; return; }
     const pending = state.pending.get(m.id);
     if (!pending) return;
@@ -533,6 +535,241 @@ function renderFfaPlot(ffa, unit, color) {
   Plotly.react("plot-ffa", traces, { ...PLOT_LAYOUT, height: 260, xaxis: { title: { text: "return period (years)" }, type: "log" }, yaxis: { title: { text: unit } }, legend: { orientation: "h", y: 1.15 } }, PLOT_CONFIG);
 }
 
+// ── Ask (the Analyst in the browser) ────────────────────────────────────────
+// aquascope.ai_engine.analyst.ask runs inside the Pyodide worker: the model
+// call goes from the worker straight to the provider (bring your own key), the
+// tools run on the catalog held here plus the agencies' APIs, and the report
+// ends with Data and Methods sections assembled from tool results.
+
+const ASK_PROVIDERS = {
+  groq: { base_url: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile" },
+  huggingface: { base_url: "https://router.huggingface.co/v1", model: "Qwen/Qwen2.5-72B-Instruct" },
+  openai: { base_url: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+  mistral: { base_url: "https://api.mistral.ai/v1", model: "mistral-small-latest" },
+  openrouter: { base_url: "https://openrouter.ai/api/v1", model: "openai/gpt-4o-mini" },
+  custom: { base_url: "", model: "" },
+};
+const ASK_EXAMPLES = [
+  "What is the 100-year flood of the Thames at Kingston, and how sure can we be?",
+  "Compare the low flows (Q95) of the Seine at Paris and the Loire at Blois.",
+  "Is the Potomac at Little Falls getting drier? Use the annual-mean trend.",
+  "How wet is Taipei compared with London, and what is the aridity class of each?",
+  "Which UK boreholes near Cambridge have the longest groundwater records?",
+];
+const ASK_STORE = "aquascope.ask.settings";
+
+function askSettings() {
+  try { return JSON.parse(localStorage.getItem(ASK_STORE) || sessionStorage.getItem(ASK_STORE) || "{}"); } catch { return {}; }
+}
+function saveAskSettings() {
+  const remember = $("ask-remember").checked;
+  const data = { provider: $("ask-provider").value, model: $("ask-model").value, base_url: $("ask-base-url").value, remember };
+  const withKey = { ...data, key: $("ask-key").value };
+  try {
+    if (remember) { localStorage.setItem(ASK_STORE, JSON.stringify(withKey)); sessionStorage.removeItem(ASK_STORE); }
+    else { sessionStorage.setItem(ASK_STORE, JSON.stringify(withKey)); localStorage.setItem(ASK_STORE, JSON.stringify(data)); }
+  } catch { /* storage blocked: fine, the tab keeps the values */ }
+}
+
+function initAsk() {
+  const provider = $("ask-provider"), model = $("ask-model"), baseRow = $("ask-base-url-row"), base = $("ask-base-url");
+  const saved = askSettings();
+  if (saved.provider && ASK_PROVIDERS[saved.provider]) provider.value = saved.provider;
+  const applyProvider = (keepModel) => {
+    const p = ASK_PROVIDERS[provider.value];
+    baseRow.hidden = provider.value !== "custom";
+    if (!keepModel) model.value = p.model;
+    if (provider.value !== "custom") base.value = p.base_url;
+    model.placeholder = p.model || "model id";
+  };
+  applyProvider(Boolean(saved.model));
+  if (saved.model) model.value = saved.model;
+  if (saved.base_url && provider.value === "custom") base.value = saved.base_url;
+  if (saved.key) $("ask-key").value = saved.key;
+  $("ask-remember").checked = Boolean(saved.remember);
+  $("ask-settings").open = !saved.key;
+  provider.addEventListener("change", () => applyProvider(false));
+  for (const el of [provider, model, base, $("ask-key"), $("ask-remember")]) el.addEventListener("change", saveAskSettings);
+
+  const ex = $("ask-examples");
+  for (const q of ASK_EXAMPLES) {
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = q;
+    b.addEventListener("click", () => { $("ask-question").value = q; $("ask-question").focus(); });
+    ex.appendChild(b);
+  }
+  $("btn-ask").addEventListener("click", openAsk);
+  $("ask-run").addEventListener("click", runAsk);
+  $("ask-question").addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") runAsk(); });
+  $("ask-copy").addEventListener("click", async () => {
+    if (!state.ask.markdown) return;
+    try { await navigator.clipboard.writeText(state.ask.markdown); $("ask-copy").textContent = "Copied!"; setTimeout(() => ($("ask-copy").textContent = "Copy Markdown"), 1500); }
+    catch { prompt("Copy the report", state.ask.markdown); }
+  });
+  $("ask-download").addEventListener("click", () => {
+    if (!state.ask.markdown) return;
+    const blob = new Blob([state.ask.markdown], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "aquascope-answer.md";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+}
+
+function openAsk() {
+  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-point").hidden = true;
+  $("panel-ask").hidden = false;
+  const q = $("ask-question");
+  if (state.selected && !q.value.trim()) {
+    const r = state.selected;
+    q.value = `Summarise the record of ${r.name || r.station_id} (${r.source} / ${r.station_id}): period, mean, trend, and the flood frequency if the record allows it.`;
+  }
+  const chip = document.getElementById("ask-this-station");
+  if (chip) chip.remove();
+  if (state.selected) {
+    const r = state.selected;
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.id = "ask-this-station";
+    b.textContent = `About ${r.name || r.station_id}`;
+    b.addEventListener("click", () => { q.value = `Summarise the record of ${r.name || r.station_id} (${r.source} / ${r.station_id}): period, mean, trend, and the flood frequency if the record allows it.`; q.focus(); });
+    $("ask-examples").prepend(b);
+  }
+  $("panel").scrollTop = 0;
+  q.focus();
+}
+
+function askStatus(text, kind = "info") {
+  const el = $("ask-status");
+  el.textContent = text; el.className = `status ${kind}`; el.hidden = !text;
+}
+function askLog(text) {
+  const log = $("ask-log");
+  log.hidden = false;
+  const li = document.createElement("li");
+  const m = String(text).match(/^tool (\w+)\((.*)\)$/);
+  li.innerHTML = m ? `<code>${escapeHtml(m[1])}</code>(${escapeHtml(m[2]).slice(0, 160)})` : escapeHtml(text);
+  log.appendChild(li);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function ensureCatalogInWorker() {
+  if (state.ask.catalogSent) return;
+  const rows = state.stations.map((r) => ({
+    source: r.source, station_id: r.station_id, name: r.name, latitude: r.lat, longitude: r.lon,
+    variables: r.variables || [], period_start: r.period_start, period_end: r.period_end, url: r.url,
+    agency: (SOURCE_STYLE[r.source] || {}).label || r.source,
+  }));
+  await call("catalog", { rows });
+  state.ask.catalogSent = true;
+}
+
+async function runAsk() {
+  if (state.ask.running) return;
+  const question = $("ask-question").value.trim();
+  const provider = $("ask-provider").value, key = $("ask-key").value.trim();
+  const model = $("ask-model").value.trim() || ASK_PROVIDERS[provider].model;
+  const base_url = provider === "custom" ? $("ask-base-url").value.trim() : ASK_PROVIDERS[provider].base_url;
+  if (!question) { askStatus("Type a question first.", "warn"); return; }
+  if (!key && provider !== "custom") { askStatus("Paste an API key (Groq and Hugging Face give free ones).", "warn"); $("ask-settings").open = true; return; }
+  if (provider === "custom" && !base_url) { askStatus("A custom endpoint needs its base URL (ending in /v1).", "warn"); return; }
+  saveAskSettings();
+  state.ask.running = true; state.ask.markdown = null;
+  $("ask-run").disabled = true; $("ask-run").textContent = "Working…";
+  $("ask-copy").hidden = true; $("ask-download").hidden = true;
+  $("ask-result").hidden = true; $("ask-stations").hidden = true;
+  $("ask-log").innerHTML = ""; $("ask-log").hidden = true;
+  askStatus(state.workerReady ? "Preparing…" : "Loading Python in your browser (once, ~15 MB)…");
+  try {
+    await ensureCatalogInWorker();
+    askStatus(`Asking ${model} via ${provider}…`);
+    const res = await call("ask", { question, provider: provider === "custom" ? "custom" : provider, model, api_key: key || (provider === "custom" ? "none" : null), base_url, max_steps: 8 });
+    askStatus("");
+    state.ask.markdown = res.markdown;
+    renderAsk(res);
+  } catch (err) {
+    askStatus(`The analyst could not finish: ${err.message}`, "error");
+  } finally {
+    state.ask.running = false;
+    $("ask-run").disabled = false; $("ask-run").textContent = "Ask";
+  }
+}
+
+function renderAsk(res) {
+  const out = $("ask-result");
+  out.innerHTML = mdToHtml(res.markdown);
+  out.hidden = false;
+  $("ask-copy").hidden = false; $("ask-download").hidden = false;
+  // chips for every station the tools touched: click to open it on the map
+  const chips = [];
+  for (const d of res.data_used || []) {
+    const m = String(d.label || "").match(/^(\S+) \/ (.+)$/);
+    if (!m) continue;
+    const key = `${m[1]}/${m[2]}`;
+    const r = state.byKey.get(key);
+    if (!r) continue;
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button";
+    b.innerHTML = `<i style="background:${(SOURCE_STYLE[r.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(r.name || r.station_id)}`;
+    b.title = "Open this station on the map";
+    b.addEventListener("click", () => selectStation(key, { fly: true }));
+    chips.push(b);
+  }
+  const box = $("ask-stations");
+  box.innerHTML = "";
+  if (chips.length) { const l = document.createElement("span"); l.className = "muted"; l.textContent = "Stations used: "; box.appendChild(l); for (const c of chips) box.appendChild(c); }
+  box.hidden = chips.length === 0;
+}
+
+// A small Markdown renderer for the analyst's reports (headings, lists,
+// tables, code, emphasis, links). Input is escaped first; only our own tags
+// come out.
+function mdToHtml(md) {
+  const lines = String(md || "").replace(/\r\n?/g, "\n").split("\n");
+  const html = [];
+  let i = 0, list = null, para = [];
+  const flushPara = () => { if (para.length) { html.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
+  const closeList = () => { if (list) { html.push(`</${list}>`); list = null; } };
+  const inline = (t) => escapeHtml(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^```/.test(line)) {
+      flushPara(); closeList();
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      html.push(`<pre><code>${escapeHtml(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { flushPara(); closeList(); html.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { flushPara(); closeList(); html.push("<hr>"); i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      flushPara(); closeList();
+      const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => inline(c.trim()));
+      const head = cells(line); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(cells(lines[i++]));
+      html.push(`<table><thead><tr>${head.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    const ul = line.match(/^\s*[-*+]\s+(.*)$/), ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (ul || ol) {
+      flushPara();
+      const kind = ul ? "ul" : "ol";
+      if (list !== kind) { closeList(); html.push(`<${kind}>`); list = kind; }
+      html.push(`<li>${inline((ul || ol)[1])}</li>`); i++;
+      continue;
+    }
+    if (!line.trim()) { flushPara(); closeList(); i++; continue; }
+    para.push(line.trim()); i++;
+  }
+  flushPara(); closeList();
+  return html.join("\n").replace(/<p>(Produced by aquascope[^<]*)<\/p>/, '<p class="foot">$1</p>');
+}
+
 // ── buttons ─────────────────────────────────────────────────────────────────
 
 function initButtons() {
@@ -581,6 +818,7 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&a
   trace("boot");
   initButtons();
   initSearch();
+  initAsk();
   const mapReady = initMap();
   trace("map init called");
   const catalogReady = loadCatalog().then(() => true).catch((err) => {

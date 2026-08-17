@@ -614,12 +614,11 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     client = model = None
     if args.llm:
         try:
-            from openai import OpenAI
-
             from aquascope.ai_engine.analyst import resolve_llm
+            from aquascope.ai_engine.llm_transport import make_client
 
             cfg = resolve_llm(args.provider, args.model, args.api_key)
-            client, model = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"]), cfg["model"]
+            client, model = make_client(cfg["api_key"], cfg["base_url"]), cfg["model"]
         except Exception as exc:  # noqa: BLE001
             logger.warning("LLM mapping unavailable (%s); using heuristics", exc)
     try:
@@ -1357,7 +1356,8 @@ def main() -> None:
     # ── ask ──────────────────────────────────────────────────────────
     p_ask = sub.add_parser("ask", help="Ask a water question in plain language; get a cited answer from real data")
     p_ask.add_argument("question")
-    p_ask.add_argument("--provider", choices=["openai", "groq", "huggingface", "ollama"], default=None)
+    p_ask.add_argument("--provider", choices=["openai", "groq", "huggingface", "mistral", "openrouter", "ollama"],
+                       default=None)
     p_ask.add_argument("--model", default=None)
     p_ask.add_argument("--api-key", default=None)
     p_ask.add_argument("--base-url", default=None, help="Any OpenAI-compatible endpoint")
@@ -1376,7 +1376,8 @@ def main() -> None:
     p_ingest.add_argument("--sheet", default=None, help="Excel sheet name or index")
     p_ingest.add_argument("--describe", default=None, help="A sentence about the file (helps the LLM mapping)")
     p_ingest.add_argument("--llm", action="store_true", help="Let a configured LLM propose the column mapping")
-    p_ingest.add_argument("--provider", choices=["openai", "groq", "huggingface", "ollama"], default=None)
+    p_ingest.add_argument("--provider", choices=["openai", "groq", "huggingface", "mistral", "openrouter", "ollama"],
+                          default=None)
     p_ingest.add_argument("--model", default=None)
     p_ingest.add_argument("--api-key", default=None)
     p_ingest.add_argument("--out", "-o", default=None, help="Output stem (default: <file>_clean)")
