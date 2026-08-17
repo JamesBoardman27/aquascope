@@ -241,7 +241,20 @@ def harvest_observations(
         )
 
     save_manifest(out, manifest)
-    (out / "obs" / "last_run.json").write_text(json.dumps(report.to_dict(), indent=1), encoding="utf-8")
+    # last_run.json accumulates the sources of every invocation in a run
+    # (the workflow calls harvest obs once per budget group).
+    last_path = out / "obs" / "last_run.json"
+    merged = report.to_dict()
+    if last_path.exists():
+        try:
+            previous = json.loads(last_path.read_text(encoding="utf-8"))
+            if previous.get("run_at", "")[:10] == merged["run_at"][:10]:
+                mine = {s["source"] for s in merged["sources"]}
+                kept = [s for s in previous.get("sources", []) if s["source"] not in mine]
+                merged["sources"] = kept + merged["sources"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            pass
+    last_path.write_text(json.dumps(merged, indent=1), encoding="utf-8")
     return report
 
 
