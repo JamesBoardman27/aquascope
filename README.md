@@ -38,6 +38,13 @@ AquaScope unifies **28 global water-data sources** behind one Python schema, the
 
 ---
 
+## 🌍 Try it without installing anything
+
+**[AquaScope Explorer](https://rekin226-aquascope-explorer.static.hf.space/)**: every public gauge we can reach on one map
+(45,919 stations from USGS, UK EA, Hub'Eau, PEGELONLINE, Ireland OPW and Taiwan CWA). Click one and get the observed record,
+flood frequency with confidence limits, flow duration and trend, computed in your browser by aquascope on Pyodide.
+The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
+
 ## ✨ What you can do
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
@@ -246,11 +253,12 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 21-command CLI for the most common workflows:
+AquaScope ships a 22-command CLI for the most common workflows:
 
 ```bash
 # Find stations, then collect data
 aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
+aquascope harvest stations --out archive          # the open gauge catalog (GeoParquet)
 aquascope collect --source usgs --days 365
 aquascope collect --source wapor --bbox 30.5,29.8,31.1,30.2 --variable RET --start-date 2026-04-01
 
