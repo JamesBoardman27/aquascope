@@ -36,7 +36,7 @@ _STORE = {}
 async function analyze({ id, source, station_id, years }) {
   post("progress", { text: "Fetching the record from the agency…" });
   const code = `
-import json, analysis
+import json
 _STORE.clear()
 _res = analysis.analyze_station(${JSON.stringify(source)}, ${JSON.stringify(station_id)}, years=${Number(years) || 40}, store=_STORE)
 _STORE["result"] = _res
@@ -48,7 +48,7 @@ json.dumps(_res)
 
 async function floodCi({ id }) {
   const code = `
-import json, analysis
+import json
 json.dumps(analysis.flood_ci(_STORE["series"]))
 `;
   const out = await pyodide.runPythonAsync(code);
@@ -57,7 +57,6 @@ json.dumps(analysis.flood_ci(_STORE["series"]))
 
 async function csv({ id }) {
   const out = await pyodide.runPythonAsync(`
-import analysis
 analysis.to_csv(_STORE["result"])
 `);
   post("result", { id, result: out });
@@ -72,7 +71,11 @@ self.onmessage = async (e) => {
     if (m.type === "flood_ci") return await floodCi(m);
     if (m.type === "csv") return await csv(m);
   } catch (err) {
-    const msg = String(err && err.message ? err.message : err).split("\n").filter(Boolean).slice(-3).join(" ");
-    post("error", { id: m.id, message: msg });
+    // Pyodide raises PythonError with the full traceback in .message; keep the
+    // exception line (last non-empty) and log the whole thing for debugging.
+    const full = String(err && err.message ? err.message : err);
+    console.error(full);
+    const lines = full.split("\n").filter((l) => l.trim());
+    post("error", { id: m.id, message: lines[lines.length - 1] || "unknown error" });
   }
 };
