@@ -531,6 +531,16 @@ def cmd_harvest(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_mcp(args: argparse.Namespace) -> None:
+    """Serve aquascope's tools over the Model Context Protocol (stdio by default)."""
+    try:
+        from aquascope.mcp_server import main as mcp_main
+    except ImportError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    mcp_main(transport=args.transport)
+
+
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
@@ -1213,6 +1223,10 @@ def main() -> None:
     p_harvest.add_argument("--publish", default=None, metavar="REPO_ID",
                            help="Upload the folder to this Hugging Face dataset (needs HF_TOKEN)")
 
+    # ── mcp ──────────────────────────────────────────────────────────
+    p_mcp = sub.add_parser("mcp", help="Serve find_stations / get_timeseries / analyze_station over MCP (#113)")
+    p_mcp.add_argument("--transport", choices=["stdio", "sse", "streamable-http"], default="stdio")
+
     # ── solve ─────────────────────────────────────────────────────────
     p_solve = sub.add_parser("solve", help="Solve a water challenge from a natural-language description")
     p_solve.add_argument(
@@ -1400,6 +1414,7 @@ def main() -> None:
         "list-sources": cmd_list_sources,
         "stations": cmd_stations,
         "harvest": cmd_harvest,
+        "mcp": cmd_mcp,
         "solve": cmd_solve,
         "forecast": cmd_forecast,
         "plot": cmd_plot,
