@@ -1,0 +1,333 @@
+"""The Analyst: ask a water question in plain language, get a cited answer built from real data.
+
+Not an agent that replaces the hydrologist. A tool-using assistant over the
+same functions the MCP server exposes (``find_stations``, ``analyze_station``,
+``flood_frequency``, ``get_timeseries``, ``list_sources``, ``describe_methods``,
+``anywhere``): the model decides which to call, aquascope does the work, and
+the report ends with a "Data" and a "Methods and citations" section that are
+assembled deterministically from what the tools returned, never from the
+model's memory.
+
+Works with any OpenAI-compatible chat endpoint that supports tool calling
+(OpenAI, Groq, Hugging Face router, Ollama, ...). Configuration, in order:
+explicit arguments, ``AQUASCOPE_LLM_API_KEY`` / ``AQUASCOPE_LLM_BASE_URL`` /
+``AQUASCOPE_LLM_MODEL``, then ``OPENAI_API_KEY``, ``GROQ_API_KEY``,
+``HF_TOKEN``. Requires the ``llm`` extra (``openai``).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+from aquascope import __version__
+
+logger = logging.getLogger(__name__)
+
+MAX_TOOL_RESULT_CHARS = 14_000
+
+PROVIDERS: dict[str, dict[str, str | None]] = {
+    "openai": {"base_url": None, "model": "gpt-4o-mini", "env": "OPENAI_API_KEY"},
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b-versatile", "env": "GROQ_API_KEY",
+    },
+    "huggingface": {
+        "base_url": "https://router.huggingface.co/v1", "model": "Qwen/Qwen2.5-72B-Instruct", "env": "HF_TOKEN",
+    },
+    "ollama": {"base_url": "http://localhost:11434/v1", "model": "qwen2.5:7b", "env": None},
+}
+
+SYSTEM_PROMPT = """You are AquaScope's analyst, a careful hydrologist's assistant.
+You answer questions about rivers, gauges, floods, rainfall and water resources ONLY from tool results.
+Rules:
+- Find stations with find_stations before analysing; prefer stations with long records for flood questions.
+- Use analyze_station / flood_frequency for numbers; use anywhere(lat, lon) when the user names a place with no gauge.
+- Never invent values, station ids, or citations. If a tool returns an error or an empty record, say so.
+- Report units. Quote return levels with their confidence intervals when available.
+- Say which record (station, source, period, number of years) each number comes from.
+- Keep the answer under 300 words unless the user asks for a full report; the tool outputs already carry
+  licences and citations, they will be appended automatically.
+"""
+
+
+@dataclass
+class ToolSpec:
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    func: Callable[..., Any]
+
+
+def _tool_specs() -> list[ToolSpec]:
+    from aquascope import mcp_server as t
+    from aquascope.explore import anywhere
+
+    num = {"type": "number"}
+    return [
+        ToolSpec(
+            "list_sources", "Every data source with agency, country, variables and licence.",
+            {"type": "object", "properties": {}}, t.list_sources,
+        ),
+        ToolSpec(
+            "find_stations",
+            "Search the world station catalog (no agency call). Use query for a name/id, near=[lat, lon] for the "
+            "nearest gauges, bbox=[west, south, east, north] for an area, variable to filter (discharge, "
+            "water_level, precipitation, ...).",
+            {"type": "object", "properties": {
+                "query": {"type": "string"}, "bbox": {"type": "array", "items": num, "minItems": 4, "maxItems": 4},
+                "near": {"type": "array", "items": num, "minItems": 2, "maxItems": 2}, "variable": {"type": "string"},
+                "sources": {"type": "array", "items": {"type": "string"}}, "limit": {"type": "integer"}}},
+            t.find_stations,
+        ),
+        ToolSpec(
+            "analyze_station",
+            "Fetch one station's record and compute summary, annual maxima, flood frequency (GEV, LP3 with CI), "
+            "FDC percentiles and trend.",
+            {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"}},
+             "required": ["source", "station_id"]},
+            t.analyze_station,
+        ),
+        ToolSpec(
+            "flood_frequency",
+            "Return levels for T = 2..100 years at a station (subset of analyze_station).",
+            {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"}},
+             "required": ["source", "station_id"]},
+            t.flood_frequency,
+        ),
+        ToolSpec(
+            "get_timeseries",
+            "The observed record for a station, resampled (D/W/M/Y) and thinned; use for values, not for statistics.",
+            {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "years": {"type": "integer"}, "resample": {"type": "string"},
+                                              "max_points": {"type": "integer"}},
+             "required": ["source", "station_id"]},
+            t.get_timeseries,
+        ),
+        ToolSpec(
+            "anywhere",
+            "Climate and modelled discharge for a point with no gauge: ERA5 rainfall/temperature, FAO-56 ET0, "
+            "aridity, GloFAS.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "years": {"type": "integer"}},
+             "required": ["lat", "lon"]},
+            lambda lat, lon, years=10: anywhere(lat, lon, years=years),
+        ),
+        ToolSpec(
+            "describe_methods", "What each analysis computes and the reference to cite.",
+            {"type": "object", "properties": {}}, t.describe_methods,
+        ),
+    ]
+
+
+def _openai_tools(specs: list[ToolSpec]) -> list[dict[str, Any]]:
+    return [
+        {"type": "function", "function": {"name": s.name, "description": s.description, "parameters": s.parameters}}
+        for s in specs
+    ]
+
+
+def resolve_llm(
+    provider: str | None = None, model: str | None = None, api_key: str | None = None, base_url: str | None = None
+) -> dict[str, str | None]:
+    """Pick provider/model/key/base_url from arguments and the environment; raise if no key can be found."""
+    if os.environ.get("AQUASCOPE_LLM_API_KEY") and not api_key and not provider:
+        return {
+            "provider": "custom",
+            "api_key": os.environ["AQUASCOPE_LLM_API_KEY"],
+            "base_url": base_url or os.environ.get("AQUASCOPE_LLM_BASE_URL") or PROVIDERS["huggingface"]["base_url"],
+            "model": model or os.environ.get("AQUASCOPE_LLM_MODEL") or PROVIDERS["huggingface"]["model"],
+        }
+    if provider is None:
+        for name in ("openai", "groq", "huggingface"):
+            env = PROVIDERS[name]["env"]
+            if env and os.environ.get(env):
+                provider = name
+                break
+        else:
+            provider = "ollama" if base_url or os.environ.get("AQUASCOPE_LLM_BASE_URL") else None
+    if provider is None:
+        raise RuntimeError(
+            "No LLM configured. Set OPENAI_API_KEY, GROQ_API_KEY or HF_TOKEN, or AQUASCOPE_LLM_API_KEY with "
+            "AQUASCOPE_LLM_BASE_URL/AQUASCOPE_LLM_MODEL, or pass --provider ollama for a local model."
+        )
+    if provider not in PROVIDERS and provider != "custom":
+        raise ValueError(f"Unknown provider {provider!r}; choose from {list(PROVIDERS)}")
+    cfg = PROVIDERS.get(provider, {"base_url": None, "model": None, "env": None})
+    key = api_key or (os.environ.get(cfg["env"]) if cfg["env"] else None)
+    if not key and provider == "ollama":
+        key = "ollama"
+    if not key:
+        raise RuntimeError(f"No API key for {provider}: pass --api-key or set {cfg['env']}.")
+    return {
+        "provider": provider, "api_key": key, "base_url": base_url or cfg["base_url"], "model": model or cfg["model"],
+    }
+
+
+@dataclass
+class ToolCallRecord:
+    name: str
+    arguments: dict[str, Any]
+    ok: bool
+    summary: str
+
+
+@dataclass
+class AskResult:
+    question: str
+    answer: str
+    model: str
+    provider: str
+    tool_calls: list[ToolCallRecord] = field(default_factory=list)
+    methods: list[dict[str, str]] = field(default_factory=list)
+    data_used: list[dict[str, Any]] = field(default_factory=list)
+    steps: int = 0
+
+    def to_markdown(self) -> str:
+        lines = [f"# {self.question}", "", self.answer.strip(), ""]
+        if self.data_used:
+            lines += ["## Data", ""]
+            for d in self.data_used:
+                bits = [f"**{d.get('label')}**"]
+                if d.get("period"):
+                    bits.append(d["period"])
+                if d.get("license"):
+                    bits.append(f"licence {d['license']}")
+                if d.get("attribution"):
+                    bits.append(d["attribution"])
+                lines.append("- " + " · ".join(bits))
+            lines.append("")
+        if self.methods:
+            lines += ["## Methods and citations", ""]
+            for i, m in enumerate(self.methods, 1):
+                lines.append(f"{i}. **{m['name']}.** {m['text']} _{m['citation']}_")
+            lines.append("")
+        lines += [
+            "---",
+            f"Produced by aquascope {__version__} (`aquascope ask`), model {self.model} via {self.provider}, "
+            f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}. Tools called: "
+            + (", ".join(f"{c.name}" for c in self.tool_calls) or "none")
+            + ". Numbers come from the tool results; the model wrote the prose.",
+        ]
+        return "\n".join(lines)
+
+
+def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskResult) -> None:
+    """Pull citations and data provenance out of tool results, deterministically."""
+    if not isinstance(result, dict):
+        return
+    seen = {m["name"] for m in res.methods}
+    for m in result.get("methods", []) or []:
+        if isinstance(m, dict) and m.get("name") and m["name"] not in seen:
+            res.methods.append({k: str(m.get(k, "")) for k in ("name", "text", "citation")})
+            seen.add(m["name"])
+    if name in ("analyze_station", "flood_frequency", "get_timeseries") and result.get("source"):
+        label = f"{result.get('source')} / {result.get('station_id')}"
+        period = None
+        if result.get("start") and result.get("end"):
+            period = f"{result['start']} to {result['end']}"
+            if result.get("years"):
+                period += f" ({result['years']} years)"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({
+                "label": label, "period": period, "license": result.get("license"),
+                "attribution": result.get("attribution"),
+            })
+    if name == "anywhere" and "latitude" in result:
+        label = f"point {result['latitude']}, {result['longitude']}"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({
+                "label": label, "period": f"{result.get('start')} to {result.get('end')}",
+                "license": "CC-BY-4.0", "attribution": result.get("attribution"),
+            })
+
+
+def _truncate(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
+    return text if len(text) <= limit else text[:limit] + f'... [truncated {len(text) - limit} chars]'
+
+
+def ask(
+    question: str,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    max_steps: int = 8,
+    client: Any | None = None,
+    on_event: Callable[[str], None] | None = None,
+) -> AskResult:
+    """Answer ``question`` with tool calls over aquascope; returns an :class:`AskResult`.
+
+    ``client`` lets tests (or callers with their own SDK setup) pass an
+    OpenAI-compatible client; otherwise one is built from ``resolve_llm``.
+    """
+    cfg = {"provider": "custom", "model": model or "test", "api_key": None, "base_url": base_url}
+    if client is None:
+        cfg = resolve_llm(provider, model, api_key, base_url)
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise ImportError("The analyst needs the openai package: pip install 'aquascope[llm]'") from exc
+        client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+    specs = {s.name: s for s in _tool_specs()}
+    tools = _openai_tools(list(specs.values()))
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": question},
+    ]
+    result = AskResult(question=question, answer="", model=str(cfg["model"]), provider=str(cfg["provider"]))
+    say = on_event or (lambda _m: None)
+
+    for step in range(1, max_steps + 1):
+        result.steps = step
+        response = client.chat.completions.create(
+            model=cfg["model"], messages=messages, tools=tools, tool_choice="auto"
+        )
+        choice = response.choices[0]
+        msg = choice.message
+        calls = getattr(msg, "tool_calls", None) or []
+        if not calls:
+            result.answer = (msg.content or "").strip()
+            break
+        messages.append({
+            "role": "assistant", "content": msg.content or "",
+            "tool_calls": [{"id": c.id, "type": "function",
+                            "function": {"name": c.function.name, "arguments": c.function.arguments}} for c in calls],
+        })
+        for c in calls:
+            name = c.function.name
+            try:
+                args = json.loads(c.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            spec = specs.get(name)
+            say(f"tool {name}({', '.join(f'{k}={v!r}' for k, v in args.items())})")
+            if spec is None:
+                payload: Any = {"error": f"unknown tool {name}"}
+                ok = False
+            else:
+                try:
+                    payload = spec.func(**args)
+                    ok = not (isinstance(payload, dict) and payload.get("error"))
+                except Exception as exc:  # noqa: BLE001 - the model gets to see the failure and try again
+                    payload = {"error": f"{type(exc).__name__}: {exc}"}
+                    ok = False
+            _harvest_provenance(name, args, payload, result)
+            text = json.dumps(payload, ensure_ascii=False, default=str)
+            summary = text[:160]
+            result.tool_calls.append(ToolCallRecord(name=name, arguments=args, ok=ok, summary=summary))
+            messages.append({"role": "tool", "tool_call_id": c.id, "name": name, "content": _truncate(text)})
+    else:
+        result.answer = (result.answer or "").strip() or (
+            "I ran out of tool-call steps before finishing. Here is what the tools returned so far; "
+            "ask a narrower question or raise --max-steps."
+        )
+    if not result.answer:
+        result.answer = "The model returned no answer."
+    return result

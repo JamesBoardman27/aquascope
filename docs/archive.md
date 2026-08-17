@@ -6,8 +6,8 @@ scheduled harvest writes what the sources answer into cloud-native files and
 publishes them to a public Hugging Face dataset,
 [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges).
 
-Phase 0 (shipped) is the **station catalog**. Phase 1 adds daily observations
-for the sources whose terms allow mirroring. See
+Phase 0 is the **station catalog**. Phase 1 (also shipped, filling up week by
+week) mirrors **daily observations** for the sources whose terms allow it. See
 [#188](https://github.com/Rekin226/aquascope/issues/188) for the plan.
 
 ## What is in it
@@ -18,6 +18,8 @@ for the sources whose terms allow mirroring. See
 | `stations.geojson` | the same rows as GeoJSON, for tools and browsers that don't read parquet |
 | `health.json` | per-source status of the last run: station count, seconds, error message if the endpoint failed |
 | `README.md` | the dataset card, regenerated on every run, with the per-source licence table |
+| `obs/<variable>/<source>/<station_id>.csv.gz` | daily means for one station (`date,value`, SI units), only for redistributable sources; today USGS, UK EA, Hub'Eau discharge and Taiwan CWA rainfall |
+| `obs/manifest.json` | every harvested station with period, count, unit and harvest time; `obs/last_run.json` the last run's per-source tallies |
 
 Sources with a station catalog today: USGS, UK Environment Agency, Hub'Eau
 (France), PEGELONLINE (Germany), Ireland OPW, Taiwan CWA. Every source that
@@ -42,6 +44,31 @@ stations = pd.read_parquet("hf://datasets/Rekin226/aquascope-gauges/stations.par
 ```
 
 GeoPandas / QGIS open the parquet directly as a point layer.
+
+## Observations, incrementally
+
+Each weekly run harvests a budget of stations per source (150 for USGS, UK EA
+and Hub'Eau, 15 for CWA) and re-harvests a station once it is older than 30
+days, so the archive grows without ever hammering an agency. Read one station:
+
+```python
+import pandas as pd
+s = pd.read_csv("hf://datasets/Rekin226/aquascope-gauges/obs/discharge/usgs/USGS-01646500.csv.gz")
+```
+
+or a whole source with DuckDB:
+
+```sql
+SELECT * FROM read_csv('hf://datasets/Rekin226/aquascope-gauges/obs/discharge/hubeau_hydrometrie/*.csv.gz');
+```
+
+The Explorer and `aquascope.explore.fetch_series` read a station's file first
+(one HTTPS GET, no agency load) and only fall back to the agency when the
+archive has no file yet.
+
+Run it yourself: `aquascope harvest obs --out archive --source usgs --max-stations 50`
+(add `--sync-from Rekin226/aquascope-gauges` for an incremental run and
+`--publish` to upload).
 
 ## Terms
 

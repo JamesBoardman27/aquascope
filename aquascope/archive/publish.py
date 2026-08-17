@@ -40,7 +40,7 @@ def publish_folder(
         repo_id=repo_id,
         repo_type="dataset",
         commit_message=commit_message or "aquascope harvest",
-        allow_patterns=["*.parquet", "*.geojson", "*.json", "README.md"],
+        allow_patterns=["*.parquet", "*.geojson", "*.json", "*.csv.gz", "README.md"],
     )
     url = getattr(info, "commit_url", None) or str(info)
     logger.info("Published %s to https://huggingface.co/datasets/%s (%s)", folder, repo_id, url)

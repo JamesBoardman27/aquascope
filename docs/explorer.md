@@ -20,6 +20,17 @@ aquascope in your browser (Pyodide) to compute:
 Every result has a permalink (`#s=<source>/<station_id>`), a CSV download, and
 a link to the agency page. Data licence and attribution are shown per source.
 
+Click anywhere that is not a gauge and you get the **hydrology of that point**
+(`#p=<lat>,<lon>`): ERA5 rainfall and temperature, FAO-56 reference
+evapotranspiration and the aridity class, a monthly climate chart, GloFAS
+modelled discharge with an indicative return-period table (clearly labelled
+as a model, not a gauge), and the nearest gauges to click next. All from
+Open-Meteo, keyless.
+
+Stations already mirrored in the [Archive](archive.md) load from it (one small
+file) instead of from the agency, so they are faster and do not add load
+upstream.
+
 ## What works today (Phase 0 of [#189](https://github.com/Rekin226/aquascope/issues/189))
 
 | source | record you get | analyses |

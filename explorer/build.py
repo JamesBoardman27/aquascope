@@ -53,6 +53,12 @@ def assemble(out: Path, wheel: Path, build: str, space_readme: bool = True) -> N
     (out / "wheels.json").write_text(json.dumps({"wheel": wheel.name, "build": build}), encoding="utf-8")
     if space_readme:
         shutil.copy2(SRC / "SPACE_README.md", out / "README.md")
+    plugin_src = ROOT / "integrations" / "geolibre"
+    if plugin_src.exists():  # the GeoLibre plugin is served next to the Explorer
+        plugin_out = out / "geolibre-plugin"
+        plugin_out.mkdir(exist_ok=True)
+        for name in ("plugin.json", "index.js", "style.css", "README.md"):
+            shutil.copy2(plugin_src / name, plugin_out / name)
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
 
