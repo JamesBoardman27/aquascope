@@ -75,3 +75,46 @@ def test_pegelonline_requires_station_uuid(monkeypatch, caplog):
         main()
     assert exc.value.code == 1
     assert any("requires --station" in record.message for record in caplog.records)
+
+
+def test_bom_requires_station(monkeypatch, caplog):
+    """BOM fails clearly before collection when no station is supplied."""
+    monkeypatch.setattr(sys, "argv", ["aquascope", "collect", "--source", "bom"])
+    with caplog.at_level("ERROR"), pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 1
+    assert any("requires --station" in record.message for record in caplog.records)
+
+
+def test_bom_passes_parameter_type_through_to_collect(monkeypatch):
+    """--parameter-type reaches BOMCollector.collect() as the parameter_type kwarg.
+
+    Regression test: BOM's Water Course Discharge series is unpopulated at
+    some stations (e.g. regulated rivers), so --parameter-type "Water Course
+    Level" must be wireable from the CLI, not just from the Python API.
+    """
+    captured_kwargs = {}
+
+    class _FakeCollector:
+        def collect(self, **kwargs):
+            captured_kwargs.update(kwargs)
+            return []
+
+    monkeypatch.setattr("aquascope.collectors.BOMCollector", lambda: _FakeCollector())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "aquascope",
+            "collect",
+            "--source",
+            "bom",
+            "--station",
+            "409001",
+            "--parameter-type",
+            "Water Course Level",
+        ],
+    )
+    main()
+    assert captured_kwargs.get("parameter_type") == "Water Course Level"
+    assert captured_kwargs.get("station_id") == "409001"

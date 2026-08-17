@@ -322,6 +322,18 @@ SOURCES: dict[str, SourceMeta] = {
         license="unknown", redistributable=False,
         attribution="India-WRIS (terms not yet verified)",
     ),
+    # ── Oceania ─────────────────────────────────────────────────────────
+    "bom": _s(
+        key="bom", label="BOM Water Data Online", region="Australia",
+        description="Streamflow, water level, storage and groundwater level from ~8,000 Australian gauging stations",
+        agency="Bureau of Meteorology", country="AUS",
+        homepage="http://www.bom.gov.au/waterdata/",
+        variables=("discharge", "water_level", "reservoir_storage", "groundwater_level", "precipitation",
+                   "water_quality"),
+        output_model="StreamflowReading | WaterLevelReading | WaterQualitySample",
+        license="unknown", redistributable=False,
+        attribution="Bureau of Meteorology, Water Data Online (KISTERS KiWIS); terms to verify before mirroring",
+    ),
     # ── Global ──────────────────────────────────────────────────────────
     "grdc": _s(
         key="grdc", label="GRDC river discharge", region="Global",
@@ -461,6 +473,7 @@ def build_collector(source_key: str, api_key: str | None = None, **ctor_kwargs):
         "camels_cl": lambda: c.CAMELSCLCollector(),
         "camels_br": lambda: c.CAMELSBRCollector(),
         "uk_ea": lambda: c.UKEACollector(),
+        "bom": lambda: c.BOMCollector(),
     }
     if source_key not in factories:
         raise ValueError(f"Unknown source {source_key!r}. Available: {source_keys()}")

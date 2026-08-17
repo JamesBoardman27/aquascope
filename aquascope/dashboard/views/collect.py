@@ -600,6 +600,31 @@ def _source_form(source_key: str, ctor: dict, fetch: dict) -> None:  # noqa: C90
         if ed:
             fetch["end"] = str(ed)
 
+    elif source_key == "bom":
+        st.caption(
+            "BOM Water Data Online (Australia) — not every station has a populated discharge series; "
+            "check Water Course Level if discharge comes back empty."
+        )
+        station = st.text_input("AWRC station number", placeholder="e.g. 410001")
+        if station.strip():
+            fetch["station_id"] = station.strip()
+        fetch["parameter_type"] = st.selectbox(
+            "Parameter type",
+            [
+                "Water Course Discharge",
+                "Water Course Level",
+                "Storage Level",
+                "Storage Volume",
+                "Ground Water Level",
+                "Rainfall",
+                "Water Temperature",
+                "Electrical Conductivity At 25C",
+                "Turbidity",
+                "pH",
+            ],
+        )
+        fetch["days"] = st.slider("Days of history", 1, 90, 30, key="bom_days")
+
     elif source_key == "uk_ea":
         st.caption("UK Environment Agency — real-time river level, flow, rainfall, and groundwater telemetry.")
         fetch["observed_property"] = st.selectbox(
