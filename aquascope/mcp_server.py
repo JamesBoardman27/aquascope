@@ -296,6 +296,25 @@ def similar_basins(
         return {"error": f"similar basins lookup failed: {type(exc).__name__}: {exc}"}
 
 
+def regionalize_signatures(lat: float, lon: float, k: int = 10, method: str = "similarity") -> dict[str, Any]:
+    """Estimated flow regime of an UNGAUGED point, transferred from the gauged donors in the Archive: mean, median,
+    Q95 (low) and Q05 (high) daily flow in mm/d, mean annual maximum, runoff ratio, baseflow index, FDC slope,
+    high/low-flow frequency, zero-flow fraction, seasonality and flashiness, each with an uncertainty band and
+    the donors used. method: 'similarity' (weighted mean over the k most similar catchments), 'regression'
+    (ridge on catchment attributes over all donors) or 'both'. Comes with the leave-one-out skill (NSE, median
+    error) of each estimate so you can say how much to trust it. Prediction in ungauged basins (PUB).
+    """
+    from aquascope.archive.regionalize import regionalize_point
+
+    k = max(1, min(int(k or 10), 50))
+    try:
+        return regionalize_point(float(lat), float(lon), k=k, method=method)
+    except ImportError as exc:
+        return {"error": f"{exc}"}
+    except Exception as exc:  # noqa: BLE001 - the model gets to see it
+        return {"error": f"regionalisation failed: {type(exc).__name__}: {exc}"}
+
+
 def _default_years_note() -> str:
     today = date.today()
     return f"Records are requested back to {(today - timedelta(days=int(40 * 365.25))).isoformat()} by default."
@@ -315,6 +334,7 @@ def build_server():
     server.tool()(describe_methods)
     server.tool()(describe_catchment)
     server.tool()(similar_basins)
+    server.tool()(regionalize_signatures)
     server.tool()(archive_health)
 
     @server.resource("aquascope://sources")

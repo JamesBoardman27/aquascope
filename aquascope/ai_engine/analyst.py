@@ -55,6 +55,8 @@ Rules:
 - Use analyze_station / flood_frequency for numbers; use anywhere(lat, lon) when the user names a place with no gauge.
 - Use describe_catchment(lat, lon) for the catchment itself: area, elevation, climate, land cover, soils, dams.
 - For an ungauged place, use similar_basins to find donor gauges, then analyze_station on the best donors.
+- For "what flow to expect" at an ungauged place, use regionalize_signatures (mm/d estimates with a band and
+  the leave-one-out skill); always quote the band and the skill, never a bare number.
 - Never invent values, station ids, or citations. If a tool returns an error or an empty record, say so.
 - Report units. Quote return levels with their confidence intervals when available.
 - Say which record (station, source, period, number of years) each number comes from.
@@ -146,6 +148,16 @@ def _tool_specs() -> list[ToolSpec]:
                                               "method": {"type": "string"},
                                               "sources": {"type": "array", "items": {"type": "string"}}}},
             t.similar_basins,
+        ),
+        ToolSpec(
+            "regionalize_signatures",
+            "Estimated flow regime of an ungauged point (mean/median/Q95/Q05 flow in mm/d, annual max, runoff ratio, "
+            "baseflow index, FDC slope, flow frequencies, seasonality, flashiness) transferred from similar gauged "
+            "donors, with an uncertainty band and the leave-one-out skill. method: similarity | regression | both.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "k": {"type": "integer"},
+                                              "method": {"type": "string"}},
+             "required": ["lat", "lon"]},
+            t.regionalize_signatures,
         ),
         ToolSpec(
             "describe_methods", "What each analysis computes and the reference to cite.",
@@ -272,6 +284,11 @@ def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskRe
         if not any(d.get("label") == label for d in res.data_used):
             res.data_used.append({"label": label, "period": None, "license": result.get("license"),
                                   "attribution": result.get("attribution")})
+    if name == "regionalize_signatures" and result.get("estimates"):
+        label = f"regionalised signatures at {result.get('latitude')}, {result.get('longitude')}"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({"label": label, "period": None, "license": result.get("license"),
+                                  "attribution": "donor gauges (per-source licences); BasinATLAS (CC BY 4.0)"})
     if name == "describe_catchment" and result.get("sub_basin"):
         label = f"catchment at {result.get('latitude')}, {result.get('longitude')}"
         if not any(d.get("label") == label for d in res.data_used):

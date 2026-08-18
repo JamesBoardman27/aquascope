@@ -45,6 +45,7 @@ If `aquascope` is not on the client's PATH, use the interpreter explicitly:
 | `describe_methods()` | what each analysis computes and the reference to cite | no |
 | `describe_catchment(lat, lon, upstream=True)` | the BasinATLAS (HydroATLAS, CC BY 4.0) catchment of a point: sub-basin, upstream area, elevation, climate, land cover, soils, population, dams; `upstream=False` for the local sub-basin | no (Archive `basins/` files) |
 | `similar_basins(lat, lon | source, station_id, k, method, sources)` | the gauged basins whose catchments most resemble a point's or a station's (BasinATLAS attribute space and/or distance): donor selection for ungauged sites | no (Archive `basins/station_catchments.parquet`) |
+| `regionalize_signatures(lat, lon, k, method)` | the estimated flow regime of an ungauged point (mean/median/Q95/Q05 flow in mm/d, annual maximum, runoff ratio, baseflow index, FDC slope, flow frequencies, seasonality, flashiness) transferred from the most similar gauged donors, with a band and the leave-one-out skill; `method`: similarity, regression or both | no (Archive `basins/station_signatures.parquet` + `regionalization_skill.json`) |
 | `archive_health()` | per-source status of the last catalog harvest | no |
 
 Resources: `aquascope://sources` and `aquascope://methods` (JSON).

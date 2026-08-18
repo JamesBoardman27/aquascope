@@ -56,7 +56,15 @@ Under the catchment card, **Similar gauged basins** lists the gauges whose
 catchments look most like the point's or the station's (standardised
 BasinATLAS attributes combined with distance, from
 `basins/station_catchments.parquet`), the donor list one needs at an
-ungauged site; click one to open it.
+ungauged site; click one to open it. Below it, **Estimated flow regime** is
+what those donors suggest for the point: mean, low (Q95) and high (Q05) daily
+flow and mean annual maximum in mm/d, baseflow index, seasonality and
+flashiness, each transferred as a similarity-weighted mean over the ten
+closest donors with a band, and the archive's published leave-one-out skill
+(NSE, median error) next to every number (`basins/station_signatures.parquet`
+and `regionalization_skill.json`, computed weekly by the harvest; see
+[archive.md](archive.md#estimated-flow-regime-prediction-in-ungauged-basins-the-predictive-half)).
+Not a measurement, and it says so.
 
 Why not HydroBASINS itself: the HydroSHEDS core licence forbids distributing
 the data "as a stand-alone product" and requires an end-user licence, so it
