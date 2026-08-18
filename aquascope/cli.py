@@ -799,6 +799,64 @@ def cmd_basins(args: argparse.Namespace) -> None:
     print(f"\n  {res['attribution']}")
 
 
+def cmd_gym(args: argparse.Namespace) -> None:
+    """`aquascope gym basins|run|leaderboard`: HydroGym, the calibration environment over real basins."""
+    from aquascope import gym as hg
+
+    if args.gym_cmd == "basins":
+        rows = hg.suggest_basins(args.n, sources=args.source or None, min_years=args.min_years,
+                                 max_snow_pct=None if args.allow_snow else 20.0)
+        if args.json:
+            print(json.dumps(rows, indent=2, default=str))
+            return
+        if not rows:
+            print("  no candidate basins yet (the archive publishes basins/station_signatures.parquet weekly)")
+            return
+        print(f"  {len(rows)} basins with long archived discharge and a catchment area (use SOURCE/ID with `gym run`)")
+        for r in rows:
+            snow = f"snow {r['snow_cover_pct']:.0f} %" if r.get("snow_cover_pct") is not None else ""
+            print(f"  {r['source']}/{r['station_id']:<42} {r['area_km2']:>9,.0f} km2  {r['n_years']:>4.0f} yr  "
+                  f"q {r['q_mean_mm']:.2f} mm/d  RR {r['runoff_ratio'] if r['runoff_ratio'] is not None else float('nan'):.2f}  {snow}")
+        return
+
+    def _basins():
+        if args.synthetic or not args.basin:
+            return [hg.synthetic_basin(i) for i in range(args.n_synthetic)]
+        out = []
+        for spec in args.basin:
+            src, _, sid = spec.partition("/")
+            out.append(hg.load_basin(src, sid))
+        return out
+
+    if args.gym_cmd == "leaderboard":
+        basins = _basins()
+        table = hg.run_leaderboard(basins, args.agent or None, objective=args.objective, max_steps=args.steps,
+                                   seeds=tuple(range(args.seeds)))
+        if args.json:
+            print(table.to_json(orient="records", indent=2))
+            return
+        cols = ["agent", "basin", "seed", "steps", "simulator_calls", "best_reward", "val_nse", "val_kge", "seconds"]
+        print(table[cols].to_string(index=False, float_format=lambda v: f"{v:.3f}"))
+        if args.out:
+            table.to_csv(args.out, index=False)
+            print(f"\n  -> {args.out}")
+        return
+    # run: one agent on one (or the first) basin
+    basins = _basins()
+    env = hg.CalibrationEnv(basins, objective=args.objective, max_steps=args.steps)
+    env.reset(seed=args.seed)
+    fn = hg.BASELINES[args.agent[0] if args.agent else "differential_evolution"]
+    res = fn(env, {"seed": args.seed} if (args.agent or ["differential_evolution"])[0] != "nelder_mead" else {})
+    if args.json:
+        print(json.dumps({**res, "history": hg.episode_table(env).to_dict("records")}, indent=2, default=str))
+        return
+    print(env.render())
+    print(f"  {res['agent']}: {res['steps']} steps, {res.get('simulator_calls', res['steps'])} simulator calls, "
+          f"{res['seconds']} s")
+    val = res.get("validation") or {}
+    print(f"  validation: NSE {val.get('nse')}, KGE {val.get('kge')}, PBIAS {val.get('pbias')}")
+
+
 def cmd_caravan(args: argparse.Namespace) -> None:
     """`aquascope caravan export|validate`: Caravan-format sub-datasets from the Archive."""
     from aquascope.archive import caravan
@@ -1617,6 +1675,30 @@ def main() -> None:
     p_bbuild.add_argument("--max-features", type=int, default=None)
     p_bbuild.add_argument("--fgb", action="store_true", help="Also write lev12.fgb from Python (needs memory)")
 
+    # ── gym (HydroGym) ───────────────────────────────────────────────
+    p_gym = sub.add_parser("gym", help="HydroGym: a gym-style calibration environment over real basins (#175)")
+    gym_sub = p_gym.add_subparsers(dest="gym_cmd", required=True)
+    p_gb = gym_sub.add_parser("basins", help="Suggest gauged basins from the Archive that make good tasks")
+    p_gb.add_argument("--n", type=int, default=10)
+    p_gb.add_argument("--source", action="append", help="Restrict to these sources (repeatable)")
+    p_gb.add_argument("--min-years", type=float, default=15.0)
+    p_gb.add_argument("--allow-snow", action="store_true", help="Keep snowy catchments (GR4J has no snow routine)")
+    p_gb.add_argument("--json", action="store_true")
+    for name, help_ in (("run", "Play one baseline agent on a basin"),
+                        ("leaderboard", "Play the baselines on one or more basins, one row per run")):
+        p_g = gym_sub.add_parser(name, help=help_)
+        p_g.add_argument("--basin", action="append", metavar="SOURCE/ID", help="Archive station (repeatable)")
+        p_g.add_argument("--synthetic", action="store_true", help="Use synthetic GR4J basins (no network)")
+        p_g.add_argument("--n-synthetic", type=int, default=1)
+        p_g.add_argument("--agent", action="append", choices=["random_search", "nelder_mead", "differential_evolution"],
+                         help="Baseline agent(s); default: differential_evolution for run, all three for leaderboard")
+        p_g.add_argument("--objective", choices=["nse", "kge", "log_nse"], default="nse")
+        p_g.add_argument("--steps", type=int, default=30, help="Step budget per episode")
+        p_g.add_argument("--seed", type=int, default=0)
+        p_g.add_argument("--seeds", type=int, default=1, help="leaderboard: number of seeds per agent and basin")
+        p_g.add_argument("--out", default=None, help="leaderboard: write the table as CSV")
+        p_g.add_argument("--json", action="store_true")
+
     # ── caravan ──────────────────────────────────────────────────────
     p_car = sub.add_parser("caravan", help="Caravan-format sub-datasets (forcing + mm/day streamflow + attributes) from the Archive")
     car_sub = p_car.add_subparsers(dest="caravan_cmd", required=True)
@@ -1832,6 +1914,7 @@ def main() -> None:
         "harvest": cmd_harvest,
         "mcp": cmd_mcp,
         "basins": cmd_basins,
+        "gym": cmd_gym,
         "caravan": cmd_caravan,
         "ask": cmd_ask,
         "ingest": cmd_ingest,

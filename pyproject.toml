@@ -98,6 +98,11 @@ archive = [
     "pyarrow>=14",
     "huggingface_hub>=0.20",
 ]
+gym = [
+    "gymnasium>=0.29",
+    "pyarrow>=14",
+    "huggingface_hub>=0.20",
+]
 mcp = [
     "mcp>=1.2",
     "pyarrow>=14",

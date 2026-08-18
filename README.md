@@ -262,7 +262,7 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 24-command CLI (`agri`, `basins` and `caravan` carry subcommands) for the most common workflows:
+AquaScope ships a 25-command CLI (`agri`, `basins`, `caravan` and `gym` carry subcommands) for the most common workflows:
 
 ```bash
 # Find stations, then collect data
@@ -272,6 +272,7 @@ aquascope basins at 48.85 2.35                    # the catchment of any point: 
 aquascope basins similar 25.04 121.56             # gauged basins whose catchments look most like this point's (ungauged-site donors)
 aquascope basins regionalize 52.29 -3.51          # estimated flow regime of an ungauged point from those donors, with the leave-one-out skill
 aquascope caravan export --source uk_ea --out caravan_gb   # a Caravan-format large-sample dataset from the archive
+aquascope gym run --basin uk_ea/013054a3-670e-49ee-afda-e0865a449197   # HydroGym: calibrate GR4J on a real basin as a gym episode
 aquascope mcp                                     # serve the same tools to Claude / Cursor over MCP
 aquascope ask "100-year flood of the Seine at Paris?"   # the analyst: tools + a cited Markdown report
 aquascope ingest agency_export.csv --unit cfs     # any CSV/Excel -> clean daily series + QA report
@@ -334,6 +335,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 | [Architecture](docs/guides/architecture.md) | How AquaScope is structured internally |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
 | [Use cases](docs/use_cases.md) | Real-world applications and case studies |
+| [HydroGym](docs/gym.md) | A gym-style calibration environment over real basins, with baselines and a leaderboard |
 | [Integration guides](docs/integration_guides/) | xarray, QGIS, R interoperability |
 | [Contributing](CONTRIBUTING.md) | How to add a data source, methodology, or test |
 
