@@ -20,14 +20,17 @@ const pyodide = await loadPyodide({
   packages: ["micropip", "numpy", "scipy", "pandas", "pydantic", "httpx"],
 });
 
-console.log(`Installing ${basename(wheelPath)} + pyodide-http…`);
+const wheelName = basename(wheelPath);
+console.log(`Installing ${wheelName} + pyodide-http…`);
 // Write the wheel into Emscripten's MEMFS so micropip reads it via emfs:
 // (emfs:/path — single slash, MEMFS-absolute; not an authority-style URL).
+// httpx is not in Pyodide's built-in package set, so install it via micropip.
+// The filename in MEMFS must retain standard PEP 427 wheel tags for micropip.
 const wheelData = readFileSync(wheelPath);
-pyodide.FS.writeFile("/tmp/aquascope.whl", new Uint8Array(wheelData));
+pyodide.FS.writeFile(`/tmp/${wheelName}`, new Uint8Array(wheelData));
 await pyodide.runPythonAsync(`
 import micropip
-await micropip.install(["pyodide-http", "emfs:/tmp/aquascope.whl"])
+await micropip.install(["pyodide-http", "emfs:/tmp/${wheelName}"])
 `);
 
 console.log("Running analyze_series on a synthetic 30-year series…");
