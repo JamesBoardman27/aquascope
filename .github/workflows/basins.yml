@@ -12,8 +12,6 @@ name: Build basins (BasinATLAS)
 # BasinATLAS changes (it does not: v1.0 is from 2019) or the layout does.
 
 on:
-  push:
-    branches: [explorer/basins]   # TEMP: smoke run on the feature branch (20k sub-basins, no publish)
   workflow_dispatch:
     inputs:
       publish:
@@ -119,11 +117,11 @@ jobs:
           print(r.to_dict())
           EOF
         env:
-          MAX_FEATURES: ${{ github.event_name == 'push' && '20000' || inputs.max_features }}
+          MAX_FEATURES: ${{ inputs.max_features }}
 
       - name: FlatGeobuf (simplified polygons with a spatial index; ogr2ogr streams it)
         env:
-          MAX_FEATURES: ${{ github.event_name == 'push' && '20000' || inputs.max_features }}
+          MAX_FEATURES: ${{ inputs.max_features }}
         run: |
           LIMIT=""
           if [ -n "$MAX_FEATURES" ]; then LIMIT="-limit $MAX_FEATURES"; fi
@@ -135,7 +133,7 @@ jobs:
       - name: PMTiles (level 12 for zoom 5-10, level 6 for zoom 0-8)
         if: ${{ !inputs.skip_tiles }}
         env:
-          MAX_FEATURES: ${{ github.event_name == 'push' && '20000' || inputs.max_features }}
+          MAX_FEATURES: ${{ inputs.max_features }}
         run: |
           LIMIT=""
           if [ -n "$MAX_FEATURES" ]; then LIMIT="-limit $MAX_FEATURES"; fi
@@ -176,6 +174,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: basins-build-${{ github.run_id }}
-          path: ${{ (github.event_name == 'push' || inputs.max_features != '') && 'archive/basins/' || 'archive/basins/build.json' }}
+          path: ${{ inputs.max_features != '' && 'archive/basins/' || 'archive/basins/build.json' }}
           if-no-files-found: ignore
           retention-days: 7
