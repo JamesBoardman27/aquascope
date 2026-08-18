@@ -260,13 +260,14 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 23-command CLI (`agri` and `basins` carry subcommands) for the most common workflows:
+AquaScope ships a 24-command CLI (`agri`, `basins` and `caravan` carry subcommands) for the most common workflows:
 
 ```bash
 # Find stations, then collect data
 aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
 aquascope harvest stations --out archive          # the open gauge catalog (GeoParquet)
 aquascope basins at 48.85 2.35                    # the catchment of any point: area, climate, land cover, soils, dams (BasinATLAS)
+aquascope caravan export --source uk_ea --out caravan_gb   # a Caravan-format large-sample dataset from the archive
 aquascope mcp                                     # serve the same tools to Claude / Cursor over MCP
 aquascope ask "100-year flood of the Seine at Paris?"   # the analyst: tools + a cited Markdown report
 aquascope ingest agency_export.csv --unit cfs     # any CSV/Excel -> clean daily series + QA report

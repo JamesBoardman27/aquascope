@@ -131,6 +131,13 @@ sub-basins for any station or clicked point. Built by
 not weekly. Why BasinATLAS and not HydroBASINS: the HydroSHEDS core licence
 forbids stand-alone redistribution, HydroATLAS is CC BY 4.0.
 
+## Caravan-format export
+
+`aquascope caravan export --source uk_ea --out caravan_gb` turns the archive
+(catalog + discharge bundle + BasinATLAS + Open-Meteo forcing) into a Caravan
+sub-dataset: per-gauge daily forcing and mm/d streamflow, climate indices and
+HydroATLAS-style attributes. See [caravan.md](caravan.md).
+
 ## Terms
 
 The station catalog is factual metadata (where a gauge is, what it measures)

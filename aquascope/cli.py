@@ -721,6 +721,44 @@ def cmd_basins(args: argparse.Namespace) -> None:
     print(f"\n  {res['attribution']}")
 
 
+def cmd_caravan(args: argparse.Namespace) -> None:
+    """`aquascope caravan export|validate`: Caravan-format sub-datasets from the Archive."""
+    from aquascope.archive import caravan
+
+    if args.caravan_cmd == "validate":
+        res = caravan.validate_caravan(args.out, args.prefix)
+        print(f"  {res['n_gauges']} gauges, {'OK' if res['ok'] else str(len(res['problems'])) + ' problems'}")
+        for pr in res["problems"][:30]:
+            print(f"    - {pr}")
+        if not res["ok"]:
+            sys.exit(1)
+        return
+
+    def say(msg: str) -> None:
+        if not args.quiet:
+            print(f"  · {msg}", file=sys.stderr)
+
+    try:
+        report = caravan.export_caravan(
+            args.source, args.out, station_ids=args.station or None, max_stations=args.max_stations,
+            min_years=args.min_years, start=args.start, end=args.end, prefix=args.prefix,
+            forcing=not args.no_forcing, forcing_models=None if args.era5 else "best_match",
+            fetch_missing=args.fetch_missing, write_netcdf=args.netcdf, pause=args.pause, on_event=say,
+        )
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(2)
+    for g in report.gauges:
+        status = f"{g.n_days:>6} days, {g.n_streamflow:>6} with flow, area {g.area_km2:,.0f} km2 ({g.area_source})" \
+            if g.ok else f"skipped: {g.error}"
+        print(f"  {g.gauge_id:<48} {status}")
+    print(f"\n  {report.n_ok}/{len(report.gauges)} gauges written under {report.out_dir} (prefix {report.prefix})")
+    res = caravan.validate_caravan(args.out, report.prefix) if report.n_ok else {"ok": False, "problems": ["nothing written"]}
+    print(f"  validation: {'OK' if res['ok'] else '; '.join(res['problems'][:5])}")
+    if report.n_ok == 0:
+        sys.exit(1)
+
+
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
@@ -1472,6 +1510,29 @@ def main() -> None:
     p_bbuild.add_argument("--max-features", type=int, default=None)
     p_bbuild.add_argument("--fgb", action="store_true", help="Also write lev12.fgb from Python (needs memory)")
 
+    # ── caravan ──────────────────────────────────────────────────────
+    p_car = sub.add_parser("caravan", help="Caravan-format sub-datasets (forcing + mm/day streamflow + attributes) from the Archive")
+    car_sub = p_car.add_subparsers(dest="caravan_cmd", required=True)
+    p_cex = car_sub.add_parser("export", help="Export one source's discharge stations in the Caravan layout")
+    p_cex.add_argument("--source", required=True, choices=["usgs", "uk_ea", "hubeau_hydrometrie"])
+    p_cex.add_argument("--out", required=True, help="Output folder (Caravan tree is written inside it)")
+    p_cex.add_argument("--station", action="append", help="Only these station ids (repeatable)")
+    p_cex.add_argument("--max-stations", type=int, default=None, help="Cap (longest archived records first)")
+    p_cex.add_argument("--min-years", type=float, default=10.0, help="Minimum streamflow record length (default 10)")
+    p_cex.add_argument("--start", type=date.fromisoformat, default=None, help="Forcing start (default 1981-01-01)")
+    p_cex.add_argument("--end", type=date.fromisoformat, default=None, help="Forcing end (default last observation)")
+    p_cex.add_argument("--prefix", default=None, help="Sub-dataset prefix (default aquascope_<source>)")
+    p_cex.add_argument("--no-forcing", action="store_true", help="Streamflow and attributes only, no Open-Meteo calls")
+    p_cex.add_argument("--era5", action="store_true",
+                       help="Use plain ERA5 (25 km) instead of Open-Meteo's ERA5-Land + ERA5 blend")
+    p_cex.add_argument("--fetch-missing", action="store_true", help="Fetch stations the archive lacks from the agency")
+    p_cex.add_argument("--netcdf", action="store_true", help="Also write timeseries/netcdf (needs xarray + netCDF4)")
+    p_cex.add_argument("--pause", type=float, default=3.0, help="Seconds between Open-Meteo calls (default 3)")
+    p_cex.add_argument("--quiet", action="store_true")
+    p_cval = car_sub.add_parser("validate", help="Check a folder against the Caravan layout")
+    p_cval.add_argument("out")
+    p_cval.add_argument("--prefix", required=True)
+
     p_mcp = sub.add_parser("mcp", help="Serve find_stations / get_timeseries / analyze_station over MCP (#113)")
     p_mcp.add_argument("--transport", choices=["stdio", "sse", "streamable-http"], default="stdio")
 
@@ -1664,6 +1725,7 @@ def main() -> None:
         "harvest": cmd_harvest,
         "mcp": cmd_mcp,
         "basins": cmd_basins,
+        "caravan": cmd_caravan,
         "ask": cmd_ask,
         "ingest": cmd_ingest,
         "solve": cmd_solve,
