@@ -591,10 +591,13 @@ def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None
     return out
 
 
-def row_catchment_attributes(row: dict[str, Any] | pd.Series) -> dict[str, float]:
-    """Flat ``{guide key: value}`` for one BasinATLAS row, taking the upstream field where it exists.
+def row_catchment_attributes(row: dict[str, Any] | pd.Series, *, scope: str = "upstream") -> dict[str, float]:
+    """Flat ``{guide key: value}`` for one BasinATLAS row.
 
-    The catchment closed at the row's sub-basin outlet, in real units (storage
+    ``scope="upstream"`` takes the upstream (``_u``/``_p``) field where it
+    exists: the catchment closed at the row's sub-basin outlet.
+    ``scope="local"`` takes the sub-basin's own (``_s``) field: right for a
+    gauge that drains only a corner of its sub-basin. Real units (storage
     multipliers undone, ``NODATA`` dropped). Used to tabulate every gauged
     station's catchment for similarity search.
     """
@@ -603,7 +606,8 @@ def row_catchment_attributes(row: dict[str, Any] | pd.Series) -> dict[str, float
     out: dict[str, float] = {}
     for key, (s_field, u_field, _unit, _how, _label) in ATTRIBUTE_GUIDE.items():
         val = None
-        for f in (u_field, s_field):
+        order = (u_field, s_field) if scope == "upstream" else (s_field, u_field)
+        for f in order:
             if f and f in row and row[f] is not None:
                 try:
                     v = float(row[f])

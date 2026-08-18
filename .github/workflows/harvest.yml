@@ -26,6 +26,10 @@ on:
         description: "Stations per source to harvest daily series for (default 150)"
         type: string
         default: ""
+      skip_obs:
+        description: "Skip the observation harvest (catalog, station catchments and bundles only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -95,6 +99,7 @@ jobs:
 
       - name: Harvest daily observations (budgeted; the archive fills up over weeks)
         id: obs
+        if: ${{ !inputs.skip_obs }}
         timeout-minutes: 120
         run: |
           set +e

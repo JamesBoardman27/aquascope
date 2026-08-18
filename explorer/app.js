@@ -699,7 +699,7 @@ const SIMILAR_METHOD = {
 };
 // [table column, basin-card key, transform, weight]
 const SIMILAR_FEATURES = [
-  ["up_area", "__area", "log10", 1.5], ["elevation_m", "elev", null, 1.0], ["slope_deg", "slope", "log1p", 1.0],
+  ["area_km2", "__area", "log10", 1.5], ["elevation_m", "elev", null, 1.0], ["slope_deg", "slope", "log1p", 1.0],
   ["precipitation_mm_yr", "pre", null, 1.5], ["aridity_index", "ari", "log1p", 1.5], ["temperature_c", "tmp", null, 1.0],
   ["snow_cover_pct", "snw", null, 1.0], ["forest_pct", "for", null, 0.7], ["cropland_pct", "crp", null, 0.7],
   ["urban_pct", "urb", "log1p", 0.7], ["clay_pct", "cly", null, 0.5], ["sand_pct", "snd", null, 0.5],
@@ -730,15 +730,20 @@ async function requestSimilar({ lat, lon, upArea, attrs, target, my }) {
   try {
     const { rows, stats } = await ensureSimilarTable();
     if (my !== basinReq) return;
+    const selfKey = target === "st" && state.selected ? `${state.selected.source}/${state.selected.station_id}` : null;
+    // A station's own table row is the better target: it carries the agency's area and the attribute scope
+    // (a small creek inside a big river's sub-basin must not be described by the big river).
+    const selfRow = selfKey ? rows.find((r) => `${r.source}/${r.station_id}` === selfKey) : null;
     const tvals = {};
     for (const [col, key] of SIMILAR_FEATURES) {
-      const v = key === "__area" ? upArea : (attrs[key] && attrs[key].value);
+      let v;
+      if (selfRow && selfRow[col] !== null && selfRow[col] !== undefined) v = selfRow[col];
+      else v = key === "__area" ? upArea : (attrs[key] && attrs[key].value);
       if (v !== undefined && v !== null && Number.isFinite(Number(v))) tvals[col] = Number(v);
     }
     const used = SIMILAR_FEATURES.filter(([col]) => tvals[col] !== undefined);
     if (!used.length) return;
     const wsum = used.reduce((a, [, , , w]) => a + w * w, 0);
-    const selfKey = target === "st" && state.selected ? `${state.selected.source}/${state.selected.station_id}` : null;
     const scored = [];
     for (const r of rows) {
       const key = `${r.source}/${r.station_id}`;
@@ -756,7 +761,7 @@ async function requestSimilar({ lat, lon, upArea, attrs, target, my }) {
       }
       const dAttr = Math.sqrt(acc / wsum);
       const dKm = haversineKm(lat, lon, st.lat, st.lon);
-      scored.push({ st, dAttr, dKm, score: Math.sqrt(dAttr ** 2 + (dKm / 500) ** 2), area: Number(r.up_area) });
+      scored.push({ st, dAttr, dKm, score: Math.sqrt(dAttr ** 2 + (dKm / 500) ** 2), area: Number(r.area_km2 ?? r.up_area) });
     }
     scored.sort((a, b) => a.score - b.score);
     const top = scored.slice(0, 8);

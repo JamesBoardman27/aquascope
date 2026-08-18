@@ -160,8 +160,23 @@ class HubeauHydrometrieCollector(BaseCollector):
                     )
                 )
                 if max_items is not None and len(stations) >= max_items:
-                    return stations
-            url = data.get("next") or None
+                    url = None
+                    break
+            else:
+                url = data.get("next") or None
+        # One referentiel/sites call gives every site's catchment area (surface_bv, km2): the number the
+        # archive and the Caravan export need to turn m3/s into mm/day.
+        codes = {st.extra.get("code_site") for st in stations if st.extra.get("code_site")}
+        if codes:
+            try:
+                areas = self._get_catchment_areas(codes)
+            except Exception as exc:  # noqa: BLE001 - areas are an extra, never a reason to fail the catalog
+                logger.info("Hub'Eau catchment areas unavailable (%s)", exc)
+                areas = {}
+            for st in stations:
+                area = areas.get(st.extra.get("code_site"))
+                if area:
+                    st.extra["catchment_area_km2"] = float(area)
         return stations
 
     def fetch_raw(

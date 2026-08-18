@@ -11,12 +11,18 @@ anything to an ungauged site.
 Two tables make it instant:
 
 ``basins/station_catchments.parquet``
-    one row per catalog station: ``source, station_id, hybas_id, up_area`` and
-    the catchment attributes of :data:`aquascope.archive.basins.ATTRIBUTE_GUIDE`
-    (BasinATLAS upstream values for the level-12 sub-basin containing the
-    gauge, real units). Built weekly by the harvest workflow with
-    :func:`assign_station_catchments` (a spatial join of the catalog against
-    the BasinATLAS FlatGeobuf), published next to the catalog.
+    one row per catalog station: ``source, station_id, hybas_id, up_area,
+    sub_area, area_km2, area_source, attribute_scope`` and the catchment
+    attributes of :data:`aquascope.archive.basins.ATTRIBUTE_GUIDE` (real
+    units). ``area_km2`` is the agency's catchment area when the catalog
+    carries one (``extra.catchment_area_km2``: USGS, UK EA, Hub'Eau), else
+    BasinATLAS ``up_area``. ``attribute_scope`` says which BasinATLAS values
+    were taken: ``upstream`` when the gauge closes (most of) its sub-basin's
+    catchment, ``local`` when the agency area shows the gauge drains only a
+    corner of the sub-basin (a small creek inside a big river's sub-basin
+    would otherwise inherit the big river's attributes). Built weekly by the
+    harvest workflow with :func:`assign_station_catchments` (a spatial join of
+    the catalog against the BasinATLAS FlatGeobuf), published next to the catalog.
 
 The search standardises a chosen feature set over the table (z-scores),
 measures Euclidean distance in that space (``method="similarity"``), or
@@ -48,7 +54,7 @@ TABLE_NAME = "station_catchments.parquet"
 
 # feature key -> (attribute key in the guide / table column, transform, weight)
 FEATURES: dict[str, tuple[str, str | None, float]] = {
-    "log_area": ("up_area", "log10", 1.5),
+    "log_area": ("area_km2", "log10", 1.5),
     "elevation": ("elevation_m", None, 1.0),
     "slope": ("slope_deg", "log1p", 1.0),
     "precipitation": ("precipitation_mm_yr", None, 1.5),
@@ -130,11 +136,25 @@ def assign_station_catchments(
         df = load_attributes(chunk, path=attributes_path)
         for rec in df.to_dict("records"):
             attrs_by_id[int(rec["hybas_id"])] = rec
+    agency_area = {(r["source"], r["station_id"]): (r.get("extra") or {}).get("catchment_area_km2") for r in catalog}
     for rec in joined.drop(columns=[joined.geometry.name]).to_dict("records"):
         hid = int(rec["hybas_id"])
+        up_area = float(rec.get("up_area") or 0.0)
+        sub_area = float(rec.get("sub_area") or 0.0)
+        agency = agency_area.get((rec["source"], rec["station_id"]))
+        try:
+            agency = float(agency) if agency is not None and float(agency) > 0 else None
+        except (TypeError, ValueError):
+            agency = None
+        scope, area, area_source = "upstream", up_area, "basinatlas_up_area"
+        if agency is not None:
+            area, area_source = agency, "agency"
+            if up_area and agency < 0.5 * up_area:
+                scope = "local"  # the gauge drains a fraction of the sub-basin's catchment
         base = {"source": rec["source"], "station_id": rec["station_id"], "hybas_id": hid,
-                "up_area": float(rec.get("up_area") or 0.0), "sub_area": float(rec.get("sub_area") or 0.0)}
-        base.update(row_catchment_attributes(attrs_by_id.get(hid, {})))
+                "up_area": up_area, "sub_area": sub_area, "area_km2": float(area), "area_source": area_source,
+                "attribute_scope": scope}
+        base.update(row_catchment_attributes(attrs_by_id.get(hid, {}), scope=scope))
         rows.append(base)
     out = pd.DataFrame(rows)
     out_path = Path(out_path)
@@ -296,8 +316,11 @@ def _target_values(target: dict[str, Any]) -> dict[str, float | None]:
         v = attrs.get(col)
         if isinstance(v, dict):
             v = v.get("value")
-        if v is None and col == "up_area":
-            v = (attrs.get("upstream_area_km2") if isinstance(attrs.get("upstream_area_km2"), (int, float)) else None)
+        if v is None and col == "area_km2":
+            v = attrs.get("up_area")
+            if v is None:
+                ua = attrs.get("upstream_area_km2")
+                v = ua if isinstance(ua, (int, float)) else None
             if v is None and isinstance(target.get("sub_basin"), dict):
                 v = target["sub_basin"].get("up_area")
         try:
