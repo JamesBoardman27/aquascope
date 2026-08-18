@@ -76,7 +76,7 @@ ATTRIBUTE_GUIDE: dict[str, tuple[str, str | None, str, str, str]] = {
     "precipitation_mm_yr": ("pre_mm_syr", "pre_mm_uyr", "mm/yr", "area", "annual precipitation (WorldClim)"),
     "pet_mm_yr": ("pet_mm_syr", "pet_mm_uyr", "mm/yr", "area", "annual potential evapotranspiration"),
     "aet_mm_yr": ("aet_mm_syr", "aet_mm_uyr", "mm/yr", "area", "annual actual evapotranspiration"),
-    "aridity_index": ("ari_ix_sav", "ari_ix_uav", "P/PET", "area", "aridity index"),
+    "aridity_index": ("ari_ix_sav", "ari_ix_uav", "P/PET", "area", "aridity index (P/PET)"),
     "temperature_c": ("tmp_dc_syr", "tmp_dc_uyr", "°C", "area", "mean annual air temperature"),
     "snow_cover_pct": ("snw_pc_syr", "snw_pc_uyr", "%", "area", "annual snow cover extent"),
     "runoff_mm_yr": ("run_mm_syr", None, "mm/yr", "area", "annual land-surface runoff"),
@@ -99,11 +99,93 @@ ATTRIBUTE_GUIDE: dict[str, tuple[str, str | None, str, str, str]] = {
     "population_density": ("ppd_pk_sav", "ppd_pk_uav", "people/km2", "area", "population density"),
     "population": ("pop_ct_ssu", "pop_ct_usu", "people", "sum", "population count"),
     "degree_of_regulation_pct": ("dor_pc_pva", "dor_pc_pva", "%", "outlet", "degree of regulation by reservoirs"),
-    "human_footprint_2009": ("hft_ix_s09", "hft_ix_u09", "index 0-100", "area", "human footprint (2009)"),
+    "human_footprint_2009": ("hft_ix_s09", "hft_ix_u09", "index 0-50", "area", "human footprint (2009)"),
     "reservoir_volume_mcm": ("rev_mc_usu", "rev_mc_usu", "million m3", "outlet", "reservoir volume upstream"),
 }
-# Fields stored scaled in BasinATLAS: (divisor, unit after scaling)
-_SCALED = {"tmp_dc": (10.0, "°C"), "ari_ix": (100.0, "P/PET")}
+# BasinATLAS attribute families (first six characters of the column name), from the BasinATLAS
+# Catalog v1.0: display name, unit as stored, and the multiplier the catalog says the stored
+# integers carry ("x10" means value 10 is 1 unit). Population counts are stored in thousands.
+FIELDS: dict[str, dict[str, Any]] = {
+    "dis_m3": {"id": "H01", "name": "Natural Discharge", "unit": "cubic meters per second", "stored_x": 1},
+    "run_mm": {"id": "H02", "name": "Land Surface Runoff", "unit": "millimeters", "stored_x": 1},
+    "inu_pc": {"id": "H03", "name": "Inundation Extent", "unit": "percent cover", "stored_x": 1},
+    "lka_pc": {"id": "H04", "name": "Limnicity (Percent Lake Area)", "unit": "percent cover (x10)", "stored_x": 10},
+    "lkv_mc": {"id": "H05", "name": "Lake Volume", "unit": "million cubic meters", "stored_x": 1},
+    "rev_mc": {"id": "H06", "name": "Reservoir Volume", "unit": "million cubic meters", "stored_x": 1},
+    "dor_pc": {"id": "H07", "name": "Degree of Regulation", "unit": "percent (x10)", "stored_x": 10},
+    "ria_ha": {"id": "H08", "name": "River Area", "unit": "hectares", "stored_x": 1},
+    "riv_tc": {"id": "H09", "name": "River Volume", "unit": "thousand cubic meters", "stored_x": 1},
+    "gwt_cm": {"id": "H10", "name": "Groundwater Table Depth", "unit": "centimeters", "stored_x": 1},
+    "ele_mt": {"id": "P01", "name": "Elevation", "unit": "meters a.s.l.", "stored_x": 1},
+    "slp_dg": {"id": "P02", "name": "Terrain Slope", "unit": "degrees (x10)", "stored_x": 10},
+    "sgr_dk": {"id": "P03", "name": "Stream Gradient", "unit": "decimeters per km", "stored_x": 1},
+    "clz_cl": {"id": "C01", "name": "Climate Zones", "unit": "classes (18)", "stored_x": 1},
+    "cls_cl": {"id": "C02", "name": "Climate Strata", "unit": "classes (125)", "stored_x": 1},
+    "tmp_dc": {"id": "C03", "name": "Air Temperature", "unit": "degrees Celsius (x10)", "stored_x": 10},
+    "pre_mm": {"id": "C04", "name": "Precipitation", "unit": "millimeters", "stored_x": 1},
+    "pet_mm": {"id": "C05", "name": "Potential Evapotranspiration", "unit": "millimeters", "stored_x": 1},
+    "aet_mm": {"id": "C06", "name": "Actual Evapotranspiration", "unit": "millimeters", "stored_x": 1},
+    "ari_ix": {"id": "C07", "name": "Global Aridity Index", "unit": "index value (x100)", "stored_x": 100},
+    "cmi_ix": {"id": "C08", "name": "Climate Moisture Index", "unit": "index value (x100)", "stored_x": 100},
+    "snw_pc": {"id": "C09", "name": "Snow Cover Extent", "unit": "percent cover", "stored_x": 1},
+    "glc_cl": {"id": "L01", "name": "Land Cover Classes", "unit": "classes (22)", "stored_x": 1},
+    "glc_pc": {"id": "L02", "name": "Land Cover Extent", "unit": "percent cover", "stored_x": 1},
+    "pnv_cl": {"id": "L03", "name": "Potential Natural Vegetation Classes", "unit": "classes (15)", "stored_x": 1},
+    "pnv_pc": {"id": "L04", "name": "Potential Natural Vegetation Extent", "unit": "percent cover", "stored_x": 1},
+    "wet_cl": {"id": "L05", "name": "Wetland Classes", "unit": "classes (12)", "stored_x": 1},
+    "wet_pc": {"id": "L06", "name": "Wetland Extent", "unit": "percent cover", "stored_x": 1},
+    "for_pc": {"id": "L07", "name": "Forest Cover Extent", "unit": "percent cover", "stored_x": 1},
+    "crp_pc": {"id": "L08", "name": "Cropland Extent", "unit": "percent cover", "stored_x": 1},
+    "pst_pc": {"id": "L09", "name": "Pasture Extent", "unit": "percent cover", "stored_x": 1},
+    "ire_pc": {"id": "L10", "name": "Irrigated Area Extent (Equipped)", "unit": "percent cover", "stored_x": 1},
+    "gla_pc": {"id": "L11", "name": "Glacier Extent", "unit": "percent cover", "stored_x": 1},
+    "prm_pc": {"id": "L12", "name": "Permafrost Extent", "unit": "percent cover", "stored_x": 1},
+    "pac_pc": {"id": "L13", "name": "Protected Area Extent", "unit": "percent cover", "stored_x": 1},
+    "tbi_cl": {"id": "L14", "name": "Terrestrial Biomes", "unit": "classes (14)", "stored_x": 1},
+    "tec_cl": {"id": "L15", "name": "Terrestrial Ecoregions", "unit": "classes (846)", "stored_x": 1},
+    "fmh_cl": {"id": "L16", "name": "Freshwater Major Habitat Types", "unit": "classes (13)", "stored_x": 1},
+    "fec_cl": {"id": "L17", "name": "Freshwater Ecoregions", "unit": "classes (426)", "stored_x": 1},
+    "cly_pc": {"id": "S01", "name": "Clay Fraction in Soil", "unit": "percent", "stored_x": 1},
+    "slt_pc": {"id": "S02", "name": "Silt Fraction in Soil", "unit": "percent", "stored_x": 1},
+    "snd_pc": {"id": "S03", "name": "Sand Fraction in Soil", "unit": "percent", "stored_x": 1},
+    "soc_th": {"id": "S04", "name": "Organic Carbon Content in Soil", "unit": "tonnes/hectare", "stored_x": 1},
+    "swc_pc": {"id": "S05", "name": "Soil Water Content", "unit": "percent", "stored_x": 1},
+    "lit_cl": {"id": "S06", "name": "Lithological Classes", "unit": "classes (16)", "stored_x": 1},
+    "kar_pc": {"id": "S07", "name": "Karst Area Extent", "unit": "percent cover", "stored_x": 1},
+    "ero_kh": {"id": "S08", "name": "Soil Erosion (RUSLE-based)", "unit": "kg/hectare per year", "stored_x": 1},
+    "pop_ct": {"id": "A01", "name": "Population Count", "unit": "count (thousands)", "stored_x": 1},
+    "ppd_pk": {"id": "A02", "name": "Population Density", "unit": "people per km²", "stored_x": 1},
+    "urb_pc": {"id": "A03", "name": "Urban Extent", "unit": "percent cover", "stored_x": 1},
+    "nli_ix": {"id": "A04", "name": "Nighttime Lights", "unit": "index value (x100)", "stored_x": 100},
+    "rdd_mk": {"id": "A05", "name": "Road Density", "unit": "meters per km²", "stored_x": 1},
+    "hft_ix": {"id": "A06", "name": "Human Footprint", "unit": "index value (x10)", "stored_x": 10},
+    "gad_id": {"id": "A07", "name": "Global Administrative Areas", "unit": "ID number", "stored_x": 1},
+    "gdp_ud": {"id": "A08", "name": "Gross Domestic Product (PPP)", "unit": "US dollars", "stored_x": 1},
+    "hdi_ix": {"id": "A09", "name": "Human Development Index", "unit": "index value (x1000)", "stored_x": 1000},
+}
+NODATA = -9999
+
+
+def field_info(column: str) -> dict[str, Any]:
+    """Name, unit and stored multiplier for any BasinATLAS column (``pre_mm_uyr`` -> the ``pre_mm`` family)."""
+    fam = column[:6]
+    info = dict(FIELDS.get(fam, {"id": "", "name": fam, "unit": "", "stored_x": 1}))
+    suffix = column[7:] if len(column) > 7 else ""
+    info["scope"] = {"s": "sub-basin", "u": "upstream", "p": "pour point"}.get(suffix[:1], "")
+    return info
+
+
+def scale_value(column: str, value: float) -> tuple[float, str]:
+    """Undo the catalog's storage multiplier: (value in real units, unit label)."""
+    fam = column[:6]
+    info = FIELDS.get(fam)
+    if info is None:
+        return float(value), ""
+    unit = info["unit"].split(" (x")[0]
+    val = float(value) / float(info["stored_x"] or 1)
+    if fam == "pop_ct":
+        val, unit = val * 1000.0, "people"
+    return val, unit
 
 
 @dataclass
@@ -299,6 +381,7 @@ def sub_basin_at(
     gdf = pyogrio.read_dataframe(src, bbox=(lon - d, lat - d, lon + d, lat + d))
     if gdf.empty:
         return None
+    gdf.columns = [c.lower() if c.upper() in TOPOLOGY_COLUMNS else c for c in gdf.columns]  # ogr2ogr keeps HYBAS_ID
     pt = Point(lon, lat)
     hit = gdf[gdf.contains(pt)]
     if hit.empty:
@@ -365,10 +448,11 @@ def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None
         val = None
         source = None
         has_u = u_field and u_field in df.columns and outlet in df.index and len(df) > 1
-        if has_u and pd.notna(df.at[outlet, u_field]):
+        if has_u and pd.notna(df.at[outlet, u_field]) and float(df.at[outlet, u_field]) > NODATA:
             val, source, field = float(df.at[outlet, u_field]), "basinatlas_upstream", u_field
         elif s_field in df.columns:
             col = pd.to_numeric(df[s_field], errors="coerce")
+            col = col.mask(col <= NODATA)
             if col.isna().all():
                 continue
             field = s_field
@@ -383,10 +467,8 @@ def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None
                 val, source = float(col.get(outlet, col.iloc[0])), "outlet"
         if val is None:
             continue
-        for prefix, (div, u2) in _SCALED.items():
-            if field.startswith(prefix):
-                val, unit = val / div, u2
-        entry = {"value": round(val, 2), "unit": unit, "label": label, "field": field, "source": source}
+        val, catalog_unit = scale_value(field, val)
+        entry = {"value": round(val, 2), "unit": unit or catalog_unit, "label": label, "field": field, "source": source}
         if source == "area_weighted_mean" and not complete:
             entry["note"] = "aggregated over the sub-basins returned; the upstream set may be capped"
         out[key] = entry

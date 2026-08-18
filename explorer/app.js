@@ -523,7 +523,7 @@ const BASIN_METHOD = {
 // [key, label, upstream field, sub-basin field, unit, divisor]
 const BASIN_FIELDS = [
   ["elev", "mean elevation", "ele_mt_uav", "ele_mt_sav", "m", 1],
-  ["slope", "mean slope", "slp_dg_uav", "slp_dg_sav", "°", 1],
+  ["slope", "mean slope", "slp_dg_uav", "slp_dg_sav", "°", 10],
   ["pre", "precipitation", "pre_mm_uyr", "pre_mm_syr", "mm/yr", 1],
   ["pet", "potential ET", "pet_mm_uyr", "pet_mm_syr", "mm/yr", 1],
   ["ari", "aridity P/PET", "ari_ix_uav", "ari_ix_sav", "", 100],
@@ -534,20 +534,21 @@ const BASIN_FIELDS = [
   ["crp", "cropland", "crp_pc_use", "crp_pc_sse", "%", 1],
   ["urb", "urban", "urb_pc_use", "urb_pc_sse", "%", 1],
   ["gla", "glacier", "gla_pc_use", "gla_pc_sse", "%", 1],
-  ["lka", "lakes", "lka_pc_use", "lka_pc_sse", "%", 1],
+  ["lka", "lakes", "lka_pc_use", "lka_pc_sse", "%", 10],
   ["kar", "karst", "kar_pc_use", "kar_pc_sse", "%", 1],
   ["cly", "clay in soil", "cly_pc_uav", "cly_pc_sav", "%", 1],
   ["snd", "sand in soil", "snd_pc_uav", "snd_pc_sav", "%", 1],
   ["ppd", "population density", "ppd_pk_uav", "ppd_pk_sav", "/km²", 1],
-  ["dor", "regulation by dams", "dor_pc_pva", "dor_pc_pva", "%", 1],
-  ["hft", "human footprint", "hft_ix_u09", "hft_ix_s09", "/100", 1],
+  ["pop", "population", "pop_ct_usu", "pop_ct_ssu", "k people", 1],
+  ["dor", "regulation by dams", "dor_pc_pva", "dor_pc_pva", "%", 10],
+  ["hft", "human footprint", "hft_ix_u09", "hft_ix_s09", "/50", 10],
 ];
 let basinReq = 0;
 let basinsLayersOn = false;
 let basinsLayersAdded = false;
 let topoLoaded = null;
 
-function basinsUrl(name) { return CONFIG.basinsBase + name; }
+function basinsUrl(name) { return new URL(name, new URL(CONFIG.basinsBase, location.href)).href; } // absolute: DuckDB and pmtiles want full URLs
 
 function ensureBasinsLayers() {
   if (basinsLayersAdded || !state.mapOk || !globalThis.pmtiles) return;
@@ -647,7 +648,7 @@ async function basinAttributes(hybasId) {
     const raw = row[uf] ?? row[sf];
     if (raw === undefined || raw === null) continue;
     const v = Number(raw) / div;
-    if (!Number.isFinite(v)) continue;
+    if (!Number.isFinite(v) || Number(raw) <= -9999) continue; // -9999 = no data in BasinATLAS
     out[key] = { label, value: v, unit, field: row[uf] !== undefined && row[uf] !== null ? uf : sf };
   }
   return out;
