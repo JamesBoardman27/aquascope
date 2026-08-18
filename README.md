@@ -427,7 +427,7 @@ If you use AquaScope in your research, please cite:
   author  = {Ouédraogo, Abdoul Rachid},
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
-  version = {0.11.0},
+  version = {0.12.0},
   doi     = {10.5281/zenodo.21903143},
   license = {MIT}
 }

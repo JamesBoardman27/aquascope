@@ -5,6 +5,24 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.12.0] - 2026-08-18
+
+The "on top of the archive" release. With the world's public gauges, their
+observations and their BasinATLAS catchments in one place, aquascope now does
+what a library alone could not: it says what flow to expect where there is no
+gauge (and how much to trust that), finds the gauged basins that look like
+yours, exports Caravan-format datasets, calibrates a rainfall-runoff model in
+the browser in seconds, evaluates hydrologic agents on real basins, repairs
+its own collectors, and reads from R, QGIS and DuckDB without any of it
+installed. Same day as 0.11.0 on purpose: 0.11.0 was the platform, 0.12.0 is
+the first things built on it.
+
+### Added
 - **GR4J in the Explorer, and a 9x faster GR4J** (`explorer/gr4j.js`, "Rainfall-runoff model" card): discharge stations with a catchment area get a "Calibrate GR4J" button; the page fetches Open-Meteo precipitation and FAO-56 ET0 at the gauge, converts the record to mm/d over the station's area, calibrates X1..X4 by differential evolution (KGE, first 65 % of the record after a one-year warm-up) in the browser in about two seconds for 40 years, and shows the parameters, KGE/NSE/log-NSE/PBIAS on calibration and validation, and observed vs simulated flow. The JS model is checked against the Python one to round-off (`tests/test_models/test_gr4j_js.py`, runs when node is present). `GR4J.simulate` in Python now uses a plain-float production loop, one convolution per unit hydrograph and a plain-float routing loop instead of two `np.roll` per day: same numbers to 1e-14, about nine times faster (12 years: 30 ms -> 3 ms), which is what makes calibration and HydroGym episodes quick. (#189 Phase 3, first item)
 - **HydroGym Phase 0** (`aquascope.gym`, `pip install aquascope[gym]`, `aquascope gym basins|run|leaderboard`, `docs/gym.md`, `notebooks/08_hydrogym_phase0.ipynb`): a gym-style evaluation environment for hydrologic agents. `CalibrationEnv` wraps GR4J calibration on one basin as an episode (action = X1..X4 or the unit cube, reward = NSE / KGE / log-NSE on the calibration period after warm-up, NSE/KGE/log-NSE/PBIAS on calibration and validation in `info`, a 16-number observation plus the raw daily frame), passes gymnasium's `check_env` and works without gymnasium; `synthetic_basin` (GR4J truth + noise, offline) and `load_basin` (any Archive station with a catchment area: discharge bundle in mm/d over the agency or BasinATLAS area, Open-Meteo precipitation and FAO-56 ET0 at the gauge, cached), `suggest_basins` from the signatures table (long, perennial, low-snow records); baselines `random_search`, `nelder_mead` (env-only) and `differential_evolution` (free simulator, each generation one step) with `run_leaderboard`. (#175, Phase 0)
 - **Estimated flow regime for ungauged points** (`aquascope.archive.regionalize`, `aquascope basins regionalize LAT LON`, MCP + analyst tool `regionalize_signatures`, Explorer "Estimated flow regime" table): the weekly harvest now computes the flow signatures of every gauged station with 10+ years of archived discharge and a catchment area (`basins/station_signatures.parquet`: mean, median, Q95, Q05 and mean annual maximum daily flow in mm/d, runoff ratio, baseflow index, FDC slope, high/low-flow frequency, zero-flow fraction, seasonality, flashiness) and predicts every donor from the others (`basins/regionalization_skill.json`: NSE, R2, median absolute relative error per signature and method, leave-one-out). Any point then gets each signature transferred from the k most similar donors (inverse-distance weights, geometric mean for magnitudes, band = one weighted standard deviation) or by ridge regression on the standardised catchment attributes over all donors, with the leave-one-out skill next to every number. `aquascope basins signatures` and `aquascope basins loo` are the workflow steps. Bloeschl et al. 2013, Oudin et al. 2008, Addor et al. 2018. Closes the predictive half of #53.
@@ -16,8 +34,6 @@ All notable changes to AquaScope are documented here.
 
 ### Changed
 - README, docs and `CITATION.cff` carry the Zenodo concept DOI `10.5281/zenodo.21903143` (v0.11.0: `10.5281/zenodo.21989509`).
-
-### Fixed
 
 ## [0.11.0] - 2026-08-18
 
