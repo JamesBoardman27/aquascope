@@ -293,7 +293,8 @@ function selectStation(key, { fly } = { fly: false }) {
   if (r.url) { agency.href = r.url; agency.hidden = false; } else agency.hidden = true;
   $("btn-csv").disabled = true;
   $("btn-ci").disabled = false;
-  for (const id of ["sec-summary", "sec-hydro", "sec-ffa", "sec-fdc", "sec-trend", "sec-notes", "sec-methods"]) $(id).hidden = true;
+  for (const id of ["sec-summary", "sec-hydro", "sec-ffa", "sec-fdc", "sec-trend", "sec-gr4j", "sec-notes", "sec-methods"]) $(id).hidden = true;
+  resetGr4j();
   $("panel").scrollTop = 0;
   clearCatchment();
   requestAnalysis(r);
@@ -953,6 +954,11 @@ function render(res, r) {
         annotations: [{ x: 95, y: Math.log10(res.fdc.q95 || 1), text: `Q95 ${fmt(res.fdc.q95)}`, showarrow: true, arrowhead: 2, ax: -40, ay: -30 }, { x: 10, y: Math.log10(res.fdc.q10 || 1), text: `Q10 ${fmt(res.fdc.q10)}`, showarrow: true, arrowhead: 2, ax: 40, ay: -30 }] }, PLOT_CONFIG);
   }
 
+  // GR4J: discharge records in m3/s can be modelled (needs a catchment area and Open-Meteo forcing; on demand)
+  if (res.variable === "discharge" && /m3\/s|m³\/s/.test(unit) && res.series && res.series.t.length > 365 * 4 && window.GR4J) {
+    $("sec-gr4j").hidden = false;
+  }
+
   // trend
   if (res.trend) {
     $("sec-trend").hidden = false;
@@ -979,6 +985,111 @@ function renderMethods(res) {
   if (!$("st-catchment").hidden) addMethodOnce("methods", "sec-methods", NLDI_METHOD);
   if (!$("st-basin").hidden) addMethodOnce("methods", "sec-methods", BASIN_METHOD);
   if (!$("st-similar").hidden) addMethodOnce("methods", "sec-methods", SIMILAR_METHOD);
+  if (!$("gr4j-out").hidden) for (const m of GR4J_METHODS) addMethodOnce("methods", "sec-methods", m);
+}
+
+// ── GR4J in the page ────────────────────────────────────────────────────────
+// explorer/gr4j.js is a straight port of aquascope.models.rainfall_runoff.GR4J
+// (checked against it to round-off in the test suite) plus a small differential
+// evolution. Forcing: Open-Meteo's ERA5-Land/ERA5 blend at the gauge point
+// (daily precipitation, FAO-56 ET0), the same recipe as the Caravan exporter and
+// HydroGym; area: the station's catchment row (agency, else BasinATLAS).
+
+const GR4J_METHODS = [
+  { name: "GR4J rainfall-runoff model, calibrated by differential evolution",
+    text: "Four-parameter daily lumped model (production store X1, groundwater exchange X2, routing store X3, unit-hydrograph time base X4) run on ERA5-Land/ERA5 rainfall and FAO-56 ET0 at the gauge; parameters found by differential evolution (best/1/bin, population 20, 40 generations) maximising KGE on the first 65 % of the record after a one-year warm-up; the last 35 % is validation only.",
+    citation: "Perrin, C., Michel, C., Andréassian, V. (2003). Improvement of a parsimonious model for streamflow simulation. J. Hydrol. 279, 275-289; Storn, R., Price, K. (1997). Differential evolution. J. Global Optim. 11, 341-359; Gupta, H. V. et al. (2009). Decomposition of the mean squared error and NSE performance criteria. J. Hydrol. 377, 80-91." },
+  { name: "Forcing at the gauge point",
+    text: "Daily precipitation and FAO-56 Penman-Monteith reference ET0 from Open-Meteo's historical weather API (ERA5-Land where available, ERA5 elsewhere), at the gauge coordinates, not catchment-averaged.",
+    citation: "Muñoz-Sabater, J. et al. (2021). ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. Earth Syst. Sci. Data 13, 4349-4383; Hersbach, H. et al. (2020). The ERA5 global reanalysis. Q. J. R. Meteorol. Soc. 146, 1999-2049; Open-Meteo (CC BY 4.0)." },
+];
+let gr4jRun = 0;
+
+function resetGr4j() {
+  gr4jRun++;
+  const out = $("gr4j-out"); if (out) out.hidden = true;
+  const st = $("gr4j-status"); if (st) st.textContent = "";
+  const btn = $("btn-gr4j"); if (btn) { btn.disabled = false; btn.textContent = "Calibrate GR4J"; }
+}
+
+async function stationArea(key) {
+  try {
+    const { rows } = await ensureSimilarTable();
+    const row = rows.find((r) => `${r.source}/${r.station_id}` === key);
+    if (row && row.area_km2) return { area: Number(row.area_km2), source: row.area_source === "agency" ? "agency" : "BasinATLAS upstream area" };
+  } catch (err) { console.info("catchment table unavailable:", err && err.message); }
+  return null;
+}
+
+async function runGr4j() {
+  const r = state.selected, res = state.result;
+  if (!r || !res || !res.series) return;
+  const key = `${r.source}/${r.station_id}`;
+  const my = ++gr4jRun;
+  const btn = $("btn-gr4j"), status = $("gr4j-status");
+  btn.disabled = true; btn.textContent = "Calibrating…";
+  const say = (t) => { if (my === gr4jRun) status.textContent = t; };
+  try {
+    say("Looking up the catchment area…");
+    const area = await stationArea(key);
+    if (my !== gr4jRun) return;
+    if (!area) { say("No catchment area for this gauge (not in the station catchments table), so flow cannot be expressed in mm/d."); btn.disabled = false; btn.textContent = "Calibrate GR4J"; return; }
+    const t = res.series.t, v = res.series.v;
+    let start = t[0], end = t[t.length - 1];
+    if (start < "1940-01-02") start = "1940-01-02";
+    say("Fetching ERA5-Land/ERA5 rainfall and ET0 at the gauge (Open-Meteo)…");
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${r.lat}&longitude=${r.lon}&start_date=${start}&end_date=${end}&daily=precipitation_sum,et0_fao_evapotranspiration&models=best_match&timezone=UTC`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Open-Meteo ${resp.status}${resp.status === 429 ? " (rate limit, try again in a minute)" : ""}`);
+    const om = await resp.json();
+    if (my !== gr4jRun) return;
+    const days = om.daily.time, P = om.daily.precipitation_sum, E = om.daily.et0_fao_evapotranspiration;
+    const obsByDay = new Map(); for (let i = 0; i < t.length; i++) obsByDay.set(t[i], v[i]);
+    const n = days.length;
+    const precip = new Float64Array(n), pet = new Float64Array(n), obs = new Array(n).fill(NaN);
+    let lastE = 2.0;
+    for (let i = 0; i < n; i++) {
+      precip[i] = Number.isFinite(P[i]) && P[i] > 0 ? P[i] : 0;
+      if (Number.isFinite(E[i])) lastE = Math.max(0, E[i]);
+      pet[i] = lastE;
+      const o = obsByDay.get(days[i]);
+      if (o !== undefined && o !== null && Number.isFinite(o) && o >= 0) obs[i] = o * 86.4 / area.area;  // m3/s -> mm/d
+    }
+    const nObs = obs.filter(Number.isFinite).length;
+    if (nObs < 365 * 3) { say(`Only ${nObs} days of overlap between the record and the forcing; not enough to calibrate.`); btn.disabled = false; btn.textContent = "Calibrate GR4J"; return; }
+    const calEnd = Math.floor(n * 0.65);
+    const t0 = performance.now();
+    const fit = await GR4J.calibrate(precip, pet, obs, { objective: "kge", warmup: 365, calEnd, popsize: 20, generations: 40, seed: 1,
+      onProgress: (g, best, G) => say(`Differential evolution: generation ${g}/${G}, best KGE ${best.toFixed(3)}…`) });
+    if (my !== gr4jRun) return;
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    say("");
+    const c = fit.calibration, val = fit.validation || {};
+    const f3 = (x) => (x === null || x === undefined ? "—" : Number(x).toFixed(3));
+    const f1 = (x) => (x === null || x === undefined ? "—" : Number(x).toFixed(1));
+    $("gr4j-table").innerHTML = `<thead><tr><th>Parameter</th><th>Value</th><th>Metric</th><th>Calibration<br><span class="ci">${days[365]} to ${days[calEnd - 1]}</span></th><th>Validation<br><span class="ci">${days[calEnd]} to ${days[n - 1]}</span></th></tr></thead><tbody>` +
+      `<tr><td>X1 production store</td><td>${fit.params.X1.toFixed(0)} mm</td><td>KGE</td><td>${f3(c.kge)}</td><td>${f3(val.kge)}</td></tr>` +
+      `<tr><td>X2 exchange</td><td>${fit.params.X2.toFixed(2)} mm/d</td><td>NSE</td><td>${f3(c.nse)}</td><td>${f3(val.nse)}</td></tr>` +
+      `<tr><td>X3 routing store</td><td>${fit.params.X3.toFixed(0)} mm</td><td>log-NSE</td><td>${f3(c.log_nse)}</td><td>${f3(val.log_nse)}</td></tr>` +
+      `<tr><td>X4 UH time base</td><td>${fit.params.X4.toFixed(2)} d</td><td>PBIAS</td><td>${f1(c.pbias)} %</td><td>${f1(val.pbias)} %</td></tr></tbody>`;
+    // plot: last 6 years, observed vs simulated, in the station's unit
+    const from = Math.max(0, n - 365 * 6);
+    const toUnit = (mm) => mm * area.area / 86.4;
+    const st = SOURCE_STYLE[r.source] || { color: FALLBACK_COLOR };
+    Plotly.react("plot-gr4j", [
+      { x: days.slice(from), y: Array.from(obs.slice(from), (o) => (Number.isFinite(o) ? toUnit(o) : null)), mode: "lines", line: { width: 1, color: st.color }, name: "observed", hovertemplate: "%{x}<br>obs %{y:.3~f} " + res.unit + "<extra></extra>" },
+      { x: days.slice(from), y: Array.from(fit.sim.slice(from), toUnit), mode: "lines", line: { width: 1, color: "#e53935" }, name: "GR4J", hovertemplate: "%{x}<br>sim %{y:.3~f} " + res.unit + "<extra></extra>" },
+    ], { ...PLOT_LAYOUT, yaxis: { title: { text: res.unit }, rangemode: "tozero" }, legend: { orientation: "h", y: 1.15 }, shapes: calEnd > from ? [{ type: "line", x0: days[calEnd], x1: days[calEnd], y0: 0, y1: 1, yref: "paper", line: { color: "#999", dash: "dot" } }] : [] }, PLOT_CONFIG);
+    $("gr4j-foot").textContent = `Last six years shown (dotted line: start of the validation period). Area ${area.area.toLocaleString(undefined, { maximumFractionDigits: 0 })} km² (${area.source}); forcing at the gauge point, not catchment-averaged, so wet mountainous catchments will under-run. ${fit.simulations} simulations in ${secs} s. Point values, not a forecast.`;
+    $("gr4j-out").hidden = false;
+    btn.textContent = "Recalibrate";
+    btn.disabled = false;
+    for (const m of GR4J_METHODS) addMethodOnce("methods", "sec-methods", m);
+  } catch (err) {
+    if (my !== gr4jRun) return;
+    say(`GR4J failed: ${err.message}`);
+    btn.disabled = false; btn.textContent = "Calibrate GR4J";
+  }
 }
 
 function renderFfaTable(ffa, unit) {
@@ -1268,6 +1379,7 @@ function initButtons() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });
+  $("btn-gr4j").addEventListener("click", () => runGr4j());
   $("btn-ci").addEventListener("click", async () => {
     if (!state.result || !state.result.ffa) return;
     const btn = $("btn-ci");

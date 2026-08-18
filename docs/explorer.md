@@ -107,6 +107,25 @@ The model has to support tool calling; the provider defaults do.
 Flood frequency needs at least 10 complete years of daily flow; the page says
 so when a record is shorter.
 
+## Rainfall-runoff model in the page (GR4J)
+
+Discharge records in m3/s with a catchment area get a **Rainfall-runoff model**
+card. "Calibrate GR4J" fetches daily precipitation and FAO-56 ET0 at the gauge
+from Open-Meteo (the ERA5-Land/ERA5 blend the Caravan exporter and HydroGym
+use), converts the record to mm/d over the station's catchment area (agency,
+else BasinATLAS), and calibrates the four GR4J parameters by differential
+evolution (population 20, 40 generations, KGE on the first 65 % of the record
+after a one-year warm-up) in the page: `explorer/gr4j.js` is a line-for-line
+port of `aquascope.models.rainfall_runoff.GR4J`, checked against it to
+round-off in the test suite, and 40 years run in about 4 ms per simulation, so
+820 simulations take two seconds. You get X1 to X4, KGE / NSE / log-NSE /
+PBIAS on the calibration and the validation periods, and the last six years
+of observed against simulated flow. Point forcing, not catchment-averaged, so
+wet mountainous catchments under-run and snow basins do badly; the numbers say
+so rather than hide it. The Python model got the same treatment (the daily
+loop is nine times faster, same numbers to 1e-14), which is what makes
+`aquascope gym` usable.
+
 ## How it is built
 
 `explorer/` in the repository, no build step:
