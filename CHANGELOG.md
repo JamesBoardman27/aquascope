@@ -7,8 +7,10 @@ All notable changes to AquaScope are documented here.
 ### Added
 
 ### Changed
+- `CITATION.cff` lists the v0.12.0 version DOI `10.5281/zenodo.21995649` (concept DOI unchanged).
 
 ### Fixed
+- `aquascope.models` no longer imports the scikit-learn ensembles at package import time (PEP 562 lazy attributes), so `from aquascope.models.rainfall_runoff import GR4J`, `aquascope.gym` and `pip install "aquascope[gym]"` work on a bare install; the ensembles still import on first use with the `ml` extra.
 
 ## [0.12.0] - 2026-08-18
 
