@@ -39,6 +39,9 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 - [x] The Explorer: static MapLibre + DuckDB-WASM + Pyodide page with click-any-gauge analysis and click-anywhere climate cards (#189)
 - [x] MCP server (`aquascope mcp`), the Analyst (`aquascope ask`) and `aquascope ingest` (#113)
 - [x] GeoLibre plugin: AquaScope Gauges (`integrations/geolibre`)
+- [x] Explorer Phase 2: Ask ✨ (the Analyst in the page), NLDI catchments, BasinATLAS catchments everywhere, similar gauged basins (#189, #213, #218)
+- [x] Caravan-format export from the archive (`aquascope caravan export`, #217) and the similar-basins donor search (#53, the practical half)
+- [x] Self-healing harvest: automated repair proposals as reviewable PRs (`repair.yml`)
 
 ## In progress
 
@@ -57,9 +60,9 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 Ambitious, high-impact work that takes AquaScope to the next level. These are [`major feature`](https://github.com/Rekin226/aquascope/labels/major%20feature) · `help wanted` — larger than a weekend, mentorship available. Comment on the issue to discuss scope before starting.
 
 - [ ] Archive Phase 3: reservoir storage and water-quality variables, more agencies with a `stations()` catalog (Australia BOM, Taiwan WRA), a data paper ([#188](https://github.com/Rekin226/aquascope/issues/188))
-- [ ] Explorer Phase 2: catchment polygons (HydroBASINS PMTiles), Analyst panel in the page, GR4J once it runs in seconds ([#189](https://github.com/Rekin226/aquascope/issues/189))
-- [ ] CAMELS-TW / Caravan Asia extension built from the archive ([#100](https://github.com/Rekin226/aquascope/issues/100), [#99](https://github.com/Rekin226/aquascope/issues/99))
-- [ ] Prediction in Ungauged Basins — regionalize signatures/parameters ([#53](https://github.com/Rekin226/aquascope/issues/53)) — *now unblocked by the shipped GR4J keystone*
+- [ ] Explorer Phase 3: GR4J once it runs in seconds, agency catchment boundaries under open licences (UK NRFA), sub-daily where terms allow ([#189](https://github.com/Rekin226/aquascope/issues/189))
+- [ ] CAMELS-TW: `aquascope caravan export` is ready; the Taiwan daily discharge collector ([#211](https://github.com/Rekin226/aquascope/issues/211)) is the missing leg ([#100](https://github.com/Rekin226/aquascope/issues/100), [#99](https://github.com/Rekin226/aquascope/issues/99))
+- [ ] Prediction in Ungauged Basins: regionalise signatures/parameters over the similar-basins donors (regression + leave-one-out skill; the donor search shipped in #218) ([#53](https://github.com/Rekin226/aquascope/issues/53))
 - [ ] Declarative, reproducible study runner `aquascope run study.yaml` with provenance ([#54](https://github.com/Rekin226/aquascope/issues/54))
 - [ ] Plugin architecture — third-party collectors & methodologies via entry points ([#55](https://github.com/Rekin226/aquascope/issues/55))
 - [ ] Large-sample CAMELS benchmark — automated accuracy report ([#56](https://github.com/Rekin226/aquascope/issues/56))
