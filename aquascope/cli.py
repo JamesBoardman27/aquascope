@@ -722,6 +722,55 @@ def cmd_basins(args: argparse.Namespace) -> None:
             print(f"  {i:>2}. {st['source']:<20} {st['station_id']:<40} {(st.get('name') or '')[:38]:<38} "
                   f"area {st['up_area_km2']:>9,.0f} km2  score {st['score']:.3f} {dist}")
         return
+    if args.basins_cmd == "regionalize":
+        from aquascope.archive.regionalize import regionalize_point
+
+        res = regionalize_point(args.lat, args.lon, k=args.k, method=args.method)
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False, default=str))
+            return
+        if res.get("error"):
+            print(f"  {res['error']}")
+            sys.exit(1)
+        est = res.get("estimates", {})
+        print(f"  {len(est)} signatures from {res.get('n_donors_available', 0):,} donors, method {res['method']}"
+              + (f", k={res['similarity']['k']}" if "similarity" in res else ""))
+        skill = (res.get("skill") or {}).get("by_signature", {})
+        for name, e in est.items():
+            sk = skill.get(name) or {}
+            tail = f"  LOO NSE {sk['nse']:.2f}, median error {sk['median_ape'] * 100:.0f} %" if sk else ""
+            print(f"  {e['label']:<48} {e['value']:>10.3f} {e['unit']:<7} [{e['low']:.3f}, {e['high']:.3f}]{tail}")
+        return
+    if args.basins_cmd == "signatures":
+        from aquascope.archive.bundles import read_bundle
+        from aquascope.archive.regionalize import compute_station_signatures
+        from aquascope.archive.similar import load_station_catchments
+
+        root = Path(args.archive) / "obs" / "discharge"
+        bundles = {p.stem: read_bundle(p) for p in sorted(root.glob("*.parquet"))} if root.exists() else {}
+        cat = load_station_catchments(path=args.catchments) if args.catchments else load_station_catchments()
+        table = compute_station_signatures(bundles, cat, min_years=args.min_years)
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        table.to_parquet(out, index=False)
+        print(f"  {len(table):,} stations with signatures ({len(bundles)} discharge bundles) -> {out}")
+        return
+    if args.basins_cmd == "loo":
+        from aquascope.archive.catalog import load_stations
+        from aquascope.archive.regionalize import load_station_signatures, loo_skill
+        from aquascope.archive.similar import load_station_catchments
+
+        sig = load_station_signatures(path=args.signatures) if args.signatures else load_station_signatures()
+        cat = load_station_catchments(path=args.catchments) if args.catchments else load_station_catchments()
+        skill = loo_skill(sig, cat, load_stations(), k=args.k, max_stations=args.max_stations or None)
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(skill, indent=1), encoding="utf-8")
+        print(f"  leave-one-out over {skill['n_stations']:,} stations -> {out}")
+        for m, per in skill["methods"].items():
+            for name, sk in per.items():
+                print(f"  {m:<11} {name:<22} n={sk['n']:>6}  NSE {sk['nse']:>6.2f}  median APE {sk['median_ape']:.2f}")
+        return
     if args.basins_cmd == "upstream":
         topo = basins.Topology(basins.load_topology())
         ids = topo.upstream_ids(int(args.hybas_id), limit=args.limit)
@@ -1542,6 +1591,23 @@ def main() -> None:
     p_bassign.add_argument("--fgb", required=True, help="Local lev12.fgb")
     p_bassign.add_argument("--attributes", required=True, help="Local lev12_attributes.parquet")
     p_bassign.add_argument("--out", default="archive/basins/station_catchments.parquet")
+    p_breg = basins_sub.add_parser("regionalize", help="Estimate the flow signatures of an ungauged point from donors")
+    p_breg.add_argument("lat", type=float)
+    p_breg.add_argument("lon", type=float)
+    p_breg.add_argument("--k", type=int, default=10)
+    p_breg.add_argument("--method", choices=["similarity", "regression", "both"], default="similarity")
+    p_breg.add_argument("--json", action="store_true")
+    p_bsig = basins_sub.add_parser("signatures", help="Build basins/station_signatures.parquet from the discharge bundles")
+    p_bsig.add_argument("--archive", default="archive", help="Local archive folder holding obs/discharge/*.parquet")
+    p_bsig.add_argument("--catchments", default=None, help="Local station_catchments.parquet (default: from the Hub)")
+    p_bsig.add_argument("--out", default="archive/basins/station_signatures.parquet")
+    p_bsig.add_argument("--min-years", type=float, default=10.0)
+    p_bloo = basins_sub.add_parser("loo", help="Leave-one-out regionalisation skill -> basins/regionalization_skill.json")
+    p_bloo.add_argument("--signatures", default=None, help="Local station_signatures.parquet (default: from the Hub)")
+    p_bloo.add_argument("--catchments", default=None, help="Local station_catchments.parquet (default: from the Hub)")
+    p_bloo.add_argument("--out", default="archive/basins/regionalization_skill.json")
+    p_bloo.add_argument("--k", type=int, default=10)
+    p_bloo.add_argument("--max-stations", type=int, default=3000, help="Even stride sample of donors (0 = all)")
     p_bup = basins_sub.add_parser("upstream", help="List the level-12 sub-basins upstream of a HYBAS_ID")
     p_bup.add_argument("hybas_id", type=int)
     p_bup.add_argument("--limit", type=int, default=200_000)

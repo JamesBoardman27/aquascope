@@ -778,9 +778,76 @@ async function requestSimilar({ lat, lon, upArea, attrs, target, my }) {
     }
     el.hidden = false;
     addMethodOnce(target === "st" ? "methods" : "pt-methods", target === "st" ? "sec-methods" : "pt-sec-methods", SIMILAR_METHOD);
+    renderRegime(el, target, scored, my).catch((err) => console.info("flow regime unavailable:", err && err.message));
   } catch (err) {
     console.info("similar basins unavailable:", err && err.message);
   }
+}
+
+// ── estimated flow regime (regionalisation) ─────────────────────────────────
+// The signatures of every gauged donor (basins/station_signatures.parquet, built
+// weekly from the archived discharge) transferred to the target as a
+// similarity-weighted mean over the k most similar donors (geometric mean for
+// the mm/d magnitudes, weights 1/(distance + 0.05)), with one weighted standard
+// deviation as the band and the published leave-one-out skill next to each
+// number. Same arithmetic as aquascope.archive.regionalize (method "similarity").
+
+const REGIME_METHOD = {
+  name: "Regionalisation of flow signatures from similar gauged basins",
+  text: "Flow signatures of the gauged donors (mean, median, Q95 and Q05 daily flow in mm/d, mean annual maximum, baseflow index, seasonality, flashiness) transferred as an inverse-distance-weighted average over the 10 most similar catchments in standardised BasinATLAS attribute space (geometric mean for magnitudes); the band is one weighted standard deviation of the donors; the skill is leave-one-out over all donors.",
+  citation: "Blöschl, G. et al. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Water Resour. Res. 44, W03413; Addor, N. et al. (2018). A ranking of hydrological signatures based on their predictability in space. Water Resour. Res. 54, 8792-8812.",
+};
+// [column, label, unit, log?, lower bound, upper bound]
+const REGIME_ROWS = [
+  ["q_mean_mm", "Mean flow", "mm/d", true], ["q95_mm", "Low flow (Q95)", "mm/d", true], ["q05_mm", "High flow (Q05)", "mm/d", true],
+  ["q_annual_max_mm", "Mean annual max", "mm/d", true], ["baseflow_index", "Baseflow index", "", false, 0, 1],
+  ["seasonality_index", "Seasonality", "", false, 0, 1], ["flashiness_index", "Flashiness", "", false, 0],
+];
+let regimeData = null;  // { sig: Map key -> row, skill: {...} | null }
+async function ensureRegimeData() {
+  if (regimeData) return regimeData;
+  const { conn } = await duck();
+  const res = await conn.query(`SELECT * FROM read_parquet('${basinsUrl("station_signatures.parquet")}')`);
+  const sig = new Map();
+  for (const r of res.toArray().map((x) => x.toJSON())) sig.set(`${r.source}/${r.station_id}`, r);
+  let skill = null;
+  try { const rs = await fetch(basinsUrl("regionalization_skill.json")); if (rs.ok) skill = await rs.json(); } catch (_) { /* optional */ }
+  regimeData = { sig, skill };
+  return regimeData;
+}
+
+async function renderRegime(el, target, scored, my) {
+  const { sig, skill } = await ensureRegimeData();
+  if (my !== basinReq) return;
+  const donors = scored.filter((s) => sig.has(`${s.st.source}/${s.st.station_id}`)).sort((a, b) => a.dAttr - b.dAttr).slice(0, 10);
+  if (donors.length < 3) return;
+  const w = donors.map((d) => 1 / (d.dAttr + 0.05));
+  const per = ((skill || {}).methods || {}).similarity || {};
+  const rows = [];
+  for (const [col, label, unit, isLog, lo, hi] of REGIME_ROWS) {
+    const vals = [], ws = [];
+    donors.forEach((d, i) => { const v = sig.get(`${d.st.source}/${d.st.station_id}`)[col]; if (v !== null && v !== undefined && Number.isFinite(Number(v))) { vals.push(Number(v)); ws.push(w[i]); } });
+    if (!vals.length) continue;
+    const wsum = ws.reduce((a, b) => a + b, 0);
+    const y = vals.map((v) => (isLog ? Math.log(Math.max(v, 1e-3)) : v));
+    const mean = y.reduce((a, v, i) => a + (ws[i] / wsum) * v, 0);
+    const sd = Math.sqrt(y.reduce((a, v, i) => a + (ws[i] / wsum) * (v - mean) ** 2, 0));
+    const back = (v) => { let out = isLog ? Math.exp(v) : v; if (lo !== undefined) out = Math.max(lo, out); if (hi !== undefined) out = Math.min(hi, out); return out; };
+    const sk = per[col];
+    rows.push({ label, unit, value: back(mean), low: back(mean - sd), high: back(mean + sd), n: vals.length, sk });
+  }
+  if (!rows.length) return;
+  const digits = (v) => (v >= 100 ? 0 : v >= 10 ? 1 : v >= 1 ? 2 : 3);
+  const box = document.createElement("div");
+  box.className = "regime";
+  box.innerHTML = `<h3>Estimated flow regime <span class="muted">${donors.length} most similar donors, weighted</span></h3>` +
+    `<table class="ffa regime"><thead><tr><th>Signature</th><th>Estimate</th><th>Band</th><th>LOO</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td>${fmt(r.value, digits(r.value))}${r.unit ? " " + r.unit : ""}</td>` +
+      `<td class="ci">${fmt(r.low, digits(r.low))} to ${fmt(r.high, digits(r.high))}</td>` +
+      `<td class="ci">${r.sk && r.sk.nse !== null && r.sk.nse !== undefined ? "NSE " + Number(r.sk.nse).toFixed(2) + (r.sk.median_ape !== null && r.sk.median_ape !== undefined ? ", ±" + Math.round(Number(r.sk.median_ape) * 100) + " %" : "") : "–"}</td></tr>`).join("") +
+    `</tbody></table><div class="basin-foot muted">Prediction in ungauged basins: what the ${donors.length} closest donors in attribute space would suggest here (geometric mean for mm/d; band = one weighted standard deviation of the donors; LOO = leave-one-out skill over ${(skill && skill.n_stations) ? skill.n_stations.toLocaleString() : "all"} donors, NSE and median error). Not a measurement.</div>`;
+  el.appendChild(box);
+  addMethodOnce(target === "st" ? "methods" : "pt-methods", target === "st" ? "sec-methods" : "pt-sec-methods", REGIME_METHOD);
 }
 
 // ── worker (Pyodide) ────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ aquascope ask "What is the 100-year flood of the Seine at Paris, and how sure ca
 
 The model gets the same tools the [MCP server](mcp.md) exposes (`find_stations`,
 `analyze_station`, `flood_frequency`, `get_timeseries`, `anywhere`,
+`describe_catchment`, `similar_basins`, `regionalize_signatures`,
 `list_sources`, `describe_methods`) and decides which to call; aquascope runs
 them against real data. The Markdown report has three parts:
 

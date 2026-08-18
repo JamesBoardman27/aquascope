@@ -119,6 +119,22 @@ jobs:
       - name: Roll the per-station files into Parquet bundles (one per variable and source)
         run: aquascope harvest bundles --out archive
 
+      - name: Donor signatures and leave-one-out skill (basins/station_signatures.parquet, regionalization_skill.json)
+        # Flow signatures of every gauged station with 10+ years of archived discharge and a catchment row, then
+        # every donor predicted from the others (even stride sample) so the regionalisation reports its own skill.
+        # Skipped quietly when the catchment table is not on the Hub yet or the discharge bundles are empty.
+        continue-on-error: true
+        run: |
+          set -e
+          ls archive/obs/discharge/*.parquet >/dev/null 2>&1 || { echo "no discharge bundles, skipping"; exit 0; }
+          CAT_ARG=""
+          if [ -f archive/basins/station_catchments.parquet ]; then
+            CAT_ARG="--catchments archive/basins/station_catchments.parquet"   # built by the assign step above
+          fi                                                                   # else: the published table from the Hub
+          aquascope basins signatures --archive archive $CAT_ARG --out archive/basins/station_signatures.parquet
+          aquascope basins loo --signatures archive/basins/station_signatures.parquet $CAT_ARG \
+            --out archive/basins/regionalization_skill.json --max-stations 3000
+
       - name: Publish to the Hugging Face dataset
         # inputs.publish is a boolean input: compare it as one (a string compare
         # against 'true' is always false and silently skipped the first CI runs).

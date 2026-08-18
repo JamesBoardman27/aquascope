@@ -147,12 +147,51 @@ default), and prints the per-feature deltas. That is the donor-selection
 step of regionalisation (Bloeschl et al. 2013; Oudin et al. 2008); the MCP
 tool `similar_basins` and the analyst use it ("find gauges like this
 ungauged site, then analyse the best donors"), and the Explorer lists them
-under the catchment card. `aquascope.archive.similar` is the module; #53
-tracks the regression / leave-one-out half. Built by
+under the catchment card. `aquascope.archive.similar` is the module. Built by
 `.github/workflows/basins.yml` (`aquascope basins build` plus `ogr2ogr` and
 `tippecanoe`); it downloads BasinATLAS from figshare, so it runs on demand,
 not weekly. Why BasinATLAS and not HydroBASINS: the HydroSHEDS core licence
 forbids stand-alone redistribution, HydroATLAS is CC BY 4.0.
+
+### Estimated flow regime (prediction in ungauged basins, the predictive half)
+
+Donors are only useful if something is transferred from them. Every week,
+after the bundles, the harvest computes the flow signatures of every gauged
+station with ten or more years of archived discharge and a catchment row
+(`basins/station_signatures.parquet`: mean, median, Q95 and Q05 daily flow and
+mean annual maximum in mm/d over the catchment area, runoff ratio against
+BasinATLAS precipitation, baseflow index, flow-duration-curve slope, high- and
+low-flow frequency, zero-flow fraction, seasonality, flashiness), then predicts
+every donor from the others and publishes the skill
+(`basins/regionalization_skill.json`: NSE, R2 and median absolute relative
+error per signature and method, leave-one-out over an even sample of the
+donors). With that in place,
+
+```bash
+aquascope basins regionalize 52.29 -3.51            # an ungauged point in mid Wales
+aquascope basins regionalize 46.85 1.9 --method both --json
+```
+
+describes the point's catchment, ranks the donors by physical similarity and
+returns each signature as an estimate with a band: `similarity` (default) is
+the inverse-distance-weighted mean over the k = 10 most similar donors
+(geometric mean for the mm/d magnitudes, band = one weighted standard
+deviation), `regression` a ridge fit of each signature on the standardised
+attributes over all donors (band = residual spread), `both` returns the two.
+The leave-one-out skill of every number comes back with it, so the answer
+reads "mean flow 4.1 mm/d (1.7 to 10.2), leave-one-out NSE 0.48, median error
+23 %" rather than a bare number. The same estimates are the MCP tool
+`regionalize_signatures`, an analyst tool, and the "Estimated flow regime"
+table under the similar-basins list in the Explorer (computed in the browser
+from the same two files). `aquascope.archive.regionalize` is the module
+(`station_signature`, `compute_station_signatures`, `regionalize`,
+`regionalize_point`, `loo_skill`); `aquascope basins signatures` and
+`aquascope basins loo` are the workflow steps. Bloeschl et al. (2013), Oudin
+et al. (2008), Addor et al. (2018) for the method; the skill numbers are the
+honest part, and they will move as the archive fills up (795 donors across
+three agencies at the first run; NSE in log space 0.3 to 0.5 for the flow
+magnitudes, lower for the shape signatures). This closes the loop opened
+in #53.
 
 ## Caravan-format export
 
