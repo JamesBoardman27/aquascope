@@ -5,6 +5,7 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
+- **Caravan-format export from the Archive** (`aquascope caravan export|validate`, `aquascope.archive.caravan`): per-gauge daily forcing (Open-Meteo's ERA5-Land + ERA5 blend at the gauge point) and area-normalised streamflow in mm/d from the discharge bundles, Caravan's climate indices (a port of `caravan_utils.calculate_climate_indices`, FAO-PM variants), HydroATLAS-style attributes from BasinATLAS, `attributes_other` with area and provenance, licences and a `provenance.json`; USGS, UK EA and Hub'Eau, areas from the agency (`drainage_area`, `catchmentArea`, `surface_bv`) else BasinATLAS. The Open-Meteo collector accepts `models=` for the `/archive` endpoint. (#100)
 
 ### Changed
 
