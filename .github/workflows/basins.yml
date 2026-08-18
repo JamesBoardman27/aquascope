@@ -61,15 +61,23 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
           df -h / | tail -1
 
-      - name: Install GDAL and tippecanoe
+      # GDAL (ogr2ogr with the OpenFileGDB and FlatGeobuf drivers) and tippecanoe
+      # come prebuilt from conda-forge: a minute, versus 20+ minutes compiling
+      # tippecanoe on the runner.
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: geo
+          create-args: >-
+            gdal>=3.8
+            tippecanoe
+          cache-environment: true
+          init-shell: none
+
+      - name: Check GDAL and tippecanoe
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q gdal-bin libsqlite3-dev zlib1g-dev
-          ogr2ogr --version
-          git clone -q --depth 1 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
-          make -C /tmp/tippecanoe -j"$(nproc)" >/dev/null
-          sudo make -C /tmp/tippecanoe install >/dev/null
-          tippecanoe --version
+          echo "$MAMBA_ROOT_PREFIX/envs/geo/bin" >> "$GITHUB_PATH"
+          "$MAMBA_ROOT_PREFIX/envs/geo/bin/ogr2ogr" --version
+          "$MAMBA_ROOT_PREFIX/envs/geo/bin/tippecanoe" --version
 
       - name: Install aquascope with the archive and basins extras
         run: python -m pip install -q ".[archive,basins]"
