@@ -47,6 +47,7 @@ You answer questions about rivers, gauges, floods, rainfall and water resources 
 Rules:
 - Find stations with find_stations before analysing; prefer stations with long records for flood questions.
 - Use analyze_station / flood_frequency for numbers; use anywhere(lat, lon) when the user names a place with no gauge.
+- Use describe_catchment(lat, lon) for the catchment itself: area, elevation, climate, land cover, soils, dams.
 - Never invent values, station ids, or citations. If a tool returns an error or an empty record, say so.
 - Report units. Quote return levels with their confidence intervals when available.
 - Say which record (station, source, period, number of years) each number comes from.
@@ -119,6 +120,15 @@ def _tool_specs() -> list[ToolSpec]:
             {"type": "object", "properties": {"lat": num, "lon": num, "years": {"type": "integer"}},
              "required": ["lat", "lon"]},
             lambda lat, lon, years=10: anywhere(lat, lon, years=years),
+        ),
+        ToolSpec(
+            "describe_catchment",
+            "The catchment of a point from BasinATLAS (HydroATLAS): sub-basin, upstream area and area-weighted "
+            "attributes (elevation, precipitation, PET, aridity, snow, runoff, land cover, soils, population, dams). "
+            "upstream=false for the local sub-basin only.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "upstream": {"type": "boolean"}},
+             "required": ["lat", "lon"]},
+            t.describe_catchment,
         ),
         ToolSpec(
             "describe_methods", "What each analysis computes and the reference to cite.",
@@ -240,6 +250,11 @@ def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskRe
                 "label": label, "period": period, "license": result.get("license"),
                 "attribution": result.get("attribution"),
             })
+    if name == "describe_catchment" and result.get("sub_basin"):
+        label = f"catchment at {result.get('latitude')}, {result.get('longitude')}"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({"label": label, "period": None, "license": result.get("license"),
+                                  "attribution": result.get("attribution")})
     if name == "anywhere" and "latitude" in result:
         label = f"point {result['latitude']}, {result['longitude']}"
         if not any(d.get("label") == label for d in res.data_used):

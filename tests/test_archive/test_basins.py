@@ -58,7 +58,7 @@ def test_catchment_attributes_aggregate_per_guide():
     assert out["elevation_m"]["value"] == 420.0 and out["elevation_m"]["unit"] == "m"
     assert out["temperature_c"]["value"] == pytest.approx((10 * 50 + 20 * 80 + 30 * 120 + 40 * 150) / 100 / 10)
     assert out["aridity_index"]["value"] == pytest.approx((10 * 150 + 20 * 120 + 30 * 90 + 40 * 70) / 100 / 100)
-    assert out["population"]["value"] == 43300.0 and out["population"]["aggregation"] == "sum"
+    assert out["population"]["value"] == 43300.0 and out["population"]["source"] == "sum"
     assert out["discharge_m3s"]["value"] == 5.0 and out["degree_of_regulation_pct"]["value"] == 12.0  # outlet values
     assert "glacier_pct" not in out  # field absent: skipped, not invented
     # the local sub-basin only

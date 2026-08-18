@@ -61,43 +61,47 @@ LICENSE = "CC-BY-4.0"
 TOPOLOGY_COLUMNS = ("HYBAS_ID", "NEXT_DOWN", "NEXT_SINK", "MAIN_BAS", "SUB_AREA", "UP_AREA", "PFAF_ID", "ENDO",
                     "COAST", "ORDER")
 
-# The attributes a hydrologist asks about first, with the BasinATLAS field name
-# (suffix: s = sub-basin, u = upstream; av = average, se = spatial extent %,
-# yr = annual, mn/mx = min/max month) and how to aggregate over an upstream set.
-# "area" = area-weighted mean over sub-basins, "sum" = total, "outlet" = value
-# of the outlet sub-basin's upstream ("u") field, "max" = maximum.
-ATTRIBUTE_GUIDE: dict[str, tuple[str, str, str, str]] = {
-    # key: (field, unit, aggregation, label)
-    "elevation_m": ("ele_mt_sav", "m", "area", "mean elevation"),
-    "slope_deg": ("slp_dg_sav", "degrees", "area", "mean slope"),
-    "precipitation_mm_yr": ("pre_mm_syr", "mm/yr", "area", "annual precipitation (WorldClim)"),
-    "pet_mm_yr": ("pet_mm_syr", "mm/yr", "area", "annual potential evapotranspiration"),
-    "aet_mm_yr": ("aet_mm_syr", "mm/yr", "area", "annual actual evapotranspiration"),
-    "aridity_index": ("ari_ix_sav", "P/PET x 100", "area", "aridity index (x100)"),
-    "temperature_c": ("tmp_dc_syr", "°C", "area", "mean annual air temperature (stored x10)"),
-    "snow_cover_pct": ("snw_pc_syr", "%", "area", "annual snow cover extent"),
-    "runoff_mm_yr": ("run_mm_syr", "mm/yr", "area", "annual land-surface runoff"),
-    "discharge_m3s": ("dis_m3_pyr", "m3/s", "outlet", "mean annual natural discharge at the outlet"),
-    "forest_pct": ("for_pc_sse", "%", "area", "forest cover"),
-    "cropland_pct": ("crp_pc_sse", "%", "area", "cropland"),
-    "pasture_pct": ("pst_pc_sse", "%", "area", "pasture"),
-    "urban_pct": ("urb_pc_sse", "%", "area", "urban extent"),
-    "irrigated_pct": ("ire_pc_sse", "%", "area", "irrigated area"),
-    "glacier_pct": ("gla_pc_sse", "%", "area", "glacier extent"),
-    "wetland_pct": ("wet_pc_sg1", "%", "area", "wetlands (all classes)"),
-    "lake_pct": ("lka_pc_sse", "%", "area", "lake area"),
-    "karst_pct": ("kar_pc_sse", "%", "area", "karst extent"),
-    "clay_pct": ("cly_pc_sav", "%", "area", "clay fraction in soil"),
-    "silt_pct": ("slt_pc_sav", "%", "area", "silt fraction in soil"),
-    "sand_pct": ("snd_pc_sav", "%", "area", "sand fraction in soil"),
-    "soil_water_pct": ("swc_pc_syr", "%", "area", "annual soil water content"),
-    "groundwater_table_cm": ("gwt_cm_sav", "cm", "area", "groundwater table depth"),
-    "population_density": ("ppd_pk_sav", "people/km2", "area", "population density"),
-    "population": ("pop_ct_ssu", "people", "sum", "population count"),
-    "degree_of_regulation_pct": ("dor_pc_pva", "%", "outlet", "degree of regulation by reservoirs"),
-    "human_footprint_2009": ("hft_ix_s09", "index 0-100", "area", "human footprint (2009)"),
-    "reservoir_volume_mcm": ("rev_mc_usu", "million m3", "outlet", "reservoir volume upstream"),
+# The attributes a hydrologist asks about first. BasinATLAS field names end in a
+# scope + statistic code: "s" = this sub-basin, "u" = everything upstream (total
+# or area-weighted), "p" = at the pour point; "av" average, "se" spatial extent
+# (%), "yr" annual, "su" sum. Where an upstream ("u"/"p") field exists we read it
+# from the outlet sub-basin's row (that is what BasinATLAS precomputed); otherwise
+# the sub-basin ("s") field is aggregated over the upstream set as noted.
+ATTRIBUTE_GUIDE: dict[str, tuple[str, str | None, str, str, str]] = {
+    # key: (sub-basin field, upstream field or None, unit, aggregation of the sub-basin field, label)
+    "elevation_m": ("ele_mt_sav", "ele_mt_uav", "m", "area", "mean elevation"),
+    "slope_deg": ("slp_dg_sav", "slp_dg_uav", "degrees", "area", "mean slope"),
+    "precipitation_mm_yr": ("pre_mm_syr", "pre_mm_uyr", "mm/yr", "area", "annual precipitation (WorldClim)"),
+    "pet_mm_yr": ("pet_mm_syr", "pet_mm_uyr", "mm/yr", "area", "annual potential evapotranspiration"),
+    "aet_mm_yr": ("aet_mm_syr", "aet_mm_uyr", "mm/yr", "area", "annual actual evapotranspiration"),
+    "aridity_index": ("ari_ix_sav", "ari_ix_uav", "P/PET", "area", "aridity index"),
+    "temperature_c": ("tmp_dc_syr", "tmp_dc_uyr", "°C", "area", "mean annual air temperature"),
+    "snow_cover_pct": ("snw_pc_syr", "snw_pc_uyr", "%", "area", "annual snow cover extent"),
+    "runoff_mm_yr": ("run_mm_syr", None, "mm/yr", "area", "annual land-surface runoff"),
+    "discharge_m3s": ("dis_m3_pyr", "dis_m3_pyr", "m3/s", "outlet", "mean annual natural discharge at the outlet"),
+    "forest_pct": ("for_pc_sse", "for_pc_use", "%", "area", "forest cover"),
+    "cropland_pct": ("crp_pc_sse", "crp_pc_use", "%", "area", "cropland"),
+    "pasture_pct": ("pst_pc_sse", "pst_pc_use", "%", "area", "pasture"),
+    "urban_pct": ("urb_pc_sse", "urb_pc_use", "%", "area", "urban extent"),
+    "irrigated_pct": ("ire_pc_sse", "ire_pc_use", "%", "area", "irrigated area"),
+    "glacier_pct": ("gla_pc_sse", "gla_pc_use", "%", "area", "glacier extent"),
+    "wetland_pct": ("wet_pc_sg1", "wet_pc_ug1", "%", "area", "wetlands (all classes)"),
+    "lake_pct": ("lka_pc_sse", "lka_pc_use", "%", "area", "lake area"),
+    "karst_pct": ("kar_pc_sse", "kar_pc_use", "%", "area", "karst extent"),
+    "clay_pct": ("cly_pc_sav", "cly_pc_uav", "%", "area", "clay fraction in soil"),
+    "silt_pct": ("slt_pc_sav", "slt_pc_uav", "%", "area", "silt fraction in soil"),
+    "sand_pct": ("snd_pc_sav", "snd_pc_uav", "%", "area", "sand fraction in soil"),
+    "soil_organic_carbon_t_ha": ("soc_th_sav", "soc_th_uav", "t/ha", "area", "soil organic carbon"),
+    "soil_water_pct": ("swc_pc_syr", "swc_pc_uyr", "%", "area", "annual soil water content"),
+    "groundwater_table_cm": ("gwt_cm_sav", None, "cm", "area", "groundwater table depth"),
+    "population_density": ("ppd_pk_sav", "ppd_pk_uav", "people/km2", "area", "population density"),
+    "population": ("pop_ct_ssu", "pop_ct_usu", "people", "sum", "population count"),
+    "degree_of_regulation_pct": ("dor_pc_pva", "dor_pc_pva", "%", "outlet", "degree of regulation by reservoirs"),
+    "human_footprint_2009": ("hft_ix_s09", "hft_ix_u09", "index 0-100", "area", "human footprint (2009)"),
+    "reservoir_volume_mcm": ("rev_mc_usu", "rev_mc_usu", "million m3", "outlet", "reservoir volume upstream"),
 }
+# Fields stored scaled in BasinATLAS: (divisor, unit after scaling)
+_SCALED = {"tmp_dc": (10.0, "°C"), "ari_ix": (100.0, "P/PET")}
 
 
 @dataclass
@@ -325,7 +329,12 @@ def load_attributes(
 
 
 def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None = None) -> dict[str, Any]:
-    """Aggregate BasinATLAS attributes over a set of sub-basins per :data:`ATTRIBUTE_GUIDE`."""
+    """Catchment attributes for a set of sub-basins per :data:`ATTRIBUTE_GUIDE`.
+
+    When the outlet row carries BasinATLAS's own upstream field it is used
+    as is (``source: "basinatlas_upstream"``); otherwise the sub-basin field is
+    aggregated over ``ids`` (area-weighted mean, sum, or outlet value).
+    """
     if attrs.empty:
         return {}
     df = attrs.set_index("hybas_id")
@@ -344,25 +353,37 @@ def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None
     }
     if "up_area" in df.columns and outlet in df.index:
         out["upstream_area_km2"] = round(float(df.at[outlet, "up_area"]), 1)
-    for key, (field, unit, how, label) in ATTRIBUTE_GUIDE.items():
-        if field not in df.columns:
+    complete = len(df) == 1 or ("up_area" in df.columns and outlet in df.index
+                                and abs(float(df.at[outlet, "up_area"]) - float(w.sum())) < 0.05 * float(w.sum()))
+    for key, (s_field, u_field, unit, how, label) in ATTRIBUTE_GUIDE.items():
+        val = None
+        source = None
+        has_u = u_field and u_field in df.columns and outlet in df.index and len(df) > 1
+        if has_u and pd.notna(df.at[outlet, u_field]):
+            val, source, field = float(df.at[outlet, u_field]), "basinatlas_upstream", u_field
+        elif s_field in df.columns:
+            col = pd.to_numeric(df[s_field], errors="coerce")
+            if col.isna().all():
+                continue
+            field = s_field
+            if how == "area":
+                val = float((col.fillna(0) * w).sum() / wsum)
+                source = "area_weighted_mean" if len(df) > 1 else "sub_basin"
+            elif how == "sum":
+                val, source = float(col.fillna(0).sum()), "sum" if len(df) > 1 else "sub_basin"
+            elif how == "max":
+                val, source = float(col.max()), "max"
+            else:
+                val, source = float(col.get(outlet, col.iloc[0])), "outlet"
+        if val is None:
             continue
-        col = pd.to_numeric(df[field], errors="coerce")
-        if col.isna().all():
-            continue
-        if how == "area":
-            val = float((col.fillna(0) * w).sum() / wsum)
-        elif how == "sum":
-            val = float(col.fillna(0).sum())
-        elif how == "max":
-            val = float(col.max())
-        else:  # outlet
-            val = float(col.get(outlet, col.iloc[0]))
-        if field == "tmp_dc_syr":
-            val, unit = val / 10.0, "°C"
-        if field == "ari_ix_sav":
-            val, unit = val / 100.0, "P/PET"
-        out[key] = {"value": round(val, 2), "unit": unit, "label": label, "field": field, "aggregation": how}
+        for prefix, (div, u2) in _SCALED.items():
+            if field.startswith(prefix):
+                val, unit = val / div, u2
+        entry = {"value": round(val, 2), "unit": unit, "label": label, "field": field, "source": source}
+        if source == "area_weighted_mean" and not complete:
+            entry["note"] = "aggregated over the sub-basins returned; the upstream set may be capped"
+        out[key] = entry
     return out
 
 
