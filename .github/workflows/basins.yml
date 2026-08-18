@@ -73,9 +73,9 @@ jobs:
           cache-environment: true
           init-shell: none
 
-      - name: Check GDAL and tippecanoe
+      - name: Check GDAL and tippecanoe (kept off PATH so the conda python does not shadow setup-python)
         run: |
-          echo "$MAMBA_ROOT_PREFIX/envs/geo/bin" >> "$GITHUB_PATH"
+          echo "GEO_BIN=$MAMBA_ROOT_PREFIX/envs/geo/bin" >> "$GITHUB_ENV"
           "$MAMBA_ROOT_PREFIX/envs/geo/bin/ogr2ogr" --version
           "$MAMBA_ROOT_PREFIX/envs/geo/bin/tippecanoe" --version
 
@@ -105,7 +105,7 @@ jobs:
           rm BasinATLAS.gdb.zip
           GDB=$(find . -maxdepth 2 -name "BasinATLAS_v10.gdb" -type d | head -1)
           echo "GDB=$GDB" >> "$GITHUB_ENV"
-          ogrinfo -so "$GDB" BasinATLAS_v10_lev12 | head -20
+          "$GEO_BIN/ogrinfo" -so "$GDB" BasinATLAS_v10_lev12 | head -20
           df -h / | tail -1
 
       - name: Topology + attributes parquet (streamed, batches of 50k)
@@ -127,7 +127,7 @@ jobs:
         run: |
           LIMIT=""
           if [ -n "$MAX_FEATURES" ]; then LIMIT="-limit $MAX_FEATURES"; fi
-          ogr2ogr -f FlatGeobuf archive/basins/lev12.fgb "$GDB" BasinATLAS_v10_lev12 \
+          "$GEO_BIN/ogr2ogr" -f FlatGeobuf archive/basins/lev12.fgb "$GDB" BasinATLAS_v10_lev12 \
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID \
             -simplify 0.0005 -nlt PROMOTE_TO_MULTI -lco SPATIAL_INDEX=YES -nln lev12 $LIMIT
           ls -la archive/basins/
@@ -139,15 +139,15 @@ jobs:
         run: |
           LIMIT=""
           if [ -n "$MAX_FEATURES" ]; then LIMIT="-limit $MAX_FEATURES"; fi
-          ogr2ogr -f GeoJSONSeq /vsistdout/ "$GDB" BasinATLAS_v10_lev12 \
+          "$GEO_BIN/ogr2ogr" -f GeoJSONSeq /vsistdout/ "$GDB" BasinATLAS_v10_lev12 \
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID $LIMIT \
-          | tippecanoe -o archive/basins/lev12.pmtiles -l basins -n "BasinATLAS level 12" \
+          | "$GEO_BIN/tippecanoe" -o archive/basins/lev12.pmtiles -l basins -n "BasinATLAS level 12" \
               -A "HydroATLAS v1.0 (Linke et al. 2019), CC BY 4.0" \
               -Z5 -z11 --drop-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders \
               --simplification=8 --no-tile-size-limit --force -P
-          ogr2ogr -f GeoJSONSeq /vsistdout/ "$GDB" BasinATLAS_v10_lev06 \
+          "$GEO_BIN/ogr2ogr" -f GeoJSONSeq /vsistdout/ "$GDB" BasinATLAS_v10_lev06 \
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID \
-          | tippecanoe -o archive/basins/lev06.pmtiles -l basins6 -n "BasinATLAS level 6" \
+          | "$GEO_BIN/tippecanoe" -o archive/basins/lev06.pmtiles -l basins6 -n "BasinATLAS level 6" \
               -A "HydroATLAS v1.0 (Linke et al. 2019), CC BY 4.0" \
               -Z0 -z8 --drop-densest-as-needed --detect-shared-borders --simplification=8 --force -P
           ls -la archive/basins/
