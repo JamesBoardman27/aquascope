@@ -9,10 +9,12 @@ assembled deterministically from what the tools returned, never from the
 model's memory.
 
 Works with any OpenAI-compatible chat endpoint that supports tool calling
-(OpenAI, Groq, Hugging Face router, Ollama, ...). Configuration, in order:
-explicit arguments, ``AQUASCOPE_LLM_API_KEY`` / ``AQUASCOPE_LLM_BASE_URL`` /
-``AQUASCOPE_LLM_MODEL``, then ``OPENAI_API_KEY``, ``GROQ_API_KEY``,
-``HF_TOKEN``. Requires the ``llm`` extra (``openai``).
+(OpenAI, Groq, Hugging Face router, Mistral, OpenRouter, Ollama, ...).
+Configuration, in order: explicit arguments, ``AQUASCOPE_LLM_API_KEY`` /
+``AQUASCOPE_LLM_BASE_URL`` / ``AQUASCOPE_LLM_MODEL``, then ``OPENAI_API_KEY``,
+``GROQ_API_KEY``, ``HF_TOKEN``. Uses the ``openai`` SDK when installed and a
+built-in ``urllib`` client otherwise (``aquascope.ai_engine.llm_transport``),
+which is also what runs inside the Explorer's browser worker.
 """
 
 from __future__ import annotations
@@ -39,6 +41,10 @@ PROVIDERS: dict[str, dict[str, str | None]] = {
     "huggingface": {
         "base_url": "https://router.huggingface.co/v1", "model": "Qwen/Qwen2.5-72B-Instruct", "env": "HF_TOKEN",
     },
+    "mistral": {"base_url": "https://api.mistral.ai/v1", "model": "mistral-small-latest", "env": "MISTRAL_API_KEY"},
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1", "model": "openai/gpt-4o-mini", "env": "OPENROUTER_API_KEY",
+    },
     "ollama": {"base_url": "http://localhost:11434/v1", "model": "qwen2.5:7b", "env": None},
 }
 
@@ -47,6 +53,10 @@ You answer questions about rivers, gauges, floods, rainfall and water resources 
 Rules:
 - Find stations with find_stations before analysing; prefer stations with long records for flood questions.
 - Use analyze_station / flood_frequency for numbers; use anywhere(lat, lon) when the user names a place with no gauge.
+- Use describe_catchment(lat, lon) for the catchment itself: area, elevation, climate, land cover, soils, dams.
+- For an ungauged place, use similar_basins to find donor gauges, then analyze_station on the best donors.
+- For "what flow to expect" at an ungauged place, use regionalize_signatures (mm/d estimates with a band and
+  the leave-one-out skill); always quote the band and the skill, never a bare number.
 - Never invent values, station ids, or citations. If a tool returns an error or an empty record, say so.
 - Report units. Quote return levels with their confidence intervals when available.
 - Say which record (station, source, period, number of years) each number comes from.
@@ -87,9 +97,11 @@ def _tool_specs() -> list[ToolSpec]:
         ToolSpec(
             "analyze_station",
             "Fetch one station's record and compute summary, annual maxima, flood frequency (GEV, LP3 with CI), "
-            "FDC percentiles and trend.",
+            "FDC percentiles and trend. variable: discharge (default), water_level, precipitation or "
+            "groundwater_level for stations that have several.",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
-                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"}},
+                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"},
+                                              "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.analyze_station,
         ),
@@ -106,7 +118,7 @@ def _tool_specs() -> list[ToolSpec]:
             "The observed record for a station, resampled (D/W/M/Y) and thinned; use for values, not for statistics.",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
                                               "years": {"type": "integer"}, "resample": {"type": "string"},
-                                              "max_points": {"type": "integer"}},
+                                              "max_points": {"type": "integer"}, "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.get_timeseries,
         ),
@@ -117,6 +129,35 @@ def _tool_specs() -> list[ToolSpec]:
             {"type": "object", "properties": {"lat": num, "lon": num, "years": {"type": "integer"}},
              "required": ["lat", "lon"]},
             lambda lat, lon, years=10: anywhere(lat, lon, years=years),
+        ),
+        ToolSpec(
+            "describe_catchment",
+            "The catchment of a point from BasinATLAS (HydroATLAS): sub-basin, upstream area and area-weighted "
+            "attributes (elevation, precipitation, PET, aridity, snow, runoff, land cover, soils, population, dams). "
+            "upstream=false for the local sub-basin only.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "upstream": {"type": "boolean"}},
+             "required": ["lat", "lon"]},
+            t.describe_catchment,
+        ),
+        ToolSpec(
+            "similar_basins",
+            "Gauged basins whose catchments most resemble a point's (lat, lon) or a station's (source, station_id): "
+            "donor selection for ungauged sites. method: similarity | proximity | combined.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "source": {"type": "string"},
+                                              "station_id": {"type": "string"}, "k": {"type": "integer"},
+                                              "method": {"type": "string"},
+                                              "sources": {"type": "array", "items": {"type": "string"}}}},
+            t.similar_basins,
+        ),
+        ToolSpec(
+            "regionalize_signatures",
+            "Estimated flow regime of an ungauged point (mean/median/Q95/Q05 flow in mm/d, annual max, runoff ratio, "
+            "baseflow index, FDC slope, flow frequencies, seasonality, flashiness) transferred from similar gauged "
+            "donors, with an uncertainty band and the leave-one-out skill. method: similarity | regression | both.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "k": {"type": "integer"},
+                                              "method": {"type": "string"}},
+             "required": ["lat", "lon"]},
+            t.regionalize_signatures,
         ),
         ToolSpec(
             "describe_methods", "What each analysis computes and the reference to cite.",
@@ -144,7 +185,7 @@ def resolve_llm(
             "model": model or os.environ.get("AQUASCOPE_LLM_MODEL") or PROVIDERS["huggingface"]["model"],
         }
     if provider is None:
-        for name in ("openai", "groq", "huggingface"):
+        for name in ("openai", "groq", "huggingface", "mistral", "openrouter"):
             env = PROVIDERS[name]["env"]
             if env and os.environ.get(env):
                 provider = name
@@ -238,6 +279,21 @@ def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskRe
                 "label": label, "period": period, "license": result.get("license"),
                 "attribution": result.get("attribution"),
             })
+    if name == "similar_basins" and result.get("stations"):
+        label = "similar-basins search"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({"label": label, "period": None, "license": result.get("license"),
+                                  "attribution": result.get("attribution")})
+    if name == "regionalize_signatures" and result.get("estimates"):
+        label = f"regionalised signatures at {result.get('latitude')}, {result.get('longitude')}"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({"label": label, "period": None, "license": result.get("license"),
+                                  "attribution": "donor gauges (per-source licences); BasinATLAS (CC BY 4.0)"})
+    if name == "describe_catchment" and result.get("sub_basin"):
+        label = f"catchment at {result.get('latitude')}, {result.get('longitude')}"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({"label": label, "period": None, "license": result.get("license"),
+                                  "attribution": result.get("attribution")})
     if name == "anywhere" and "latitude" in result:
         label = f"point {result['latitude']}, {result['longitude']}"
         if not any(d.get("label") == label for d in res.data_used):
@@ -265,16 +321,15 @@ def ask(
     """Answer ``question`` with tool calls over aquascope; returns an :class:`AskResult`.
 
     ``client`` lets tests (or callers with their own SDK setup) pass an
-    OpenAI-compatible client; otherwise one is built from ``resolve_llm``.
+    OpenAI-compatible client; otherwise one is built from ``resolve_llm``
+    (the ``openai`` SDK if installed, else the built-in ``urllib`` client).
     """
     cfg = {"provider": "custom", "model": model or "test", "api_key": None, "base_url": base_url}
     if client is None:
+        from aquascope.ai_engine.llm_transport import make_client
+
         cfg = resolve_llm(provider, model, api_key, base_url)
-        try:
-            from openai import OpenAI
-        except ImportError as exc:
-            raise ImportError("The analyst needs the openai package: pip install 'aquascope[llm]'") from exc
-        client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+        client = make_client(cfg["api_key"], cfg["base_url"])
     specs = {s.name: s for s in _tool_specs()}
     tools = _openai_tools(list(specs.values()))
     messages: list[dict[str, Any]] = [

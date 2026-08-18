@@ -55,6 +55,13 @@ COLLECTION_PERIOD_VALUES = {
     "daily": 86400
 }
 
+def _is_number(value: Any) -> bool:
+    try:
+        return value is not None and float(value) == float(value)
+    except (TypeError, ValueError):
+        return False
+
+
 def _first_str(value: Any) -> str | None:
     """EA fields are sometimes a list of alternate labels; keep the first."""
     if isinstance(value, list):
@@ -159,7 +166,11 @@ class UKEACollector(BaseCollector):
                         url=str(item.get("@id")) if item.get("@id") else None,
                         river=_first_str(item.get("riverName")),
                         country="GBR",
-                        extra={k: item[k] for k in ("wiskiID", "easting", "northing") if item.get(k) is not None},
+                        extra={
+                            **{k: item[k] for k in ("wiskiID", "easting", "northing") if item.get(k) is not None},
+                            **({"catchment_area_km2": float(item["catchmentArea"])}
+                               if _is_number(item.get("catchmentArea")) else {}),
+                        },
                     )
                 )
                 if max_items is not None and len(stations) >= max_items:

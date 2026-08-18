@@ -10,6 +10,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/aquascope.svg?color=blue&cacheSeconds=300&v=2)](https://pypi.org/project/aquascope/)
 [![Python](https://img.shields.io/pypi/pyversions/aquascope.svg?color=informational&cacheSeconds=300&v=2)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21903143.svg)](https://doi.org/10.5281/zenodo.21903143)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-brightgreen.svg)](#)
 [![Live demo](https://img.shields.io/badge/%F0%9F%8C%8A%20Live%20demo-Hugging%20Face%20Space-blue)](https://huggingface.co/spaces/Rekin226/aquascope-dashboard)
@@ -44,6 +45,10 @@ AquaScope unifies **29 global water-data sources** behind one Python schema, the
 (45,919 stations from USGS, UK EA, Hub'Eau, PEGELONLINE, Ireland OPW and Taiwan CWA). Click one and get the observed record,
 flood frequency with confidence limits, flow duration and trend, computed in your browser by aquascope on Pyodide.
 The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
+Press **Ask ✨** to type a question in plain language (bring your own key, Groq and Hugging Face are free): the model picks the
+tools, aquascope runs them in your browser, and the answer ends with the data used and the methods with citations.
+Not a Python user? The same files open in [R, QGIS, DuckDB and Julia](docs/readers.md) in place; `integrations/qgis/` has a
+drag-and-drop layer definition.
 
 Prefer an assistant? `pip install "aquascope[mcp]"` then `claude mcp add aquascope -- aquascope mcp` gives Claude (or any
 MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_frequency` over the same catalog and methods
@@ -52,7 +57,7 @@ MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_freq
 ## ✨ What you can do
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
-- 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 21 hydrological signatures.
+- 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 22 hydrological signatures.
 - 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 20 crops, irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
 - 📊 **Visualise + report** — 16 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
@@ -133,7 +138,7 @@ print(sig.q5, sig.q95)         # high-flow / low-flow exceedances
 print(sig.flashiness_index)    # Richards-Baker flashiness index
 ```
 
-21 signatures across magnitude, variability, timing, recession, and flashiness — see [docs/features.md](docs/features.md#hydrological-analysis).
+22 signatures across magnitude, variability, timing, recession, and flashiness — see [docs/features.md](docs/features.md#hydrological-analysis).
 
 ### 3. Collect data from any of the 29 sources
 
@@ -257,12 +262,17 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 25-command CLI for the most common workflows:
+AquaScope ships a 25-command CLI (`agri`, `basins`, `caravan` and `gym` carry subcommands) for the most common workflows:
 
 ```bash
 # Find stations, then collect data
 aquascope stations --bbox -0.5,51.3,0.3,51.7 --variable discharge --format geojson
 aquascope harvest stations --out archive          # the open gauge catalog (GeoParquet)
+aquascope basins at 48.85 2.35                    # the catchment of any point: area, climate, land cover, soils, dams (BasinATLAS)
+aquascope basins similar 25.04 121.56             # gauged basins whose catchments look most like this point's (ungauged-site donors)
+aquascope basins regionalize 52.29 -3.51          # estimated flow regime of an ungauged point from those donors, with the leave-one-out skill
+aquascope caravan export --source uk_ea --out caravan_gb   # a Caravan-format large-sample dataset from the archive
+aquascope gym run --basin uk_ea/013054a3-670e-49ee-afda-e0865a449197   # HydroGym: calibrate GR4J on a real basin as a gym episode
 aquascope mcp                                     # serve the same tools to Claude / Cursor over MCP
 aquascope ask "100-year flood of the Seine at Paris?"   # the analyst: tools + a cited Markdown report
 aquascope ingest agency_export.csv --unit cfs     # any CSV/Excel -> clean daily series + QA report
@@ -310,7 +320,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 - **1,000+ tests** — covering every collector, hydrology method, and pipeline (spatial and ARIMA tests require the optional `[all]` / `[ml]` extras)
 - **CAMELS benchmark** — a 10-catchment validation subset of the [CAMELS dataset](https://ral.ucar.edu/solutions/products/camels) ships with the repo at `data/camels_benchmark/` and runs as part of CI
 - **Every method cited** — equations, decision trees, and DOI references for all 26 methodologies live in the [theory guide](docs/theory.md)
-- **JOSS paper in submission** — see [`paper.md`](paper.md) and [`paper.bib`](paper.bib)
+- **JOSS paper in preparation** — see [`paper.md`](paper.md) and [`paper.bib`](paper.bib)
 
 ---
 
@@ -325,6 +335,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 | [Architecture](docs/guides/architecture.md) | How AquaScope is structured internally |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
 | [Use cases](docs/use_cases.md) | Real-world applications and case studies |
+| [HydroGym](docs/gym.md) | A gym-style calibration environment over real basins, with baselines and a leaderboard |
 | [Integration guides](docs/integration_guides/) | xarray, QGIS, R interoperability |
 | [Contributing](CONTRIBUTING.md) | How to add a data source, methodology, or test |
 
@@ -416,14 +427,16 @@ If you use AquaScope in your research, please cite:
   author  = {Ouédraogo, Abdoul Rachid},
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
-  version = {0.9.0},
+  version = {0.12.0},
+  doi     = {10.5281/zenodo.21903143},
   license = {MIT}
 }
 ```
 
 Machine-readable metadata lives in [CITATION.cff](CITATION.cff); GitHub's "Cite this
 repository" button renders it in APA and BibTeX. Every tagged release is archived on
-Zenodo with a version DOI.
+Zenodo; `10.5281/zenodo.21903143` is the concept DOI that always resolves to the latest
+version (v0.11.0 is [10.5281/zenodo.21989509](https://doi.org/10.5281/zenodo.21989509)).
 
 ## 📄 License
 

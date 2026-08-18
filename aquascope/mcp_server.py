@@ -140,12 +140,14 @@ def get_timeseries(
     years: int = 10,
     resample: str = "D",
     max_points: int = 400,
+    variable: str | None = None,
 ) -> dict[str, Any]:
-    """Observed record for one station through aquascope's collector, resampled and bounded.
+    """Observed record for one station (archive first, then the agency), resampled and bounded.
 
     resample: 'D' daily, 'W' weekly, 'M' monthly means, 'Y' annual means. Values beyond ``max_points``
-    are thinned evenly (never more than 2,000). Returns unit, variable, stats and the points as
-    [date, value] pairs, plus licence and attribution.
+    are thinned evenly (never more than 2,000). variable: discharge (default), water_level,
+    precipitation or groundwater_level, for stations that have several. Returns unit, variable, stats
+    and the points as [date, value] pairs, plus licence and attribution.
     """
     import pandas as pd
 
@@ -153,8 +155,10 @@ def get_timeseries(
 
     if source not in SOURCES:
         return {"error": f"unknown source {source!r}"}
+    if variable and variable not in VARIABLES:
+        return {"error": f"unknown variable {variable!r}; allowed: {list(VARIABLES)}"}
     meta = SOURCES[source]
-    fetched = fetch_series(source, station_id, years=int(years))
+    fetched = fetch_series(source, station_id, years=int(years), variable=variable)
     s = fetched["series"]
     if s is None or s.empty:
         return {"source": source, "station_id": station_id, "n": 0, "error": "no observations returned",
@@ -183,18 +187,24 @@ def get_timeseries(
     }
 
 
-def analyze_station(source: str, station_id: str, years: int = 40, bootstrap_ci: bool = False) -> dict[str, Any]:
+def analyze_station(
+    source: str, station_id: str, years: int = 40, bootstrap_ci: bool = False, variable: str | None = None
+) -> dict[str, Any]:
     """Fetch and analyse one station: record summary, annual maxima, flood frequency (GEV L-moments and
     Log-Pearson III with 90 % CI; optional bootstrap GEV band), flow-duration percentiles, Mann-Kendall
     trend, and the method citations. Raw daily arrays are omitted; use get_timeseries for those.
+    variable picks one of the station's variables (discharge by default; water_level, precipitation,
+    groundwater_level where the station has them).
     """
     from aquascope.explore import analyze_station as _analyze
     from aquascope.explore import flood_ci
 
     if source not in SOURCES:
         return {"error": f"unknown source {source!r}"}
+    if variable and variable not in VARIABLES:
+        return {"error": f"unknown variable {variable!r}; allowed: {list(VARIABLES)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years), store=store)
+    res = _analyze(source, station_id, years=int(years), store=store, variable=variable)
     res.pop("series", None)
     if "fdc" in res:
         res["fdc"] = {k: res["fdc"][k] for k in ("q95", "q50", "q10")}
@@ -239,6 +249,72 @@ def archive_health() -> dict[str, Any]:
         return resp.json()
 
 
+def describe_catchment(lat: float, lon: float, upstream: bool = True) -> dict[str, Any]:
+    """The catchment of a point from BasinATLAS (HydroATLAS v1.0, CC BY 4.0) in the Archive: which
+    level-12 sub-basin the point sits in, how many sub-basins drain to it, and area-weighted attributes
+    (elevation, slope, precipitation, PET, aridity, temperature, snow, runoff, natural discharge, land
+    cover, soils, groundwater table, population, regulation by dams). upstream=False describes only the
+    local sub-basin. Works anywhere on land; needs the basins files to be published.
+    """
+    from aquascope.archive.basins import describe_catchment as _describe
+
+    try:
+        return _describe(float(lat), float(lon), upstream=bool(upstream))
+    except ImportError as exc:
+        return {"error": f"{exc}"}
+    except Exception as exc:  # noqa: BLE001 - the model gets to see it
+        return {"error": f"catchment lookup failed: {type(exc).__name__}: {exc}"}
+
+
+def similar_basins(
+    lat: float | None = None,
+    lon: float | None = None,
+    source: str | None = None,
+    station_id: str | None = None,
+    k: int = 10,
+    method: str = "combined",
+    sources: list[str] | None = None,
+) -> dict[str, Any]:
+    """The gauged basins in the Archive whose catchments most resemble a point's (or a station's) catchment:
+    donor selection for prediction in ungauged basins. Give lat/lon for a point, or source + station_id for a
+    station (itself excluded). method: 'similarity' (standardised BasinATLAS attribute space: area, relief,
+    climate, land cover, soils, human pressure), 'proximity' (distance on the ground) or 'combined'. Returns
+    up to k stations with ids you can pass to analyze_station, the per-feature deltas, and the citation.
+    """
+    from aquascope.archive.similar import similar_for_point, similar_for_station
+
+    k = max(1, min(int(k or 10), 50))
+    try:
+        if source and station_id:
+            return similar_for_station(source, station_id, k=k, method=method, sources=sources)
+        if lat is None or lon is None:
+            return {"error": "give lat and lon, or source and station_id"}
+        return similar_for_point(float(lat), float(lon), k=k, method=method, sources=sources)
+    except ImportError as exc:
+        return {"error": f"{exc}"}
+    except Exception as exc:  # noqa: BLE001 - the model gets to see it
+        return {"error": f"similar basins lookup failed: {type(exc).__name__}: {exc}"}
+
+
+def regionalize_signatures(lat: float, lon: float, k: int = 10, method: str = "similarity") -> dict[str, Any]:
+    """Estimated flow regime of an UNGAUGED point, transferred from the gauged donors in the Archive: mean, median,
+    Q95 (low) and Q05 (high) daily flow in mm/d, mean annual maximum, runoff ratio, baseflow index, FDC slope,
+    high/low-flow frequency, zero-flow fraction, seasonality and flashiness, each with an uncertainty band and
+    the donors used. method: 'similarity' (weighted mean over the k most similar catchments), 'regression'
+    (ridge on catchment attributes over all donors) or 'both'. Comes with the leave-one-out skill (NSE, median
+    error) of each estimate so you can say how much to trust it. Prediction in ungauged basins (PUB).
+    """
+    from aquascope.archive.regionalize import regionalize_point
+
+    k = max(1, min(int(k or 10), 50))
+    try:
+        return regionalize_point(float(lat), float(lon), k=k, method=method)
+    except ImportError as exc:
+        return {"error": f"{exc}"}
+    except Exception as exc:  # noqa: BLE001 - the model gets to see it
+        return {"error": f"regionalisation failed: {type(exc).__name__}: {exc}"}
+
+
 def _default_years_note() -> str:
     today = date.today()
     return f"Records are requested back to {(today - timedelta(days=int(40 * 365.25))).isoformat()} by default."
@@ -256,6 +332,9 @@ def build_server():
     server.tool()(analyze_station)
     server.tool()(flood_frequency)
     server.tool()(describe_methods)
+    server.tool()(describe_catchment)
+    server.tool()(similar_basins)
+    server.tool()(regionalize_signatures)
     server.tool()(archive_health)
 
     @server.resource("aquascope://sources")

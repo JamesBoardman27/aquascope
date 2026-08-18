@@ -502,6 +502,7 @@ class USGSCollector(BaseCollector):
         # streams for the hydrology variables and never let a rate-limited
         # names pass sink the catalog: stations without names beat no stations.
         names: dict[str, str] = {}
+        areas: dict[str, float] = {}
         if by_site:
             loc_params: dict[str, Any] = {"f": "json", "limit": 10_000}
             if "api_key" in params:
@@ -515,6 +516,11 @@ class USGSCollector(BaseCollector):
                     props = feat.get("properties", {})
                     if props.get("id") in by_site:
                         names[props["id"]] = props.get("monitoring_location_name")
+                        try:
+                            if props.get("drainage_area") is not None:
+                                areas[props["id"]] = float(props["drainage_area"]) * MILES2_TO_KM2
+                        except (TypeError, ValueError):
+                            pass
             except RuntimeError as exc:
                 logger.warning("USGS monitoring-locations lookup failed (%s); trying the NWIS site service.", exc)
                 try:
@@ -537,6 +543,7 @@ class USGSCollector(BaseCollector):
                     period_end=entry["end"],
                     url=f"https://waterdata.usgs.gov/monitoring-location/{number}/",
                     country="USA",
+                    extra={"catchment_area_km2": round(areas[site], 2)} if site in areas else {},
                 )
             )
         stations.sort(key=lambda s: s.station_id)

@@ -110,12 +110,60 @@ def test_server_registers_tools_and_calls_through_sdk():
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
     assert names >= {"list_sources", "find_stations", "get_timeseries", "analyze_station", "flood_frequency",
-                     "describe_methods", "archive_health"}
+                     "describe_methods", "describe_catchment", "similar_basins", "regionalize_signatures",
+                     "archive_health"}
     with patch("aquascope.archive.catalog.load_stations", return_value=CATALOG):
         res = asyncio.run(server.call_tool("find_stations", {"query": "potomac"}))
     payload = getattr(res, "structured_content", None) or getattr(res, "structuredContent", None)
+    if payload is None and isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
+        payload = res[1]  # mcp 1.10+: (unstructured content, structured content)
     if payload is None:  # older SDKs return only text content
         import json
 
-        payload = json.loads(res[0].text if isinstance(res, list) else res.content[0].text)
+        blocks = res[0] if isinstance(res, tuple) else res
+        payload = json.loads(blocks[0].text if isinstance(blocks, list) else blocks.content[0].text)
     assert payload["n_returned"] == 1 and payload["stations"][0]["station_id"] == "USGS-1"
+
+
+def test_describe_catchment_tool_wraps_basins(monkeypatch):
+    calls = {}
+
+    def fake(lat, lon, upstream=True):
+        calls["args"] = (lat, lon, upstream)
+        return {"sub_basin": {"hybas_id": 1}, "attributes": {}, "license": "CC-BY-4.0"}
+
+    monkeypatch.setattr("aquascope.archive.basins.describe_catchment", fake)
+    out = m.describe_catchment(48.85, 2.35, upstream=False)
+    assert out["sub_basin"]["hybas_id"] == 1 and calls["args"] == (48.85, 2.35, False)
+
+    def boom(lat, lon, upstream=True):
+        raise RuntimeError("no basins yet")
+
+    monkeypatch.setattr("aquascope.archive.basins.describe_catchment", boom)
+    assert "no basins yet" in m.describe_catchment(0, 0)["error"]
+
+
+def test_similar_basins_tool_dispatches(monkeypatch):
+    calls = []
+    monkeypatch.setattr("aquascope.archive.similar.similar_for_point",
+                        lambda lat, lon, **kw: calls.append(("point", lat, lon, kw)) or {"stations": [], "k": 0})
+    monkeypatch.setattr("aquascope.archive.similar.similar_for_station",
+                        lambda s, i, **kw: calls.append(("station", s, i, kw)) or {"stations": [], "k": 0})
+    assert m.similar_basins(lat=1.0, lon=2.0, k=99)["k"] == 0 and calls[-1][0] == "point" and calls[-1][3]["k"] == 50
+    assert m.similar_basins(source="usgs", station_id="USGS-1", method="similarity")["k"] == 0
+    assert calls[-1][:3] == ("station", "usgs", "USGS-1")
+    assert "give lat and lon" in m.similar_basins()["error"]
+
+
+def test_regionalize_signatures_tool_dispatches(monkeypatch):
+    calls = []
+    monkeypatch.setattr("aquascope.archive.regionalize.regionalize_point",
+                        lambda lat, lon, **kw: calls.append((lat, lon, kw)) or {"estimates": {},
+                                                                                "method": kw["method"]})
+    assert m.regionalize_signatures(1.0, 2.0, k=99, method="both")["method"] == "both" and calls[-1][2]["k"] == 50
+
+    def boom(*a, **k):
+        raise RuntimeError("no signatures yet")
+
+    monkeypatch.setattr("aquascope.archive.regionalize.regionalize_point", boom)
+    assert "no signatures yet" in m.regionalize_signatures(0, 0)["error"]

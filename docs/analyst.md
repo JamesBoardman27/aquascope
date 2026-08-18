@@ -6,13 +6,14 @@ and aquascope does the part that has to be right.
 ## `aquascope ask`: a question in, a cited report out
 
 ```bash
-pip install "aquascope[llm]"
-export GROQ_API_KEY=...            # or OPENAI_API_KEY, HF_TOKEN, or AQUASCOPE_LLM_API_KEY + _BASE_URL + _MODEL
+pip install aquascope             # the openai SDK is optional (pip install "aquascope[llm]")
+export GROQ_API_KEY=...            # or OPENAI_API_KEY, HF_TOKEN, MISTRAL_API_KEY, OPENROUTER_API_KEY, or AQUASCOPE_LLM_API_KEY + _BASE_URL + _MODEL
 aquascope ask "What is the 100-year flood of the Seine at Paris, and how sure can we be?" -o seine.md
 ```
 
 The model gets the same tools the [MCP server](mcp.md) exposes (`find_stations`,
 `analyze_station`, `flood_frequency`, `get_timeseries`, `anywhere`,
+`describe_catchment`, `similar_basins`, `regionalize_signatures`,
 `list_sources`, `describe_methods`) and decides which to call; aquascope runs
 them against real data. The Markdown report has three parts:
 
@@ -32,6 +33,15 @@ This is deliberately not an autonomous agent: no memory, no planning beyond
 the tool loop, no writes. It is the "ask, get the work done, see the work"
 surface from the direction review, and its numbers are exactly what
 `aquascope analyze`/the Explorer would give you.
+
+The same function runs inside the [Explorer](explorer.md) (the **Ask ✨**
+button): the browser worker calls the provider directly with your key through
+`aquascope.ai_engine.llm_transport.UrllibChatClient`, a dependency-free
+OpenAI-compatible client that is also the fallback when the `openai` package
+is not installed, so `pip install aquascope` alone is enough for `aquascope
+ask`. Providers: `openai`, `groq`, `huggingface`, `mistral`, `openrouter`,
+`ollama`, or `AQUASCOPE_LLM_BASE_URL` for anything else that speaks the
+protocol.
 
 ## `aquascope ingest`: any export in, a clean series and a QA report out
 

@@ -143,7 +143,77 @@ def test_uk_ea_measure_preference():
     class Fake:
         client = FakeClient()
 
-    assert analysis._uk_ea_pick_measure(Fake(), "S") == "S-flow-m-86400-m3s-qualified"
+    assert analysis._uk_ea_pick_measure(Fake(), "S") == ("S-flow-m-86400-m3s-qualified", "discharge")
+    assert analysis._uk_ea_pick_measure(Fake(), "S", variable="water_level") == ("S-level-i-900-m-qualified",
+                                                                                 "water_level")
+    assert analysis._uk_ea_pick_measure(Fake(), "S", variable="precipitation") == (None, None)
+
+
+def test_uk_ea_measure_variables_level_rain_and_boreholes():
+    """Real EA shapes: level sites publish daily max/min + 15-min; rain gauges daily totals;
+    boreholes 'level' in mAOD with manual dips (period None) and sometimes a logger."""
+    measures = [
+        {"@id": "http://x/measures/L-level-max-86400-m-qualified", "parameter": "level", "period": 86400,
+         "valueStatistic": {"@id": "http://x/def/core/maximum"}, "unitName": "m"},
+        {"@id": "http://x/measures/L-level-min-86400-m-qualified", "parameter": "level", "period": 86400,
+         "valueStatistic": {"@id": "http://x/def/core/minimum"}, "unitName": "m"},
+        {"@id": "http://x/measures/L-level-i-900-m-qualified", "parameter": "level", "period": 900,
+         "valueStatistic": {"@id": "http://x/def/core/instantaneous"}, "unitName": "m"},
+        {"@id": "http://x/measures/L-rainfall-t-86400-mm-qualified", "parameter": "rainfall", "period": 86400,
+         "valueStatistic": {"@id": "http://x/def/core/total"}, "unitName": "mm"},
+        {"@id": "http://x/measures/L-gw-dipped-i-mAOD-qualified", "parameter": "level", "period": None,
+         "valueStatistic": {"@id": "http://x/def/core/instantaneous"}, "unitName": "mAOD"},
+        {"@id": "http://x/measures/L-gw-logged-i-900-mAOD-qualified", "parameter": "level", "period": 900,
+         "valueStatistic": {"@id": "http://x/def/core/instantaneous"}, "unitName": "mAOD"},
+    ]
+
+    class FakeClient:
+        def get_json(self, path, params=None):
+            return {"items": [{"measures": measures}]}
+
+    class Fake:
+        client = FakeClient()
+
+    pick = analysis._uk_ea_pick_measure
+    assert pick(Fake(), "L") == ("L-level-max-86400-m-qualified", "water_level")  # no flow: level, daily max
+    assert pick(Fake(), "L", variable="precipitation") == ("L-rainfall-t-86400-mm-qualified", "precipitation")
+    assert pick(Fake(), "L", variable="groundwater_level") == ("L-gw-dipped-i-mAOD-qualified", "groundwater_level")
+    assert pick(Fake(), "L", variable="discharge") == (None, None)
+
+
+def test_fetch_series_variable_selection():
+    """USGS: the requested variable maps to the parameter code and feet become metres; asking for a
+    variable the station lacks yields an empty result rather than another variable."""
+    calls = []
+
+    class FakeUSGS:
+        def collect(self, **kw):
+            calls.append(kw["parameter"])
+            if kw["parameter"] == "00065":
+                return [WaterLevelReading(source=DataSource.USGS, station_id="1", reading_datetime=datetime(2020, 1, 1)
+                                          + timedelta(days=i), water_level=10.0, unit="ft") for i in range(20)]
+            return []
+
+    with patch.object(analysis, "build_collector", return_value=FakeUSGS()):
+        out = analysis.fetch_series("usgs", "USGS-1", years=1, prefer_archive=False)
+        assert calls == ["00060", "00065"] and out["variable"] == "water_level"
+        assert out["unit"] == "m" and out["series"].iloc[0] == pytest.approx(3.048)
+        calls.clear()
+        out = analysis.fetch_series("usgs", "USGS-1", years=1, prefer_archive=False, variable="water_level")
+        assert calls == ["00065"] and out["variable"] == "water_level"
+        calls.clear()
+        out = analysis.fetch_series("usgs", "USGS-1", years=1, prefer_archive=False, variable="discharge")
+        assert calls == ["00060"] and out["series"] is None and out["variable"] == ""
+
+
+def test_trend_uses_the_records_own_sampling():
+    """A 40-year monthly borehole record gets a trend; the annual maxima stay daily-coverage gated."""
+    idx = pd.date_range("1985-01-15", periods=12 * 40, freq="MS")
+    s = pd.Series(np.linspace(30, 32, len(idx)) + np.sin(np.arange(len(idx)) / 2), index=idx)
+    out = analysis.analyze_series(s, "groundwater_level", "m")
+    assert out["annual_max"]["year"] == []
+    assert out["trend"]["n_years"] == 40 and out["trend"]["trend"] == "increasing"
+    assert "ffa" not in out and not any("Flood" in n for n in out["notes"])
 
 
 def test_unknown_source_raises():

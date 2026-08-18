@@ -274,31 +274,53 @@ def _obs_section(out_dir: Path, repo_id: str) -> str:
     if not manifest_path.exists():
         return ""
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        from aquascope.archive.observations import _migrate_manifest
+
+        manifest = _migrate_manifest(json.loads(manifest_path.read_text(encoding="utf-8")))
     except json.JSONDecodeError:
         return ""
     lines = [
         "",
-        "## Observations (Phase 1, filling up week by week)",
+        "## Observations (filling up week by week)",
         "",
-        "Daily means per station as `obs/<variable>/<source>/<station_id>.csv.gz` (`date,value`), only for "
-        "sources whose terms allow mirroring. `obs/manifest.json` lists every harvested station with its "
-        "period, count and unit. Read one station:",
+        "Daily values per station as `obs/<variable>/<source>/<station_id>.csv.gz` (`date,value`; discharge in "
+        "m3/s, water and groundwater level in m, precipitation in mm/day), only for sources whose terms allow "
+        "mirroring, plus one Parquet bundle per variable and source, `obs/<variable>/<source>.parquet` "
+        "(`station_id, date, value`; join `station_id` to `stations.parquet`). `obs/manifest.json` lists every "
+        "harvested station with its period, count and unit, and every bundle. Read one station:",
         "",
         "```python",
         f'pd.read_csv("hf://datasets/{repo_id}/obs/discharge/usgs/USGS-01646500.csv.gz")',
         "```",
         "",
-        "or a whole source with DuckDB: "
-        f"`SELECT * FROM read_csv('hf://datasets/{repo_id}/obs/discharge/hubeau_hydrometrie/*.csv.gz')`.",
+        "a whole source in one go:",
         "",
-        "| source | variable | stations harvested | licence |",
-        "| --- | --- | ---: | --- |",
+        "```python",
+        f'pd.read_parquet("hf://datasets/{repo_id}/obs/discharge/hubeau_hydrometrie.parquet")',
+        "```",
+        "",
+        "or with DuckDB, joined to the catalog:",
+        "",
+        "```sql",
+        "SELECT s.name, o.date, o.value",
+        f"FROM 'hf://datasets/{repo_id}/obs/discharge/uk_ea.parquet' o",
+        f"JOIN 'hf://datasets/{repo_id}/stations.parquet' s USING (station_id)",
+        "WHERE s.name ILIKE '%thames%'",
+        "```",
+        "",
+        "| source | variable | stations harvested | bundle | licence |",
+        "| --- | --- | ---: | --- | --- |",
     ]
+    bundles = manifest.get("bundles", {})
     for key in sorted(manifest.get("sources", {})):
         entry = manifest["sources"][key]
         n = entry.get("n_stations", sum(1 for v in entry.get("stations", {}).values() if v.get("n")))
-        lines.append(f"| `{key}` | {entry.get('variable', '')} | {n:,} | {entry.get('license', '')} |")
+        b = bundles.get(key)
+        bundle = f"`{b['file']}` ({b['n_rows']:,} rows)" if b else "not yet"
+        lines.append(
+            f"| `{entry.get('source', key)}` | {entry.get('variable', '')} | {n:,} | {bundle} | "
+            f"{entry.get('license', '')} |"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -371,6 +393,20 @@ link back to the agency. Attribution for each source is in the AquaScope registr
 {table}
 
 {_obs_section(path.parent, repo_id)}
+## Catchments (BasinATLAS, `basins/`)
+
+The level-12 sub-basins of [HydroATLAS v1.0 / BasinATLAS](https://www.hydrosheds.org/hydroatlas)
+(Linke et al. 2019, **CC BY 4.0**) with their routing and attributes, so any point on land can be
+placed in its catchment and described: `basins/lev12.fgb` (simplified polygons, spatially indexed;
+point lookups over HTTPS read a few kilobytes), `basins/lev12_topology.parquet` (`hybas_id,
+next_down, main_bas, sub_area, up_area, ...` plus a representative point), `basins/lev12_attributes.parquet`
+(every BasinATLAS attribute per sub-basin, incl. the upstream-aggregated `*_u*` fields), and
+`basins/lev12.pmtiles` / `basins/lev06.pmtiles` for maps. Built by
+[basins.yml](https://github.com/Rekin226/aquascope/actions/workflows/basins.yml);
+`aquascope basins at LAT LON` and the MCP tool `describe_catchment` read them. Cite: Linke, S., Lehner, B.,
+Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics
+at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6
+
 ## How it is built
 
 `aquascope harvest stations --out archive --publish {repo_id}` runs weekly from

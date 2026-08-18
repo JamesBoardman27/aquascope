@@ -13,9 +13,9 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 
 ## Shipped
 
-- [x] 26 data source collectors (Taiwan ×7, USA ×2, Global ×5, FAO ×2, EU, France, Japan, Korea, India, Chile, UK)
+- [x] 29 data source collectors (Taiwan ×8, USA ×3, Global ×5, FAO ×2, EU, France, Germany, Ireland, UK, Japan, Korea, India, Chile, Brazil, Australia)
 - [x] Rule-based + LLM methodology recommender (26 methods, OpenAI / Groq / HuggingFace / Ollama)
-- [x] 7 auto-executable analysis pipelines
+- [x] 26 auto-executable analysis pipelines
 - [x] GR4J conceptual rainfall-runoff model + auto-calibration (NSE / KGE / log-NSE)
 - [x] Model-evaluation metrics (NSE, KGE, PBIAS, RMSE, R²)
 - [x] Bulletin 17C flood frequency with EMA
@@ -26,19 +26,22 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 - [x] Spatial hydrology (DEM, watershed, Strahler)
 - [x] Scientific I/O (WaterML, HEC, SWMM, NetCDF, HDF5)
 - [x] Interactive Streamlit dashboard
-- [x] 820+ tests with CAMELS benchmark validation
+- [x] 1,000+ tests with CAMELS benchmark validation
 - [x] Theory guide with equations and DOI citations
 - [x] EU Water Framework Directive collector
 - [x] Japan MLIT / Korea WAMIS collectors
 - [x] Groundwater module (GRACE, well databases, recharge, aquifer hydraulics)
 - [x] Climate projection workflows (CMIP6, downscaling, PDSI, scenario analysis)
-- [x] JOSS paper submission (`paper.md` + `paper.bib`)
+- [x] JOSS paper drafted (`paper.md` + `paper.bib`)
 - [x] PyPI release (sdist + wheel + GitHub Actions publish workflow)
 - [x] Shared source registry with licence and station-catalog metadata; `find_stations()` and `aquascope stations` over six catalogs (#187)
-- [x] The Archive, Phase 0 + 1: 45,919-station GeoParquet catalog and per-station daily observations on Hugging Face, weekly harvest with collector-health issues (#188)
+- [x] The Archive, Phase 0 + 1 + 2: 45,919-station GeoParquet catalog, per-station daily observations (discharge, water level, rainfall, groundwater level) and one Parquet bundle per variable and source on Hugging Face, weekly harvest with collector-health issues (#188)
 - [x] The Explorer: static MapLibre + DuckDB-WASM + Pyodide page with click-any-gauge analysis and click-anywhere climate cards (#189)
 - [x] MCP server (`aquascope mcp`), the Analyst (`aquascope ask`) and `aquascope ingest` (#113)
 - [x] GeoLibre plugin: AquaScope Gauges (`integrations/geolibre`)
+- [x] Explorer Phase 2: Ask ✨ (the Analyst in the page), NLDI catchments, BasinATLAS catchments everywhere, similar gauged basins (#189, #213, #218)
+- [x] Caravan-format export from the archive (`aquascope caravan export`, #217) and the similar-basins donor search (#53, the practical half)
+- [x] Self-healing harvest: automated repair proposals as reviewable PRs (`repair.yml`)
 
 ## In progress
 
@@ -56,10 +59,11 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 
 Ambitious, high-impact work that takes AquaScope to the next level. These are [`major feature`](https://github.com/Rekin226/aquascope/labels/major%20feature) · `help wanted` — larger than a weekend, mentorship available. Comment on the issue to discuss scope before starting.
 
-- [ ] Archive Phase 2: groundwater / reservoir / quality variables, yearly parquet bundles for bulk users, a data paper ([#188](https://github.com/Rekin226/aquascope/issues/188))
-- [ ] Explorer Phase 2: catchment polygons (HydroBASINS PMTiles), Analyst panel in the page, GR4J once it runs in seconds ([#189](https://github.com/Rekin226/aquascope/issues/189))
-- [ ] CAMELS-TW / Caravan Asia extension built from the archive ([#100](https://github.com/Rekin226/aquascope/issues/100), [#99](https://github.com/Rekin226/aquascope/issues/99))
-- [ ] Prediction in Ungauged Basins — regionalize signatures/parameters ([#53](https://github.com/Rekin226/aquascope/issues/53)) — *now unblocked by the shipped GR4J keystone*
+- [ ] Archive Phase 3: reservoir storage and water-quality variables, more agencies with a `stations()` catalog (Australia BOM, Taiwan WRA), a data paper ([#188](https://github.com/Rekin226/aquascope/issues/188))
+- [ ] Explorer Phase 3: GR4J calibrated in the page shipped (JS port + differential evolution, ~2 s for 40 years); still open: agency catchment boundaries under open licences (UK NRFA), sub-daily where terms allow ([#189](https://github.com/Rekin226/aquascope/issues/189))
+- [ ] CAMELS-TW: `aquascope caravan export` is ready; the Taiwan daily discharge collector ([#211](https://github.com/Rekin226/aquascope/issues/211)) is the missing leg ([#100](https://github.com/Rekin226/aquascope/issues/100), [#99](https://github.com/Rekin226/aquascope/issues/99))
+- [x] Prediction in Ungauged Basins: flow signatures regionalised over the similar-basins donors (similarity-weighted transfer + ridge regression, leave-one-out skill published with the archive; `aquascope basins regionalize`, MCP `regionalize_signatures`, Explorer table) ([#53](https://github.com/Rekin226/aquascope/issues/53)); parameter regionalisation (GR4J parameters from donors) is the follow-up
+- [x] HydroGym Phase 0: `aquascope.gym.CalibrationEnv` (gymnasium API, GR4J calibration on any Archive basin or a synthetic one, NSE/KGE/log-NSE reward with validation metrics), three baselines, a leaderboard, `aquascope gym`; Phases 1 and 2 (task suite across regions, LLM-loop reference agent, leaderboard doc) stay open ([#175](https://github.com/Rekin226/aquascope/issues/175))
 - [ ] Declarative, reproducible study runner `aquascope run study.yaml` with provenance ([#54](https://github.com/Rekin226/aquascope/issues/54))
 - [ ] Plugin architecture — third-party collectors & methodologies via entry points ([#55](https://github.com/Rekin226/aquascope/issues/55))
 - [ ] Large-sample CAMELS benchmark — automated accuracy report ([#56](https://github.com/Rekin226/aquascope/issues/56))
