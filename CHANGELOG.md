@@ -7,6 +7,7 @@ All notable changes to AquaScope are documented here.
 ### Added
 
 ### Changed
+- README, docs and `CITATION.cff` carry the Zenodo concept DOI `10.5281/zenodo.21903143` (v0.11.0: `10.5281/zenodo.21989509`).
 
 ### Fixed
 
