@@ -16,7 +16,7 @@ def _table():
     for i in range(60):
         rows.append({
             "source": "usgs" if i % 2 else "uk_ea", "station_id": f"S{i}", "hybas_id": 100 + i,
-            "up_area": float(10 ** rng.uniform(1.5, 4.5)), "sub_area": 100.0,
+            "up_area": float(10 ** rng.uniform(1.5, 4.5)), "sub_area": 100.0, "attribute_scope": "upstream",
             "elevation_m": float(rng.uniform(20, 2500)), "slope_deg": float(rng.uniform(0.5, 25)),
             "precipitation_mm_yr": float(rng.uniform(300, 2500)), "aridity_index": float(rng.uniform(0.2, 3)),
             "temperature_c": float(rng.uniform(-2, 24)), "snow_cover_pct": float(rng.uniform(0, 60)),
@@ -31,7 +31,10 @@ def _table():
                 forest_pct=30.0, cropland_pct=40.0, urban_pct=3.0, clay_pct=22.0, sand_pct=40.0,
                 population_density=80.0, degree_of_regulation_pct=5.0)
     rows.append(twin)
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    df["area_km2"] = df["up_area"]
+    df["area_source"] = "basinatlas_up_area"
+    return df
 
 
 def _catalog(table):
@@ -48,7 +51,7 @@ def _catalog(table):
     return cat
 
 
-TARGET = {"latitude": 51.4, "longitude": -0.3, "up_area": 1050.0, "elevation_m": 310.0, "slope_deg": 3.2,
+TARGET = {"latitude": 51.4, "longitude": -0.3, "area_km2": 1050.0, "elevation_m": 310.0, "slope_deg": 3.2,
           "precipitation_mm_yr": 880.0, "aridity_index": 0.95, "temperature_c": 10.3, "snow_cover_pct": 4.0,
           "forest_pct": 28.0, "cropland_pct": 42.0, "urban_pct": 4.0, "clay_pct": 21.0, "sand_pct": 41.0,
           "population_density": 90.0, "degree_of_regulation_pct": 4.0}
@@ -104,6 +107,8 @@ def test_target_from_describe_catchment_shape():
                                 "precipitation_mm_yr": {"value": 880.0}, "aridity_index": {"value": 0.95}}}
     vals = similar._target_values(desc_like)
     assert vals["log_area"] == 1050.0 and vals["elevation"] == 310.0 and vals["snow"] is None
+    flat = {"area_km2": 20.0, "up_area": 900.0, "elevation_m": 100.0}
+    assert similar._target_values(flat)["log_area"] == 20.0  # a station row: its own area, not the sub-basin's
 
 
 def test_similar_for_station_excludes_itself(monkeypatch):
@@ -121,6 +126,8 @@ def test_row_catchment_attributes_takes_upstream_fields():
     assert out["elevation_m"] == 400 and out["precipitation_mm_yr"] == 750 and out["runoff_mm_yr"] == 20
     assert out["slope_deg"] == 3.5 and out["population"] == 12500 and out["degree_of_regulation_pct"] == 12.0
     assert out["soil_organic_carbon_t_ha"] == 30  # NODATA upstream falls back to the local value
+    local = row_catchment_attributes(row, scope="local")
+    assert local["elevation_m"] == 100 and local["precipitation_mm_yr"] == 700 and local["slope_deg"] == 3.5
 
 
 def test_assign_station_catchments_on_a_synthetic_layer(tmp_path):
@@ -136,16 +143,29 @@ def test_assign_station_catchments_on_a_synthetic_layer(tmp_path):
     )
     fgb = tmp_path / "lev12.fgb"
     layer.to_file(fgb, driver="FlatGeobuf")
-    attrs = pd.DataFrame([{"hybas_id": 1, "ele_mt_uav": 500, "pre_mm_uyr": 1000, "for_pc_use": 40},
-                          {"hybas_id": 2, "ele_mt_uav": 200, "pre_mm_uyr": 800, "for_pc_use": 10}])
     ap = tmp_path / "attrs.parquet"
-    pq.write_table(pa.Table.from_pandas(attrs, preserve_index=False), ap)
     catalog = [{"source": "usgs", "station_id": "A", "latitude": 0.5, "longitude": 0.5},
-               {"source": "usgs", "station_id": "B", "latitude": 0.5, "longitude": 1.5},
+               {"source": "usgs", "station_id": "B", "latitude": 0.5, "longitude": 1.5,
+                "extra": {"catchment_area_km2": 850.0}},
+               {"source": "usgs", "station_id": "C", "latitude": 0.6, "longitude": 1.6,
+                "extra": {"catchment_area_km2": 12.0}},  # a creek inside sub-basin 2
                {"source": "usgs", "station_id": "SEA", "latitude": 5.0, "longitude": 5.0}]
+    attrs = pd.DataFrame([{"hybas_id": 1, "ele_mt_uav": 500, "pre_mm_uyr": 1000, "for_pc_use": 40},
+                          {"hybas_id": 2, "ele_mt_uav": 200, "ele_mt_sav": 120, "pre_mm_uyr": 800, "pre_mm_syr": 650,
+                           "for_pc_use": 10, "for_pc_sse": 55}])
+    pq.write_table(pa.Table.from_pandas(attrs, preserve_index=False), ap)
     out = similar.assign_station_catchments(catalog, fgb, ap, tmp_path / "station_catchments.parquet")
-    assert sorted(out["station_id"]) == ["A", "B"]
-    a = out[out["station_id"] == "A"].iloc[0]
-    assert a["hybas_id"] == 1 and a["up_area"] == 50.0 and a["elevation_m"] == 500 and a["forest_pct"] == 40
+    assert sorted(out["station_id"]) == ["A", "B", "C"]
+    by = out.set_index("station_id")
+    assert by.loc["A", "hybas_id"] == 1 and by.loc["A", "up_area"] == 50.0 and by.loc["A", "elevation_m"] == 500
+    assert by.loc["A", "area_km2"] == 50.0 and by.loc["A", "area_source"] == "basinatlas_up_area"
+    assert by.loc["A", "attribute_scope"] == "upstream" and by.loc["A", "forest_pct"] == 40
+    # B closes most of sub-basin 2's catchment: agency area, upstream attributes
+    assert by.loc["B", "area_km2"] == 850.0 and by.loc["B", "area_source"] == "agency"
+    assert by.loc["B", "attribute_scope"] == "upstream" and by.loc["B", "elevation_m"] == 200
+    # C drains 12 km2 of a 900 km2 catchment: local sub-basin attributes, its own area
+    assert by.loc["C", "attribute_scope"] == "local" and by.loc["C", "area_km2"] == 12.0
+    assert by.loc["C", "elevation_m"] == 120 and by.loc["C", "forest_pct"] == 55
+    assert by.loc["C", "precipitation_mm_yr"] == 650
     back = pd.read_parquet(tmp_path / "station_catchments.parquet")
-    assert len(back) == 2 and "precipitation_mm_yr" in back.columns
+    assert len(back) == 3 and "precipitation_mm_yr" in back.columns

@@ -241,6 +241,12 @@ def fetch_forcing(
 def station_area_km2(source: str, station: dict[str, Any], collectors: dict[str, Any]) -> tuple[float | None, str]:
     """Catchment area from the agency where it publishes one; ``(None, "")`` otherwise."""
     sid = station["station_id"]
+    known = (station.get("extra") or {}).get("catchment_area_km2")
+    try:
+        if known is not None and float(known) > 0:
+            return float(known), f"{source}_catalog"
+    except (TypeError, ValueError):
+        pass
     try:
         if source == "usgs":
             c = collectors.setdefault("usgs", build_collector("usgs"))
