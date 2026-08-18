@@ -3,6 +3,8 @@ export const CONFIG = {
   // The Archive (#188): station catalog published by `aquascope harvest stations`.
   stationsParquet: "https://huggingface.co/datasets/Rekin226/aquascope-gauges/resolve/main/stations.parquet",
   stationsGeoJSON: "https://huggingface.co/datasets/Rekin226/aquascope-gauges/resolve/main/stations.geojson",
+  // Catchments: BasinATLAS (HydroATLAS v1.0, CC BY 4.0) level-12 sub-basins published by basins.yml.
+  basinsBase: "https://huggingface.co/datasets/Rekin226/aquascope-gauges/resolve/main/basins/",
   // DuckDB-WASM reads the parquet in place (HF serves range requests with CORS).
   duckdbModule: "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/+esm",
   // Pyodide runtime for the analysis worker.

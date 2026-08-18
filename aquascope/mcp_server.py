@@ -249,6 +249,23 @@ def archive_health() -> dict[str, Any]:
         return resp.json()
 
 
+def describe_catchment(lat: float, lon: float, upstream: bool = True) -> dict[str, Any]:
+    """The catchment of a point from BasinATLAS (HydroATLAS v1.0, CC BY 4.0) in the Archive: which
+    level-12 sub-basin the point sits in, how many sub-basins drain to it, and area-weighted attributes
+    (elevation, slope, precipitation, PET, aridity, temperature, snow, runoff, natural discharge, land
+    cover, soils, groundwater table, population, regulation by dams). upstream=False describes only the
+    local sub-basin. Works anywhere on land; needs the basins files to be published.
+    """
+    from aquascope.archive.basins import describe_catchment as _describe
+
+    try:
+        return _describe(float(lat), float(lon), upstream=bool(upstream))
+    except ImportError as exc:
+        return {"error": f"{exc}"}
+    except Exception as exc:  # noqa: BLE001 - the model gets to see it
+        return {"error": f"catchment lookup failed: {type(exc).__name__}: {exc}"}
+
+
 def _default_years_note() -> str:
     today = date.today()
     return f"Records are requested back to {(today - timedelta(days=int(40 * 365.25))).isoformat()} by default."
@@ -266,6 +283,7 @@ def build_server():
     server.tool()(analyze_station)
     server.tool()(flood_frequency)
     server.tool()(describe_methods)
+    server.tool()(describe_catchment)
     server.tool()(archive_health)
 
     @server.resource("aquascope://sources")

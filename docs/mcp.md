@@ -43,6 +43,7 @@ If `aquascope` is not on the client's PATH, use the interpreter explicitly:
 | `analyze_station(source, station_id, years, bootstrap_ci)` | record summary, annual maxima, GEV (L-moments) and Log-Pearson III return levels with 90 % CI, optional bootstrap GEV band, FDC percentiles, Mann-Kendall trend, method citations (raw arrays omitted) | yes |
 | `flood_frequency(source, station_id, years, bootstrap_ci)` | just the return-period table and its methods | yes |
 | `describe_methods()` | what each analysis computes and the reference to cite | no |
+| `describe_catchment(lat, lon, upstream=True)` | the BasinATLAS (HydroATLAS, CC BY 4.0) catchment of a point: sub-basin, upstream area, elevation, climate, land cover, soils, population, dams; `upstream=False` for the local sub-basin | no (Archive `basins/` files) |
 | `archive_health()` | per-source status of the last catalog harvest | no |
 
 Resources: `aquascope://sources` and `aquascope://methods` (JSON).
