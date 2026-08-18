@@ -54,7 +54,7 @@ MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_freq
 ## ✨ What you can do
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
-- 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 21 hydrological signatures.
+- 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 22 hydrological signatures.
 - 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 20 crops, irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
 - 📊 **Visualise + report** — 16 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
@@ -135,7 +135,7 @@ print(sig.q5, sig.q95)         # high-flow / low-flow exceedances
 print(sig.flashiness_index)    # Richards-Baker flashiness index
 ```
 
-21 signatures across magnitude, variability, timing, recession, and flashiness — see [docs/features.md](docs/features.md#hydrological-analysis).
+22 signatures across magnitude, variability, timing, recession, and flashiness — see [docs/features.md](docs/features.md#hydrological-analysis).
 
 ### 3. Collect data from any of the 29 sources
 
@@ -312,7 +312,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 - **1,000+ tests** — covering every collector, hydrology method, and pipeline (spatial and ARIMA tests require the optional `[all]` / `[ml]` extras)
 - **CAMELS benchmark** — a 10-catchment validation subset of the [CAMELS dataset](https://ral.ucar.edu/solutions/products/camels) ships with the repo at `data/camels_benchmark/` and runs as part of CI
 - **Every method cited** — equations, decision trees, and DOI references for all 26 methodologies live in the [theory guide](docs/theory.md)
-- **JOSS paper in submission** — see [`paper.md`](paper.md) and [`paper.bib`](paper.bib)
+- **JOSS paper in preparation** — see [`paper.md`](paper.md) and [`paper.bib`](paper.bib)
 
 ---
 
