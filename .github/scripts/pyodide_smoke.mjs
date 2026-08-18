@@ -22,12 +22,12 @@ const pyodide = await loadPyodide({
 
 console.log(`Installing ${basename(wheelPath)} + pyodide-http…`);
 // Write the wheel into Emscripten's MEMFS so micropip reads it via emfs:
-// the same code path the browser worker uses (pathlib.Path.read_bytes()).
+// (emfs:/path — single slash, MEMFS-absolute; not an authority-style URL).
 const wheelData = readFileSync(wheelPath);
 pyodide.FS.writeFile("/tmp/aquascope.whl", new Uint8Array(wheelData));
 await pyodide.runPythonAsync(`
 import micropip
-await micropip.install(["pyodide-http", "emfs:///tmp/aquascope.whl"])
+await micropip.install(["pyodide-http", "emfs:/tmp/aquascope.whl"])
 `);
 
 console.log("Running analyze_series on a synthetic 30-year series…");
