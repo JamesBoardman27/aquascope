@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "explorer"
-TEXT_FILES = ("index.html", "app.js", "worker.js", "config.js", "style.css")
+TEXT_FILES = ("index.html", "app.js", "worker.js", "gr4j.js", "config.js", "style.css")
 
 
 def _git_sha() -> str:

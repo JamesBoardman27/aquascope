@@ -174,6 +174,18 @@
           <p id="trend-text"></p>
         </section>
 
+        <section id="sec-gr4j" hidden>
+          <h3>Rainfall-runoff model <span class="muted">GR4J, calibrated here</span></h3>
+          <p class="muted" id="gr4j-intro">Fit the four-parameter GR4J model to this record with ERA5-Land/ERA5 rainfall and FAO-56 ET0 at the gauge (Open-Meteo), 65 % of the record to calibrate, the rest to validate. Runs in your browser in a few seconds.</p>
+          <button id="btn-gr4j" class="btn small">Calibrate GR4J</button>
+          <span class="muted" id="gr4j-status"></span>
+          <div id="gr4j-out" hidden>
+            <table class="ffa" id="gr4j-table"></table>
+            <div id="plot-gr4j" class="plot"></div>
+            <div class="basin-foot muted" id="gr4j-foot"></div>
+          </div>
+        </section>
+
         <section id="sec-notes" hidden>
           <ul id="notes"></ul>
         </section>
@@ -193,6 +205,7 @@
   <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatgeobuf@3.36.0/dist/flatgeobuf-geojson.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.0.1/plotly.min.js" charset="utf-8"></script>
+  <script src="./gr4j.js?v=__BUILD__"></script>
   <script type="module" src="./app.js?v=__BUILD__"></script>
 </body>
 </html>
