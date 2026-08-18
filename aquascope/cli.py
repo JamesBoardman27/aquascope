@@ -693,6 +693,35 @@ def cmd_basins(args: argparse.Namespace) -> None:
             print(f"  {name:<32} {size / 1e6:8.1f} MB")
         print(f"\n  {report.n_basins:,} sub-basins in {report.seconds:.0f}s -> {args.out}/basins")
         return
+    if args.basins_cmd == "assign":
+        from aquascope.archive.catalog import load_stations
+        from aquascope.archive.similar import assign_station_catchments
+
+        catalog = load_stations()
+        table = assign_station_catchments(catalog, args.fgb, args.attributes, args.out)
+        print(f"  {len(table):,} of {len(catalog):,} stations assigned to a sub-basin -> {args.out}")
+        return
+    if args.basins_cmd == "similar":
+        from aquascope.archive.similar import similar_for_point, similar_for_station
+
+        if args.station:
+            src, _, sid = args.station.partition("/")
+            res = similar_for_station(src, sid, k=args.k, method=args.method, sources=args.source or None)
+        else:
+            res = similar_for_point(args.lat, args.lon, k=args.k, method=args.method, sources=args.source or None)
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False, default=str))
+            return
+        if res.get("error"):
+            print(f"  {res['error']}")
+            sys.exit(1)
+        print(f"  {res['k']} of {res['n_candidates']} gauged basins, method {res['method']}, "
+              f"features {', '.join(res['features_used'])}")
+        for i, st in enumerate(res["stations"], 1):
+            dist = f"{st['distance_km']:,.0f} km" if st.get("distance_km") is not None else ""
+            print(f"  {i:>2}. {st['source']:<20} {st['station_id']:<40} {(st.get('name') or '')[:38]:<38} "
+                  f"area {st['up_area_km2']:>9,.0f} km2  score {st['score']:.3f} {dist}")
+        return
     if args.basins_cmd == "upstream":
         topo = basins.Topology(basins.load_topology())
         ids = topo.upstream_ids(int(args.hybas_id), limit=args.limit)
@@ -1501,6 +1530,18 @@ def main() -> None:
     p_bat.add_argument("lon", type=float)
     p_bat.add_argument("--local", action="store_true", help="Only the level-12 sub-basin containing the point")
     p_bat.add_argument("--json", action="store_true")
+    p_bsim = basins_sub.add_parser("similar", help="Gauged basins whose catchments most resemble a point's or a station's")
+    p_bsim.add_argument("lat", type=float, nargs="?", default=None)
+    p_bsim.add_argument("lon", type=float, nargs="?", default=None)
+    p_bsim.add_argument("--station", default=None, metavar="SOURCE/ID", help="Use a station's own catchment as the target")
+    p_bsim.add_argument("--k", type=int, default=10)
+    p_bsim.add_argument("--method", choices=["similarity", "proximity", "combined"], default="combined")
+    p_bsim.add_argument("--source", action="append", help="Restrict donors to these sources (repeatable)")
+    p_bsim.add_argument("--json", action="store_true")
+    p_bassign = basins_sub.add_parser("assign", help="Build basins/station_catchments.parquet (harvest workflow step)")
+    p_bassign.add_argument("--fgb", required=True, help="Local lev12.fgb")
+    p_bassign.add_argument("--attributes", required=True, help="Local lev12_attributes.parquet")
+    p_bassign.add_argument("--out", default="archive/basins/station_catchments.parquet")
     p_bup = basins_sub.add_parser("upstream", help="List the level-12 sub-basins upstream of a HYBAS_ID")
     p_bup.add_argument("hybas_id", type=int)
     p_bup.add_argument("--limit", type=int, default=200_000)

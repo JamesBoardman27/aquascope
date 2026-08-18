@@ -110,7 +110,7 @@ def test_server_registers_tools_and_calls_through_sdk():
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
     assert names >= {"list_sources", "find_stations", "get_timeseries", "analyze_station", "flood_frequency",
-                     "describe_methods", "describe_catchment", "archive_health"}
+                     "describe_methods", "describe_catchment", "similar_basins", "archive_health"}
     with patch("aquascope.archive.catalog.load_stations", return_value=CATALOG):
         res = asyncio.run(server.call_tool("find_stations", {"query": "potomac"}))
     payload = getattr(res, "structured_content", None) or getattr(res, "structuredContent", None)
@@ -140,3 +140,15 @@ def test_describe_catchment_tool_wraps_basins(monkeypatch):
 
     monkeypatch.setattr("aquascope.archive.basins.describe_catchment", boom)
     assert "no basins yet" in m.describe_catchment(0, 0)["error"]
+
+
+def test_similar_basins_tool_dispatches(monkeypatch):
+    calls = []
+    monkeypatch.setattr("aquascope.archive.similar.similar_for_point",
+                        lambda lat, lon, **kw: calls.append(("point", lat, lon, kw)) or {"stations": [], "k": 0})
+    monkeypatch.setattr("aquascope.archive.similar.similar_for_station",
+                        lambda s, i, **kw: calls.append(("station", s, i, kw)) or {"stations": [], "k": 0})
+    assert m.similar_basins(lat=1.0, lon=2.0, k=99)["k"] == 0 and calls[-1][0] == "point" and calls[-1][3]["k"] == 50
+    assert m.similar_basins(source="usgs", station_id="USGS-1", method="similarity")["k"] == 0
+    assert calls[-1][:3] == ("station", "usgs", "USGS-1")
+    assert "give lat and lon" in m.similar_basins()["error"]

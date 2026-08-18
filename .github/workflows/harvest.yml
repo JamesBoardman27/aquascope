@@ -53,8 +53,8 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install aquascope with the archive extra
-        run: python -m pip install -q ".[archive]"
+      - name: Install aquascope with the archive and basins extras
+        run: python -m pip install -q ".[archive,basins]"
 
       - name: Sync the existing observations (incremental runs)
         if: env.HF_TOKEN != ''
@@ -69,6 +69,29 @@ jobs:
           aquascope harvest stations $ARGS
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           set -e
+
+      - name: Assign every station to its BasinATLAS sub-basin (basins/station_catchments.parquet)
+        # Reads the published lev12.fgb (955 MB) and lev12_attributes.parquet from the Hub, spatially joins the
+        # fresh catalog, and writes the table the similar-basins search runs on. Skipped when basins are not
+        # published yet; a failure here must not stop the observation harvest.
+        continue-on-error: true
+        run: |
+          python - <<'EOF'
+          import os, sys, logging
+          logging.basicConfig(level=logging.INFO, format="%(message)s")
+          from huggingface_hub import hf_hub_download
+          repo = os.environ["HF_DATASET"]
+          try:
+              fgb = hf_hub_download(repo, "basins/lev12.fgb", repo_type="dataset")
+              attrs = hf_hub_download(repo, "basins/lev12_attributes.parquet", repo_type="dataset")
+          except Exception as exc:
+              print(f"basins not published yet, skipping ({exc})"); sys.exit(0)
+          from aquascope.archive.similar import assign_station_catchments
+          from aquascope.archive.catalog import load_stations
+          catalog = load_stations(path="archive/stations.parquet")
+          table = assign_station_catchments(catalog, fgb, attrs, "archive/basins/station_catchments.parquet")
+          print(f"{len(table):,} of {len(catalog):,} stations assigned")
+          EOF
 
       - name: Harvest daily observations (budgeted; the archive fills up over weeks)
         id: obs
