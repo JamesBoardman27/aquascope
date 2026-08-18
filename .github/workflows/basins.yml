@@ -43,6 +43,9 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_DATASET: Rekin226/aquascope-gauges
+      # figshare's own downloader answers 202/403 for this 2.7 GB file for long stretches (cold storage);
+      # the public S3 object behind it serves range requests directly. Same bytes, same md5.
+      S3_URL: https://s3-eu-west-1.amazonaws.com/pfigshare-u-files/20082137/BasinATLAS_Data_v10.gdb.zip
       FIGSHARE_URL: https://ndownloader.figshare.com/files/20082137
       FIGSHARE_MD5: 69af94baee68da5a3f80f09e7b85bd04
     steps:
@@ -71,19 +74,24 @@ jobs:
       - name: Install aquascope with the archive and basins extras
         run: python -m pip install -q ".[archive,basins]"
 
-      - name: Download BasinATLAS v1.0 (figshare keeps large files in cold storage; 202 means "come back later")
+      - name: Download BasinATLAS v1.0 (S3 object behind figshare first, figshare downloader as fallback)
         run: |
           UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-          for i in $(seq 1 40); do
-            code=$(curl -sIL "$FIGSHARE_URL" -A "$UA" --max-time 60 -o /dev/null -w "%{http_code}")
-            echo "attempt $i: HTTP $code"
-            if [ "$code" = "200" ]; then
-              curl -L "$FIGSHARE_URL" -A "$UA" -o BasinATLAS.gdb.zip --retry 5 --retry-delay 30 -C - -sS
-              break
-            fi
-            sleep 90
-          done
-          test -s BasinATLAS.gdb.zip || { echo "figshare never served the file"; exit 1; }
+          if curl -sI "$S3_URL" --max-time 60 | grep -q "200 OK"; then
+            echo "downloading from S3"
+            curl -L "$S3_URL" -o BasinATLAS.gdb.zip --retry 8 --retry-delay 20 -C - -sS
+          else
+            for i in $(seq 1 30); do
+              code=$(curl -sIL "$FIGSHARE_URL" -A "$UA" --max-time 60 -o /dev/null -w "%{http_code}")
+              echo "figshare attempt $i: HTTP $code"
+              if [ "$code" = "200" ]; then
+                curl -L "$FIGSHARE_URL" -A "$UA" -o BasinATLAS.gdb.zip --retry 5 --retry-delay 30 -C - -sS
+                break
+              fi
+              sleep 90
+            done
+          fi
+          test -s BasinATLAS.gdb.zip || { echo "neither S3 nor figshare served the file"; exit 1; }
           echo "$FIGSHARE_MD5  BasinATLAS.gdb.zip" | md5sum -c -
           unzip -q BasinATLAS.gdb.zip
           rm BasinATLAS.gdb.zip
