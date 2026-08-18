@@ -170,6 +170,37 @@ mirrored for sources whose licence permits it: the registry entry's
 the terms and recorded the licence id. The current state per source is in the
 dataset card and in `aquascope list-sources`.
 
+## When a source breaks: report, then try to repair
+
+Two workflows keep the collectors honest without a human watching every
+Monday:
+
+- **Report** (`.github/scripts/harvest_issues.py`, in the harvest run): one
+  `collector-health` issue per failing source with the error, a deterministic
+  diagnosis (404, 429, TLS, timeout, 5xx, format), a reproduce command; the
+  issue is commented while the source keeps failing and closed when it
+  recovers.
+- **Repair** (`.github/workflows/repair.yml` after each scheduled harvest,
+  `aquascope.maintenance.repair`): for failures that can have a code cause
+  (404, changed format, unclassified; never 429 / TLS / timeouts), the job
+  gathers evidence (the collector's source and tests, its registry entry, the
+  last commits touching it, live probes of the URLs it uses: status, content
+  type, first bytes), asks a model for either `no_fix` or a minimal unified
+  diff limited to the collector and its tests, applies it in the working
+  tree, and verifies it: `ruff`, the collector's own tests, a live smoke call.
+  Green means a branch `repair/<source>-<date>` and a pull request labelled
+  `collector-health` + `automated-repair` for the maintainer to review; red
+  means the patch is reverted and the health issue gets a comment with the
+  model's reasoning and the rejected diff. Nothing merges by itself.
+
+The repair job needs a model key as a repository secret (`GROQ_API_KEY`,
+`OPENAI_API_KEY`, or `AQUASCOPE_LLM_API_KEY` with `AQUASCOPE_LLM_BASE_URL` /
+`AQUASCOPE_LLM_MODEL` as repository variables); without one it exits quietly.
+`REPAIR_TOKEN` (a fine-grained PAT with contents + pull-requests write) makes
+the opened PRs run CI like any other; with the default `GITHUB_TOKEN` they
+need a nudge (empty commit or close/reopen). Locally:
+`python .github/scripts/harvest_repair.py archive/health.json --dry-run`.
+
 ## Run it yourself
 
 ```bash
