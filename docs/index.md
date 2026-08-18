@@ -92,7 +92,7 @@ pip install "aquascope[all]"       # everything: ML, viz, spatial, dashboard
   author  = {AquaScope Contributors},
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
-  version = {0.10.0},
+  version = {0.11.0},
   license = {MIT}
 }
 ```
