@@ -59,7 +59,9 @@ ATTRIBUTION = (
 LICENSE = "CC-BY-4.0"
 
 TOPOLOGY_COLUMNS = ("HYBAS_ID", "NEXT_DOWN", "NEXT_SINK", "MAIN_BAS", "SUB_AREA", "UP_AREA", "PFAF_ID", "ENDO",
-                    "COAST", "ORDER")
+                    "COAST", "ORDER", "ORDER_")
+# The FileGDB stores the ids as doubles (they exceed int32); we publish them as int64.
+_ID_COLUMNS = ("hybas_id", "next_down", "next_sink", "main_bas", "pfaf_id")
 
 # The attributes a hydrologist asks about first. BasinATLAS field names end in a
 # scope + statistic code: "s" = this sub-basin, "u" = everything upstream (total
@@ -173,9 +175,13 @@ def build_basins(
     for start in range(0, total, batch):
         n = min(batch, total - start)
         gdf = pyogrio.read_dataframe(str(gdb_path), layer=LAYER, skip_features=start, max_features=n)
-        gdf.columns = [c.lower() if c.upper() in TOPOLOGY_COLUMNS else c for c in gdf.columns]
+        gdf.columns = [c.lower().rstrip("_") if c.upper() in TOPOLOGY_COLUMNS else c for c in gdf.columns]
+        for c in _ID_COLUMNS:
+            if c in gdf.columns:
+                gdf[c] = pd.to_numeric(gdf[c], errors="coerce").fillna(0).astype("int64")
         cent = gdf.geometry.representative_point()
-        topo = pd.DataFrame({c.lower(): gdf[c.lower()] for c in TOPOLOGY_COLUMNS if c.lower() in gdf.columns})
+        topo = pd.DataFrame({c: gdf[c] for c in dict.fromkeys(x.lower().rstrip("_") for x in TOPOLOGY_COLUMNS)
+                             if c in gdf.columns})
         topo["lat"] = cent.y.round(5).to_numpy()
         topo["lon"] = cent.x.round(5).to_numpy()
         topo_frames.append(topo)
