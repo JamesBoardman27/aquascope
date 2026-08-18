@@ -121,7 +121,7 @@ jobs:
           if [ -n "$MAX_FEATURES" ]; then LIMIT="-limit $MAX_FEATURES"; fi
           ogr2ogr -f FlatGeobuf archive/basins/lev12.fgb "$GDB" BasinATLAS_v10_lev12 \
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID \
-            -simplify 0.0005 -lco SPATIAL_INDEX=YES -nln lev12 $LIMIT
+            -simplify 0.0005 -nlt PROMOTE_TO_MULTI -lco SPATIAL_INDEX=YES -nln lev12 $LIMIT
           ls -la archive/basins/
 
       - name: PMTiles (level 12 for zoom 5-11, level 6 for zoom 0-8)
