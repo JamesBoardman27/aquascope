@@ -99,6 +99,6 @@ def test_resolve_llm_env_and_errors(monkeypatch):
 def test_tool_specs_cover_the_mcp_surface():
     names = {s.name for s in analyst._tool_specs()}
     assert names == {"list_sources", "find_stations", "analyze_station", "flood_frequency", "get_timeseries",
-                     "anywhere", "describe_methods"}
+                     "anywhere", "describe_catchment", "describe_methods"}
     tools = analyst._openai_tools(analyst._tool_specs())
     assert all(t["type"] == "function" and "parameters" in t["function"] for t in tools)

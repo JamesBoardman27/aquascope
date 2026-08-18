@@ -683,6 +683,44 @@ def cmd_mcp(args: argparse.Namespace) -> None:
     mcp_main(transport=args.transport)
 
 
+def cmd_basins(args: argparse.Namespace) -> None:
+    """`aquascope basins`: catchments from BasinATLAS in the Archive (at LAT LON | upstream HYBAS_ID | build GDB)."""
+    from aquascope.archive import basins
+
+    if args.basins_cmd == "build":
+        report = basins.build_basins(args.gdb, args.out, max_features=args.max_features, write_fgb=args.fgb)
+        for name, size in report.files.items():
+            print(f"  {name:<32} {size / 1e6:8.1f} MB")
+        print(f"\n  {report.n_basins:,} sub-basins in {report.seconds:.0f}s -> {args.out}/basins")
+        return
+    if args.basins_cmd == "upstream":
+        topo = basins.Topology(basins.load_topology())
+        ids = topo.upstream_ids(int(args.hybas_id), limit=args.limit)
+        print("\n".join(str(i) for i in ids))
+        print(f"\n  {len(ids)} sub-basins upstream of (and including) {args.hybas_id}", file=sys.stderr)
+        return
+    try:
+        res = basins.describe_catchment(args.lat, args.lon, upstream=not args.local)
+    except ImportError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    if args.json:
+        print(json.dumps(res, indent=2, ensure_ascii=False))
+        return
+    if res.get("error"):
+        print(f"  {res['error']}")
+        sys.exit(1)
+    sb = res["sub_basin"]
+    print(f"  Sub-basin {sb['hybas_id']} (Pfafstetter {sb.get('pfaf_id')}), {sb.get('sub_area', 0):,.1f} km², "
+          f"upstream area {sb.get('up_area', 0):,.1f} km²")
+    print(f"  {res['upstream']['note']}")
+    attrs = res.get("attributes", {})
+    for key, v in attrs.items():
+        if isinstance(v, dict):
+            print(f"  {v['label']:<48} {v['value']:>12,.2f} {v['unit']}")
+    print(f"\n  {res['attribution']}")
+
+
 def cmd_completion(args: argparse.Namespace) -> None:
     """Print the shell activation line for tab-completion."""
     from argcomplete.shell_integration import shellcode
@@ -1417,6 +1455,23 @@ def main() -> None:
     p_ingest.add_argument("--out", "-o", default=None, help="Output stem (default: <file>_clean)")
 
     # ── mcp ──────────────────────────────────────────────────────────
+    # ── basins ───────────────────────────────────────────────────────
+    p_basins = sub.add_parser("basins", help="Catchments from BasinATLAS (HydroATLAS, CC BY 4.0) in the Archive")
+    basins_sub = p_basins.add_subparsers(dest="basins_cmd", required=True)
+    p_bat = basins_sub.add_parser("at", help="Describe the catchment upstream of a point")
+    p_bat.add_argument("lat", type=float)
+    p_bat.add_argument("lon", type=float)
+    p_bat.add_argument("--local", action="store_true", help="Only the level-12 sub-basin containing the point")
+    p_bat.add_argument("--json", action="store_true")
+    p_bup = basins_sub.add_parser("upstream", help="List the level-12 sub-basins upstream of a HYBAS_ID")
+    p_bup.add_argument("hybas_id", type=int)
+    p_bup.add_argument("--limit", type=int, default=200_000)
+    p_bbuild = basins_sub.add_parser("build", help="Build the basins/ files from the BasinATLAS FileGDB")
+    p_bbuild.add_argument("gdb", help="Path to BasinATLAS_v10.gdb")
+    p_bbuild.add_argument("--out", default="archive")
+    p_bbuild.add_argument("--max-features", type=int, default=None)
+    p_bbuild.add_argument("--fgb", action="store_true", help="Also write lev12.fgb from Python (needs memory)")
+
     p_mcp = sub.add_parser("mcp", help="Serve find_stations / get_timeseries / analyze_station over MCP (#113)")
     p_mcp.add_argument("--transport", choices=["stdio", "sse", "streamable-http"], default="stdio")
 
@@ -1608,6 +1663,7 @@ def main() -> None:
         "stations": cmd_stations,
         "harvest": cmd_harvest,
         "mcp": cmd_mcp,
+        "basins": cmd_basins,
         "ask": cmd_ask,
         "ingest": cmd_ingest,
         "solve": cmd_solve,

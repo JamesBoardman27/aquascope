@@ -110,7 +110,7 @@ def test_server_registers_tools_and_calls_through_sdk():
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
     assert names >= {"list_sources", "find_stations", "get_timeseries", "analyze_station", "flood_frequency",
-                     "describe_methods", "archive_health"}
+                     "describe_methods", "describe_catchment", "archive_health"}
     with patch("aquascope.archive.catalog.load_stations", return_value=CATALOG):
         res = asyncio.run(server.call_tool("find_stations", {"query": "potomac"}))
     payload = getattr(res, "structured_content", None) or getattr(res, "structuredContent", None)
@@ -122,3 +122,21 @@ def test_server_registers_tools_and_calls_through_sdk():
         blocks = res[0] if isinstance(res, tuple) else res
         payload = json.loads(blocks[0].text if isinstance(blocks, list) else blocks.content[0].text)
     assert payload["n_returned"] == 1 and payload["stations"][0]["station_id"] == "USGS-1"
+
+
+def test_describe_catchment_tool_wraps_basins(monkeypatch):
+    calls = {}
+
+    def fake(lat, lon, upstream=True):
+        calls["args"] = (lat, lon, upstream)
+        return {"sub_basin": {"hybas_id": 1}, "attributes": {}, "license": "CC-BY-4.0"}
+
+    monkeypatch.setattr("aquascope.archive.basins.describe_catchment", fake)
+    out = m.describe_catchment(48.85, 2.35, upstream=False)
+    assert out["sub_basin"]["hybas_id"] == 1 and calls["args"] == (48.85, 2.35, False)
+
+    def boom(lat, lon, upstream=True):
+        raise RuntimeError("no basins yet")
+
+    monkeypatch.setattr("aquascope.archive.basins.describe_catchment", boom)
+    assert "no basins yet" in m.describe_catchment(0, 0)["error"]

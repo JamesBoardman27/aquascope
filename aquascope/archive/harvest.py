@@ -393,6 +393,20 @@ link back to the agency. Attribution for each source is in the AquaScope registr
 {table}
 
 {_obs_section(path.parent, repo_id)}
+## Catchments (BasinATLAS, `basins/`)
+
+The level-12 sub-basins of [HydroATLAS v1.0 / BasinATLAS](https://www.hydrosheds.org/hydroatlas)
+(Linke et al. 2019, **CC BY 4.0**) with their routing and attributes, so any point on land can be
+placed in its catchment and described: `basins/lev12.fgb` (simplified polygons, spatially indexed;
+point lookups over HTTPS read a few kilobytes), `basins/lev12_topology.parquet` (`hybas_id,
+next_down, main_bas, sub_area, up_area, ...` plus a representative point), `basins/lev12_attributes.parquet`
+(every BasinATLAS attribute per sub-basin, incl. the upstream-aggregated `*_u*` fields), and
+`basins/lev12.pmtiles` / `basins/lev06.pmtiles` for maps. Built by
+[basins.yml](https://github.com/Rekin226/aquascope/actions/workflows/basins.yml);
+`aquascope basins at LAT LON` and the MCP tool `describe_catchment` read them. Cite: Linke, S., Lehner, B.,
+Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics
+at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6
+
 ## How it is built
 
 `aquascope harvest stations --out archive --publish {repo_id}` runs weekly from

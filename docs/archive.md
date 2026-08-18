@@ -95,6 +95,42 @@ Run it yourself: `aquascope harvest obs --out archive --source uk_ea --variable 
 `--publish` to upload), then `aquascope harvest bundles --out archive` to roll
 the folders into Parquet.
 
+## Catchments: BasinATLAS in the Archive (`basins/`)
+
+Gauges are points; hydrology happens in catchments. The Archive carries the
+level-12 sub-basins of HydroATLAS v1.0 / BasinATLAS (Linke et al. 2019,
+CC BY 4.0: about a million polygons of ~130 km² with routing and some 280
+attributes each) so any point on land can be placed in its catchment and the
+catchment described without a GIS:
+
+| file | contents |
+| --- | --- |
+| `basins/lev12.fgb` | simplified sub-basin polygons as FlatGeobuf with a spatial index: a point-in-polygon lookup over HTTPS reads a few kilobytes |
+| `basins/lev12_topology.parquet` | `hybas_id, next_down, next_sink, main_bas, sub_area, up_area, pfaf_id, endo, coast, order, lat, lon` |
+| `basins/lev12_attributes.parquet` | every BasinATLAS attribute per sub-basin, including the upstream-aggregated `*_u*` fields, sorted by `hybas_id` |
+| `basins/lev12.pmtiles`, `basins/lev06.pmtiles` | vector tiles for the Explorer |
+
+```bash
+pip install "aquascope[basins]"
+aquascope basins at 48.85 2.35            # the Seine at Paris: sub-basin, upstream area, climate, land cover, soils, dams
+aquascope basins at 25.04 121.56 --local  # only the level-12 sub-basin containing the point
+aquascope basins upstream 2120018800      # every level-12 sub-basin draining to this one
+```
+
+```python
+from aquascope.archive import basins
+res = basins.describe_catchment(48.85, 2.35)      # dict: sub_basin, upstream, attributes, licence, methods
+topo = basins.Topology(basins.load_topology())     # upstream_ids / downstream_ids over the whole graph
+```
+
+The MCP tool `describe_catchment(lat, lon)` and the analyst expose the same
+function, and the Explorer shows the card and highlights the upstream
+sub-basins for any station or clicked point. Built by
+`.github/workflows/basins.yml` (`aquascope basins build` plus `ogr2ogr` and
+`tippecanoe`); it downloads BasinATLAS from figshare, so it runs on demand,
+not weekly. Why BasinATLAS and not HydroBASINS: the HydroSHEDS core licence
+forbids stand-alone redistribution, HydroATLAS is CC BY 4.0.
+
 ## Terms
 
 The station catalog is factual metadata (where a gauge is, what it measures)

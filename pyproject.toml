@@ -102,8 +102,14 @@ mcp = [
     "mcp>=1.2",
     "pyarrow>=14",
 ]
+basins = [
+    "pyogrio>=0.7",
+    "geopandas>=0.14",
+    "shapely>=2.0",
+    "pyarrow>=14",
+]
 all = [
-    "aquascope[ml,forecast,copernicus,viz,llm,scientific,dashboard,spatial,interop,archive,mcp]",
+    "aquascope[ml,forecast,copernicus,viz,llm,scientific,dashboard,spatial,interop,archive,mcp,basins]",
 ]
 dev = [
     "pytest>=7.0",
