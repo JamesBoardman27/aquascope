@@ -13,9 +13,9 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 
 ## Shipped
 
-- [x] 26 data source collectors (Taiwan ×7, USA ×2, Global ×5, FAO ×2, EU, France, Japan, Korea, India, Chile, UK)
+- [x] 29 data source collectors (Taiwan ×8, USA ×3, Global ×5, FAO ×2, EU, France, Germany, Ireland, UK, Japan, Korea, India, Chile, Brazil, Australia)
 - [x] Rule-based + LLM methodology recommender (26 methods, OpenAI / Groq / HuggingFace / Ollama)
-- [x] 7 auto-executable analysis pipelines
+- [x] 26 auto-executable analysis pipelines
 - [x] GR4J conceptual rainfall-runoff model + auto-calibration (NSE / KGE / log-NSE)
 - [x] Model-evaluation metrics (NSE, KGE, PBIAS, RMSE, R²)
 - [x] Bulletin 17C flood frequency with EMA
@@ -26,13 +26,13 @@ AquaScope is becoming **the open, continuously updated, citable record of the wo
 - [x] Spatial hydrology (DEM, watershed, Strahler)
 - [x] Scientific I/O (WaterML, HEC, SWMM, NetCDF, HDF5)
 - [x] Interactive Streamlit dashboard
-- [x] 820+ tests with CAMELS benchmark validation
+- [x] 1,000+ tests with CAMELS benchmark validation
 - [x] Theory guide with equations and DOI citations
 - [x] EU Water Framework Directive collector
 - [x] Japan MLIT / Korea WAMIS collectors
 - [x] Groundwater module (GRACE, well databases, recharge, aquifer hydraulics)
 - [x] Climate projection workflows (CMIP6, downscaling, PDSI, scenario analysis)
-- [x] JOSS paper submission (`paper.md` + `paper.bib`)
+- [x] JOSS paper drafted (`paper.md` + `paper.bib`)
 - [x] PyPI release (sdist + wheel + GitHub Actions publish workflow)
 - [x] Shared source registry with licence and station-catalog metadata; `find_stations()` and `aquascope stations` over six catalogs (#187)
 - [x] The Archive, Phase 0 + 1 + 2: 45,919-station GeoParquet catalog, per-station daily observations (discharge, water level, rainfall, groundwater level) and one Parquet bundle per variable and source on Hugging Face, weekly harvest with collector-health issues (#188)
