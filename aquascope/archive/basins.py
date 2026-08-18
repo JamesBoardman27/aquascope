@@ -391,30 +391,145 @@ def sub_basin_at(
             for k in ("hybas_id", "next_down", "main_bas", "sub_area", "up_area", "pfaf_id") if k in hit.columns}
 
 
+class _HttpRangeFile:
+    """A minimal seekable, read-only file over HTTP range requests (for pyarrow's ``PythonFile``).
+
+    Lets ``ParquetFile`` read the footer and only the row groups it needs from
+    the 250 MB attributes parquet on the Hub instead of downloading it all.
+    """
+
+    READ_AHEAD = 8 * 1024 * 1024  # column chunks of one row group are contiguous: fetch them in one go
+
+    def __init__(self, url: str, timeout: float = 60):
+        import urllib.request
+
+        self.url = url
+        self.timeout = timeout
+        self._pos = 0
+        self._buf = b""
+        self._buf_start = 0
+        req = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - fixed https host
+            self._size = int(resp.headers.get("Content-Length") or 0)
+        self.closed = False
+        self.requests = 0
+
+    def size(self) -> int:
+        return self._size
+
+    def tell(self) -> int:
+        return self._pos
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        if whence == 0:
+            self._pos = offset
+        elif whence == 1:
+            self._pos += offset
+        else:
+            self._pos = self._size + offset
+        return self._pos
+
+    def _fetch(self, start: int, end: int) -> bytes:
+        import urllib.request
+
+        req = urllib.request.Request(self.url, headers={"Range": f"bytes={start}-{end}"})
+        self.requests += 1
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 - fixed https host
+            return resp.read()
+
+    def read(self, n: int = -1) -> bytes:
+        if n is None or n < 0:
+            n = self._size - self._pos
+        if n <= 0 or self._pos >= self._size:
+            return b""
+        end = min(self._size, self._pos + n)
+        bstart, bend = self._buf_start, self._buf_start + len(self._buf)
+        if not (bstart <= self._pos and end <= bend):
+            # refill: at least what was asked, read ahead when reading forward through a row group
+            want_end = min(self._size, max(end, self._pos + self.READ_AHEAD))
+            self._buf = self._fetch(self._pos, want_end - 1)
+            self._buf_start = self._pos
+        off = self._pos - self._buf_start
+        data = self._buf[off: off + (end - self._pos)]
+        self._pos += len(data)
+        return data
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def writable(self) -> bool:
+        return False
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def load_attributes(
     hybas_ids: list[int],
     *,
     repo_id: str = DEFAULT_REPO_ID,
     path: str | Path | None = None,
     columns: list[str] | None = None,
+    max_row_groups: int = 40,
 ) -> pd.DataFrame:
-    """BasinATLAS attribute rows for the given sub-basins (row groups pruned by hybas_id min/max)."""
+    """BasinATLAS attribute rows for the given sub-basins.
+
+    Reads only the row groups whose ``hybas_id`` statistics cover the ids:
+    from ``path`` when given, otherwise straight from the Hub through HTTP
+    range requests (footer + a few row groups, not the whole file). Ids are
+    spatially clustered, so a catchment usually sits in a handful of groups;
+    when more than ``max_row_groups`` would be needed the nearest ones to the
+    outlet (the largest id block) are read and the rest skipped.
+    """
     from aquascope.utils.imports import require
 
+    pa = require("pyarrow", feature="basins", group="archive")
     pq = require("pyarrow.parquet", feature="basins", group="archive")
-    ds = require("pyarrow.dataset", feature="basins", group="archive")
-    pc = require("pyarrow.compute", feature="basins", group="archive")
 
+    ids = sorted({int(x) for x in hybas_ids})
+    if not ids:
+        return pd.DataFrame(columns=["hybas_id"])
+    remote = None
     if path is None:
-        from aquascope.archive.catalog import _download
+        remote = _HttpRangeFile(basins_url(f"lev{LEVEL:02d}_attributes.parquet", repo_id))
+        source: Any = pa.PythonFile(remote, mode="r")
+    else:
+        source = str(path)
+    pf = pq.ParquetFile(source, pre_buffer=True)
+    md = pf.metadata
+    idx = pf.schema_arrow.get_field_index("hybas_id")
+    wanted: list[int] = []
+    lo, hi = ids[0], ids[-1]
+    for g in range(md.num_row_groups):
+        st = md.row_group(g).column(idx).statistics
+        if st is None or not st.has_min_max:
+            wanted.append(g)
+            continue
+        gmin, gmax = int(st.min), int(st.max)
+        if gmax < lo or gmin > hi:
+            continue
+        # any id inside this group's range?
+        import bisect
 
-        path = _download(basins_url(f"lev{LEVEL:02d}_attributes.parquet", repo_id),
-                         _cache_path(f"lev{LEVEL:02d}_attributes.parquet", repo_id), False)
-    dataset = ds.dataset(str(path), format="parquet")
-    ids = [int(x) for x in hybas_ids]
-    table = dataset.to_table(filter=pc.field("hybas_id").isin(ids), columns=columns)
-    _ = pq
-    return table.to_pandas()
+        k = bisect.bisect_left(ids, gmin)
+        if k < len(ids) and ids[k] <= gmax:
+            wanted.append(g)
+    if len(wanted) > max_row_groups:
+        logger.info("basins: %d row groups needed, reading %d", len(wanted), max_row_groups)
+        wanted = wanted[-max_row_groups:]
+    if not wanted:
+        return pd.DataFrame(columns=["hybas_id"])
+    table = pf.read_row_groups(wanted, columns=columns)
+    if remote is not None:
+        logger.info("basins: %d row groups in %d range requests", len(wanted), remote.requests)
+    df = table.to_pandas()
+    return df[df["hybas_id"].isin(ids)].reset_index(drop=True)
 
 
 def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None = None) -> dict[str, Any]:
