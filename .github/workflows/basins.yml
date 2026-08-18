@@ -6,7 +6,7 @@ name: Build basins (BasinATLAS)
 #   basins/lev12_topology.parquet   routing graph + representative points (small)
 #   basins/lev12_attributes.parquet every BasinATLAS attribute per sub-basin
 #   basins/lev12.fgb                simplified polygons, spatially indexed (point lookups over HTTPS)
-#   basins/lev12.pmtiles            vector tiles for the Explorer (zoom 5-11)
+#   basins/lev12.pmtiles            vector tiles for the Explorer (zoom 5-10)
 #   basins/lev06.pmtiles            coarse level-6 tiles for low zooms
 # then publishes them to the public Hugging Face dataset. Manual, run when
 # BasinATLAS changes (it does not: v1.0 is from 2019) or the layout does.
@@ -129,10 +129,10 @@ jobs:
           if [ -n "$MAX_FEATURES" ]; then LIMIT="-limit $MAX_FEATURES"; fi
           "$GEO_BIN/ogr2ogr" -f FlatGeobuf archive/basins/lev12.fgb "$GDB" BasinATLAS_v10_lev12 \
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID \
-            -simplify 0.0005 -nlt PROMOTE_TO_MULTI -lco SPATIAL_INDEX=YES -nln lev12 $LIMIT
+            -simplify 0.002 -nlt PROMOTE_TO_MULTI -lco SPATIAL_INDEX=YES -nln lev12 $LIMIT
           ls -la archive/basins/
 
-      - name: PMTiles (level 12 for zoom 5-11, level 6 for zoom 0-8)
+      - name: PMTiles (level 12 for zoom 5-10, level 6 for zoom 0-8)
         if: ${{ !inputs.skip_tiles }}
         env:
           MAX_FEATURES: ${{ github.event_name == 'push' && '20000' || inputs.max_features }}
@@ -143,8 +143,8 @@ jobs:
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID $LIMIT \
           | "$GEO_BIN/tippecanoe" -o archive/basins/lev12.pmtiles -l basins -n "BasinATLAS level 12" \
               -A "HydroATLAS v1.0 (Linke et al. 2019), CC BY 4.0" \
-              -Z5 -z11 --drop-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders \
-              --simplification=8 --no-tile-size-limit --force -P
+              -Z5 -z10 --drop-densest-as-needed --coalesce-densest-as-needed --extend-zooms-if-still-dropping \
+              --detect-shared-borders --simplification=10 --force -P
           "$GEO_BIN/ogr2ogr" -f GeoJSONSeq /vsistdout/ "$GDB" BasinATLAS_v10_lev06 \
             -select HYBAS_ID,NEXT_DOWN,MAIN_BAS,SUB_AREA,UP_AREA,PFAF_ID \
           | "$GEO_BIN/tippecanoe" -o archive/basins/lev06.pmtiles -l basins6 -n "BasinATLAS level 6" \
