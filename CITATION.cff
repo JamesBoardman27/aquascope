@@ -18,13 +18,6 @@ authors:
 version: 0.11.0
 date-released: "2026-08-18"
 doi: 10.5281/zenodo.21903143
-identifiers:
-  - type: doi
-    value: 10.5281/zenodo.21903143
-    description: Concept DOI, resolves to the latest archived version
-  - type: doi
-    value: 10.5281/zenodo.21989509
-    description: Version DOI for v0.11.0
 license: MIT
 repository-code: https://github.com/Rekin226/aquascope
 url: https://rekin226.github.io/aquascope
@@ -40,6 +33,12 @@ keywords:
   - artificial intelligence
   - Python
 identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21903143
+    description: Concept DOI, resolves to the latest archived version
+  - type: doi
+    value: 10.5281/zenodo.21989509
+    description: Version DOI for v0.11.0
   - type: url
     value: https://github.com/Rekin226/aquascope
     description: GitHub repository
