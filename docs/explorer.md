@@ -31,6 +31,22 @@ Stations already mirrored in the [Archive](archive.md) load from it (one small
 file) instead of from the agency, so they are faster and do not add load
 upstream.
 
+## Catchments
+
+For every USGS gauge, and for any point clicked in the United States, the
+Explorer draws the upstream drainage basin on the map and shows its area:
+the USGS Network Linked Data Index (NLDI) traces NHDPlus V2 catchments for
+NWIS sites (`/nwissite/USGS-<id>/basin`) and, for a point, for the nearest
+flowline (`/hydrolocation` then `/comid/<id>/basin`). Public domain, fetched
+straight from `api.water.usgs.gov` (CORS), nothing stored on our side, and the
+method and source are added to the citations panel.
+
+Why not everywhere: HydroBASINS (WWF HydroSHEDS v1) was checked first and its
+licence forbids distributing the data "as a stand-alone product" and requires
+an end-user licence, so we cannot host it as tiles on the free-tier archive;
+MERIT-Basins is CC BY-NC. Agencies that publish catchment boundaries under an
+open licence (UK NRFA under OGL, for instance) are the next candidates.
+
 ## Ask ✨: the Analyst in the page
 
 The **Ask** button (top right) opens the [Analyst](analyst.md) inside the

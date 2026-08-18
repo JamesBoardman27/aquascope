@@ -87,6 +87,7 @@
             <li><strong>PEGELONLINE</strong>, <strong>Ireland OPW</strong>: the last ~month (that is all those feeds publish) → hydrograph.</li>
             <li><strong>Taiwan CWA</strong>: daily rainfall, last 10 years.</li>
             <li>Click anywhere that is not a gauge: ERA5 rainfall, temperature, FAO-56 ET0, aridity, and GloFAS modelled discharge for that spot, plus the nearest gauges.</li>
+            <li><strong>Catchments</strong>: for USGS gauges and any point in the US, the upstream drainage basin is drawn on the map (USGS NLDI over NHDPlus V2, public domain), with its area.</li>
             <li><strong>Ask ✨</strong> (top right): a plain-language question, answered from real gauges with a Data and Methods section. Bring your own key (Groq and Hugging Face have free tiers).</li>
             <li>First analysis loads Python in your browser (about 15 MB, once). After that it is quick.</li>
           </ul>
@@ -98,6 +99,7 @@
           <span class="badge" style="background:#455a64">Anywhere</span>
           <h2 id="pt-title">Point</h2>
           <div class="st-meta"><span id="pt-coords"></span> · ERA5 climate + GloFAS modelled discharge, last 10 years</div>
+          <div id="pt-catchment" class="catchment" hidden></div>
           <div class="st-actions">
             <button id="btn-share-pt" class="btn" title="Copy a link to this point">Copy link</button>
           </div>
@@ -131,6 +133,7 @@
             <span id="st-id"></span> · <span id="st-vars"></span>
             <span id="st-period"></span>
           </div>
+          <div id="st-catchment" class="catchment" hidden></div>
           <div class="st-actions">
             <a id="st-agency" href="#" target="_blank" rel="noopener" class="btn">Agency page ↗</a>
             <button id="btn-share" class="btn" title="Copy a link to this station">Copy link</button>

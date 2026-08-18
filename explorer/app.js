@@ -18,6 +18,7 @@ const VAR_LABEL = {
 };
 
 const $ = (id) => document.getElementById(id);
+const EMPTY_FC = { type: "FeatureCollection", features: [] };
 // Debug hooks (harmless in production): window.__aq.state, window.__aq.log
 const dbg = (window.__aq = { log: [], state: null });
 const trace = (msg) => { dbg.log.push(`${new Date().toISOString().slice(11, 19)} ${msg}`); };
@@ -139,6 +140,9 @@ function initMapUnsafe() {
 }
 
 function addStationLayers(fc) {
+  map.addSource("catchment", { type: "geojson", data: EMPTY_FC });
+  map.addLayer({ id: "catchment-fill", type: "fill", source: "catchment", paint: { "fill-color": "#1565c0", "fill-opacity": 0.14 } });
+  map.addLayer({ id: "catchment-line", type: "line", source: "catchment", paint: { "line-color": "#0d47a1", "line-width": 1.6, "line-dasharray": [2, 1.5] } });
   map.addSource("stations", { type: "geojson", data: fc, cluster: true, clusterMaxZoom: 9, clusterRadius: 38 });
   map.addLayer({
     id: "clusters", type: "circle", source: "stations", filter: ["has", "point_count"],
@@ -275,7 +279,9 @@ function selectStation(key, { fly } = { fly: false }) {
   $("btn-ci").disabled = false;
   for (const id of ["sec-summary", "sec-hydro", "sec-ffa", "sec-fdc", "sec-trend", "sec-notes", "sec-methods"]) $(id).hidden = true;
   $("panel").scrollTop = 0;
+  clearCatchment();
   requestAnalysis(r);
+  requestCatchment({ station: r });
 }
 
 function setStatus(text, kind = "info") {
@@ -318,6 +324,8 @@ async function selectPoint(lat, lon) {
   $("pt-title").textContent = `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
   $("pt-coords").textContent = `lat ${lat}, lon ${lon}`;
   for (const id of ["pt-sec-climate", "pt-sec-glofas", "pt-sec-notes", "pt-sec-methods"]) $(id).hidden = true;
+  clearCatchment();
+  requestCatchment({ point: { lat, lon } });
   const near = nearestStations(lat, lon);
   $("pt-nearest").innerHTML = near.map(([d, r]) => `<li data-key="${escapeHtml(`${r.source}/${r.station_id}`)}"><i style="background:${(SOURCE_STYLE[r.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(r.name || r.station_id)} <span class="muted">${escapeHtml((SOURCE_STYLE[r.source] || {}).label || r.source)}</span><span class="dist">${d < 10 ? d.toFixed(1) : Math.round(d)} km</span></li>`).join("") || `<li class="muted">no gauges in the catalog</li>`;
   for (const li of $("pt-nearest").querySelectorAll("li[data-key]")) li.addEventListener("click", () => selectStation(li.dataset.key, { fly: true }));
@@ -374,6 +382,110 @@ function renderPoint(res) {
   $("pt-methods").innerHTML = ms.map((m) => `<li><strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span></li>`).join("");
   $("pt-attribution").textContent = res.attribution ? `Data: ${res.attribution}` : "";
   $("pt-sec-methods").hidden = ms.length === 0;
+  if (!$("pt-catchment").hidden) addMethodOnce("pt-methods", "pt-sec-methods", NLDI_METHOD);
+}
+
+// ── catchments (USGS NLDI, public domain) ───────────────────────────────────
+// Upstream drainage basins come from the agency that publishes them under an
+// open licence: the USGS Network Linked Data Index traces NHDPlus V2 catchments
+// for any NWIS gauge and for any point in the US (nearest flowline). Nothing is
+// stored on our side; HydroBASINS was ruled out because its licence forbids
+// stand-alone redistribution.
+
+const NLDI = "https://api.water.usgs.gov/nldi/linked-data";
+const NLDI_METHOD = {
+  name: "Upstream catchment (USGS NLDI)",
+  text: "Drainage basin upstream of the gauge (or of the NHDPlus V2 flowline nearest to a clicked point), traced by the USGS Network Linked Data Index over NHDPlus V2 catchments; simplified geometry, area computed on the sphere. US only.",
+  citation: "U.S. Geological Survey, Network Linked Data Index (NLDI) API, https://api.water.usgs.gov/nldi/; NHDPlus Version 2 (U.S. EPA and USGS). Public domain.",
+};
+let catchmentReq = 0;
+
+function inNldiExtent(lat, lon) { return lat > 17 && lat < 72 && lon > -170 && lon < -64; }
+
+function ringAreaKm2(ring) {
+  // spherical excess (Chamberlain & Duquette 2007), as turf.js does; ring = [[lon, lat], ...]
+  const R = 6371.0088, d2r = Math.PI / 180;
+  let sum = 0;
+  const n = ring.length;
+  if (n < 3) return 0;
+  for (let i = 0; i < n; i++) {
+    const p1 = ring[i], p2 = ring[(i + 1) % n], p3 = ring[(i + 2) % n];
+    sum += (p3[0] * d2r - p1[0] * d2r) * Math.sin(p2[1] * d2r);
+  }
+  return Math.abs(sum * R * R / 2);
+}
+function geojsonAreaKm2(geom) {
+  if (!geom) return 0;
+  const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : [];
+  let a = 0;
+  for (const poly of polys) { poly.forEach((ring, k) => { a += (k === 0 ? 1 : -1) * ringAreaKm2(ring); }); }
+  return a;
+}
+function bboxOf(geom) {
+  let w = 180, s = 90, e = -180, n = -90;
+  const walk = (c) => { if (typeof c[0] === "number") { w = Math.min(w, c[0]); e = Math.max(e, c[0]); s = Math.min(s, c[1]); n = Math.max(n, c[1]); } else c.forEach(walk); };
+  walk(geom.coordinates);
+  return [[w, s], [e, n]];
+}
+
+function clearCatchment() {
+  catchmentReq++;
+  if (state.mapOk && map.getSource("catchment")) map.getSource("catchment").setData(EMPTY_FC);
+  for (const id of ["st-catchment", "pt-catchment"]) { const el = $(id); if (el) { el.textContent = ""; el.hidden = true; } }
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
+async function requestCatchment({ station, point }) {
+  const my = ++catchmentReq;
+  let url = null, label = "";
+  if (station) {
+    if (station.source !== "usgs" || !/^USGS-\d+$/.test(station.station_id)) return;
+    url = `${NLDI}/nwissite/${station.station_id}/basin?simplified=true&splitCatchment=false`;
+    label = "st-catchment";
+  } else if (point) {
+    if (!inNldiExtent(point.lat, point.lon)) return;
+    label = "pt-catchment";
+  } else return;
+  try {
+    if (point) {
+      const hl = await fetchJson(`${NLDI}/hydrolocation?coords=POINT(${point.lon} ${point.lat})`);
+      const comid = (hl.features || []).map((f) => f.properties && f.properties.comid).find(Boolean);
+      if (!comid || my !== catchmentReq) return;
+      url = `${NLDI}/comid/${comid}/basin?simplified=true`;
+    }
+    const gj = await fetchJson(url);
+    if (my !== catchmentReq) return; // the user moved on
+    const feat = (gj.features || [])[0];
+    if (!feat || !feat.geometry) return;
+    const km2 = geojsonAreaKm2(feat.geometry);
+    if (state.mapOk && map.getSource("catchment")) {
+      map.getSource("catchment").setData({ type: "FeatureCollection", features: [feat] });
+      if (km2 > 5) map.fitBounds(bboxOf(feat.geometry), { padding: 40, maxZoom: 11, duration: 700 });
+    }
+    const el = $(label);
+    if (el) {
+      const areaTxt = km2 >= 100 ? Math.round(km2).toLocaleString() : km2.toFixed(1);
+      el.innerHTML = `${station ? "Upstream catchment" : "Catchment upstream of the nearest stream reach"}: <strong>${areaTxt} km²</strong> <span class="muted">(USGS NLDI, drawn on the map)</span>`;
+      el.hidden = false;
+    }
+    addMethodOnce(station ? "methods" : "pt-methods", station ? "sec-methods" : "pt-sec-methods", NLDI_METHOD);
+  } catch (err) {
+    console.info("catchment unavailable:", err && err.message);
+  }
+}
+
+function addMethodOnce(listId, sectionId, m) {
+  const ol = $(listId);
+  if (!ol || [...ol.querySelectorAll("li strong")].some((el) => el.textContent.startsWith(m.name))) return;
+  const li = document.createElement("li");
+  li.innerHTML = `<strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span>`;
+  ol.appendChild(li);
+  $(sectionId).hidden = false;
 }
 
 // ── worker (Pyodide) ────────────────────────────────────────────────────────
@@ -502,6 +614,7 @@ function renderMethods(res) {
   $("methods").innerHTML = ms.map((m) => `<li><strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span></li>`).join("");
   $("attribution").textContent = res.attribution ? `Data: ${res.attribution}. Licence: ${res.license}. Computed with aquascope in your browser.` : "";
   $("sec-methods").hidden = ms.length === 0 && !res.attribution;
+  if (!$("st-catchment").hidden) addMethodOnce("methods", "sec-methods", NLDI_METHOD);
 }
 
 function renderFfaTable(ffa, unit) {
