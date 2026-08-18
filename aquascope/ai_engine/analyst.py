@@ -9,10 +9,12 @@ assembled deterministically from what the tools returned, never from the
 model's memory.
 
 Works with any OpenAI-compatible chat endpoint that supports tool calling
-(OpenAI, Groq, Hugging Face router, Ollama, ...). Configuration, in order:
-explicit arguments, ``AQUASCOPE_LLM_API_KEY`` / ``AQUASCOPE_LLM_BASE_URL`` /
-``AQUASCOPE_LLM_MODEL``, then ``OPENAI_API_KEY``, ``GROQ_API_KEY``,
-``HF_TOKEN``. Requires the ``llm`` extra (``openai``).
+(OpenAI, Groq, Hugging Face router, Mistral, OpenRouter, Ollama, ...).
+Configuration, in order: explicit arguments, ``AQUASCOPE_LLM_API_KEY`` /
+``AQUASCOPE_LLM_BASE_URL`` / ``AQUASCOPE_LLM_MODEL``, then ``OPENAI_API_KEY``,
+``GROQ_API_KEY``, ``HF_TOKEN``. Uses the ``openai`` SDK when installed and a
+built-in ``urllib`` client otherwise (``aquascope.ai_engine.llm_transport``),
+which is also what runs inside the Explorer's browser worker.
 """
 
 from __future__ import annotations
@@ -38,6 +40,10 @@ PROVIDERS: dict[str, dict[str, str | None]] = {
     },
     "huggingface": {
         "base_url": "https://router.huggingface.co/v1", "model": "Qwen/Qwen2.5-72B-Instruct", "env": "HF_TOKEN",
+    },
+    "mistral": {"base_url": "https://api.mistral.ai/v1", "model": "mistral-small-latest", "env": "MISTRAL_API_KEY"},
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1", "model": "openai/gpt-4o-mini", "env": "OPENROUTER_API_KEY",
     },
     "ollama": {"base_url": "http://localhost:11434/v1", "model": "qwen2.5:7b", "env": None},
 }
@@ -146,7 +152,7 @@ def resolve_llm(
             "model": model or os.environ.get("AQUASCOPE_LLM_MODEL") or PROVIDERS["huggingface"]["model"],
         }
     if provider is None:
-        for name in ("openai", "groq", "huggingface"):
+        for name in ("openai", "groq", "huggingface", "mistral", "openrouter"):
             env = PROVIDERS[name]["env"]
             if env and os.environ.get(env):
                 provider = name
@@ -267,16 +273,15 @@ def ask(
     """Answer ``question`` with tool calls over aquascope; returns an :class:`AskResult`.
 
     ``client`` lets tests (or callers with their own SDK setup) pass an
-    OpenAI-compatible client; otherwise one is built from ``resolve_llm``.
+    OpenAI-compatible client; otherwise one is built from ``resolve_llm``
+    (the ``openai`` SDK if installed, else the built-in ``urllib`` client).
     """
     cfg = {"provider": "custom", "model": model or "test", "api_key": None, "base_url": base_url}
     if client is None:
+        from aquascope.ai_engine.llm_transport import make_client
+
         cfg = resolve_llm(provider, model, api_key, base_url)
-        try:
-            from openai import OpenAI
-        except ImportError as exc:
-            raise ImportError("The analyst needs the openai package: pip install 'aquascope[llm]'") from exc
-        client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+        client = make_client(cfg["api_key"], cfg["base_url"])
     specs = {s.name: s for s in _tool_specs()}
     tools = _openai_tools(list(specs.values()))
     messages: list[dict[str, Any]] = [

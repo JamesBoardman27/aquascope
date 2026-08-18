@@ -31,6 +31,44 @@ Stations already mirrored in the [Archive](archive.md) load from it (one small
 file) instead of from the agency, so they are faster and do not add load
 upstream.
 
+## Catchments
+
+For every USGS gauge, and for any point clicked in the United States, the
+Explorer draws the upstream drainage basin on the map and shows its area:
+the USGS Network Linked Data Index (NLDI) traces NHDPlus V2 catchments for
+NWIS sites (`/nwissite/USGS-<id>/basin`) and, for a point, for the nearest
+flowline (`/hydrolocation` then `/comid/<id>/basin`). Public domain, fetched
+straight from `api.water.usgs.gov` (CORS), nothing stored on our side, and the
+method and source are added to the citations panel.
+
+Why not everywhere: HydroBASINS (WWF HydroSHEDS v1) was checked first and its
+licence forbids distributing the data "as a stand-alone product" and requires
+an end-user licence, so we cannot host it as tiles on the free-tier archive;
+MERIT-Basins is CC BY-NC. Agencies that publish catchment boundaries under an
+open licence (UK NRFA under OGL, for instance) are the next candidates.
+
+## Ask ✨: the Analyst in the page
+
+The **Ask** button (top right) opens the [Analyst](analyst.md) inside the
+Explorer. Type a question ("What is the 100-year flood of the Thames at
+Kingston, and how sure can we be?"), pick a provider (Groq and Hugging Face
+have free tiers; OpenAI, Mistral, OpenRouter, or any OpenAI-compatible
+endpoint), paste your key, and the same `aquascope.ai_engine.analyst.ask`
+that runs behind `aquascope ask` runs in the browser worker: the model picks
+the tools (`find_stations` over the catalog already loaded in your tab,
+`analyze_station`, `flood_frequency`, `get_timeseries`, `anywhere`),
+aquascope executes them, and the answer ends with a **Data** and a **Methods
+and citations** section assembled from the tool results. Every station the
+tools touched becomes a chip that opens it on the map; the report can be
+copied or downloaded as Markdown.
+
+Your key travels from your tab straight to the provider you chose: the page
+has no server, and the request is made by the browser worker (a plain
+`urllib` client, `aquascope.ai_engine.llm_transport`, that also lets
+`aquascope ask` run without the `openai` package). The key is kept in the tab
+unless you tick "remember", which stores it in your browser's local storage.
+The model has to support tool calling; the provider defaults do.
+
 ## What works today (Phase 0 of [#189](https://github.com/Rekin226/aquascope/issues/189))
 
 | source | record you get | analyses |
