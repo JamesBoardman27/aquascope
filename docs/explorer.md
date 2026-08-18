@@ -52,6 +52,12 @@ forest / cropland / urban / glacier / lake / karst extent, soil texture,
 population density, regulation by dams, human footprint. Citation in the
 methods panel.
 
+Under the catchment card, **Similar gauged basins** lists the gauges whose
+catchments look most like the point's or the station's (standardised
+BasinATLAS attributes combined with distance, from
+`basins/station_catchments.parquet`), the donor list one needs at an
+ungauged site; click one to open it.
+
 Why not HydroBASINS itself: the HydroSHEDS core licence forbids distributing
 the data "as a stand-alone product" and requires an end-user licence, so it
 cannot be hosted on the free-tier archive; HydroATLAS is CC BY 4.0, which is

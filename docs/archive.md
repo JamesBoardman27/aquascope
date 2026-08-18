@@ -125,7 +125,30 @@ topo = basins.Topology(basins.load_topology())     # upstream_ids / downstream_i
 
 The MCP tool `describe_catchment(lat, lon)` and the analyst expose the same
 function, and the Explorer shows the card and highlights the upstream
-sub-basins for any station or clicked point. Built by
+sub-basins for any station or clicked point.
+
+### Similar gauged basins (prediction in ungauged basins, the practical half)
+
+The weekly harvest also spatially joins every catalog station to its
+sub-basin and publishes `basins/station_catchments.parquet` (station, sub-basin,
+upstream area and the catchment attributes above). On that table,
+
+```bash
+aquascope basins similar 25.04 121.56 --k 8            # gauges whose catchments most resemble this point's
+aquascope basins similar --station usgs/USGS-01646500  # ... or a station's own catchment (itself excluded)
+aquascope basins similar 48.85 2.35 --method proximity --source hubeau_hydrometrie
+```
+
+ranks the gauged stations by weighted Euclidean distance in standardised
+BasinATLAS attribute space (log area, elevation, slope, precipitation,
+aridity, temperature, snow, forest, cropland, urban, clay, sand, population
+density, regulation), by great-circle distance, or both (`combined`, the
+default), and prints the per-feature deltas. That is the donor-selection
+step of regionalisation (Bloeschl et al. 2013; Oudin et al. 2008); the MCP
+tool `similar_basins` and the analyst use it ("find gauges like this
+ungauged site, then analyse the best donors"), and the Explorer lists them
+under the catchment card. `aquascope.archive.similar` is the module; #53
+tracks the regression / leave-one-out half. Built by
 `.github/workflows/basins.yml` (`aquascope basins build` plus `ogr2ogr` and
 `tippecanoe`); it downloads BasinATLAS from figshare, so it runs on demand,
 not weekly. Why BasinATLAS and not HydroBASINS: the HydroSHEDS core licence

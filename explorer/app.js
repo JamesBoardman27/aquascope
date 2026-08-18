@@ -402,6 +402,7 @@ function renderPoint(res) {
   $("pt-sec-methods").hidden = ms.length === 0;
   if (!$("pt-catchment").hidden) addMethodOnce("pt-methods", "pt-sec-methods", NLDI_METHOD);
   if (!$("pt-basin").hidden) addMethodOnce("pt-methods", "pt-sec-methods", BASIN_METHOD);
+  if (!$("pt-similar").hidden) addMethodOnce("pt-methods", "pt-sec-methods", SIMILAR_METHOD);
 }
 
 // ── catchments (USGS NLDI, public domain) ───────────────────────────────────
@@ -451,7 +452,7 @@ function clearCatchment() {
   catchmentReq++;
   basinReq++;
   if (state.mapOk && map.getSource("catchment")) map.getSource("catchment").setData(EMPTY_FC);
-  for (const id of ["st-catchment", "pt-catchment", "st-basin", "pt-basin"]) { const el = $(id); if (el) { el.textContent = ""; el.hidden = true; } }
+  for (const id of ["st-catchment", "pt-catchment", "st-basin", "pt-basin", "st-similar", "pt-similar"]) { const el = $(id); if (el) { el.textContent = ""; el.hidden = true; } }
   highlightBasins([]);
 }
 
@@ -678,8 +679,102 @@ async function requestBasin(lat, lon, target) {
       (kv ? `<div class="kv">${kv}</div>` : `<div class="muted">attributes unavailable</div>`) +
       `<div class="basin-foot muted">HydroATLAS v1.0, CC BY 4.0 (Linke et al. 2019). Upstream sub-basins highlighted on the map at zoom 4+.</div>`;
     addMethodOnce(target === "st" ? "methods" : "pt-methods", target === "st" ? "sec-methods" : "pt-sec-methods", BASIN_METHOD);
+    if (attrs) requestSimilar({ lat, lon, upArea, attrs, target, my });
   } catch (err) {
     console.info("basin lookup unavailable:", err && err.message);
+  }
+}
+
+// ── similar gauged basins (PUB-lite) ────────────────────────────────────────
+// The harvest publishes basins/station_catchments.parquet: every catalog
+// station with the BasinATLAS attributes of its catchment. Standardise the
+// feature set over that table, measure the weighted distance to the target's
+// catchment (plus distance on the ground: "combined"), list the closest gauges
+// that measure discharge. Same features and weights as aquascope.archive.similar.
+
+const SIMILAR_METHOD = {
+  name: "Similar gauged basins (physical similarity / spatial proximity)",
+  text: "Gauged stations ranked by weighted Euclidean distance in standardised BasinATLAS catchment attribute space (area, relief, climate, land cover, soils, human pressure) combined with great-circle distance (in units of 500 km); the donor-selection step of regionalisation.",
+  citation: "Blöschl, G., Sivapalan, M., Wagener, T., Viglione, A., Savenije, H. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.",
+};
+// [table column, basin-card key, transform, weight]
+const SIMILAR_FEATURES = [
+  ["up_area", "__area", "log10", 1.5], ["elevation_m", "elev", null, 1.0], ["slope_deg", "slope", "log1p", 1.0],
+  ["precipitation_mm_yr", "pre", null, 1.5], ["aridity_index", "ari", "log1p", 1.5], ["temperature_c", "tmp", null, 1.0],
+  ["snow_cover_pct", "snw", null, 1.0], ["forest_pct", "for", null, 0.7], ["cropland_pct", "crp", null, 0.7],
+  ["urban_pct", "urb", "log1p", 0.7], ["clay_pct", "cly", null, 0.5], ["sand_pct", "snd", null, 0.5],
+  ["population_density", "ppd", "log1p", 0.5], ["degree_of_regulation_pct", "dor", "log1p", 0.7],
+];
+let similarTable = null;  // { rows: [...], stats: {col: {mu, sd}} }
+const tf = (v, how) => (how === "log10" ? Math.log10(Math.max(v, 1e-3)) : how === "log1p" ? Math.log1p(Math.max(v, 0)) : v);
+
+async function ensureSimilarTable() {
+  if (similarTable) return similarTable;
+  const { conn } = await duck();
+  const res = await conn.query(`SELECT * FROM read_parquet('${basinsUrl("station_catchments.parquet")}')`);
+  const rows = res.toArray().map((r) => r.toJSON());
+  const stats = {};
+  for (const [col, , how] of SIMILAR_FEATURES) {
+    const xs = rows.map((r) => (r[col] === null || r[col] === undefined ? NaN : tf(Number(r[col]), how))).filter((x) => Number.isFinite(x));
+    const mu = xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
+    const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mu) ** 2, 0) / Math.max(xs.length, 1)) || 1;
+    stats[col] = { mu, sd };
+  }
+  similarTable = { rows, stats };
+  return similarTable;
+}
+
+async function requestSimilar({ lat, lon, upArea, attrs, target, my }) {
+  const el = $(`${target}-similar`);
+  if (!el) return;
+  try {
+    const { rows, stats } = await ensureSimilarTable();
+    if (my !== basinReq) return;
+    const tvals = {};
+    for (const [col, key] of SIMILAR_FEATURES) {
+      const v = key === "__area" ? upArea : (attrs[key] && attrs[key].value);
+      if (v !== undefined && v !== null && Number.isFinite(Number(v))) tvals[col] = Number(v);
+    }
+    const used = SIMILAR_FEATURES.filter(([col]) => tvals[col] !== undefined);
+    if (!used.length) return;
+    const wsum = used.reduce((a, [, , , w]) => a + w * w, 0);
+    const selfKey = target === "st" && state.selected ? `${state.selected.source}/${state.selected.station_id}` : null;
+    const scored = [];
+    for (const r of rows) {
+      const key = `${r.source}/${r.station_id}`;
+      if (key === selfKey) continue;
+      const st = state.byKey.get(key);
+      if (!st || !(st.variables || []).includes("discharge")) continue;
+      let acc = 0;
+      for (const [col, , how, w] of used) {
+        const { mu, sd } = stats[col];
+        const zt = (tf(tvals[col], how) - mu) / sd;
+        const v = r[col];
+        const z = v === null || v === undefined ? NaN : (tf(Number(v), how) - mu) / sd;
+        const d = Number.isFinite(z) ? Math.abs(z - zt) : 3.0;
+        acc += (d * w) ** 2;
+      }
+      const dAttr = Math.sqrt(acc / wsum);
+      const dKm = haversineKm(lat, lon, st.lat, st.lon);
+      scored.push({ st, dAttr, dKm, score: Math.sqrt(dAttr ** 2 + (dKm / 500) ** 2), area: Number(r.up_area) });
+    }
+    scored.sort((a, b) => a.score - b.score);
+    const top = scored.slice(0, 8);
+    if (!top.length) return;
+    el.innerHTML = `<h3>Similar gauged basins <span class="muted">catchment attributes + distance</span></h3><ul class="nearest similar"></ul>` +
+      `<div class="basin-foot muted">Donor candidates for an ungauged site: ${scored.length.toLocaleString()} gauged catchments compared on ${used.length} standardised BasinATLAS attributes and distance. Click one to open it.</div>`;
+    const ul = el.querySelector("ul");
+    for (const s of top) {
+      const li = document.createElement("li");
+      li.dataset.key = `${s.st.source}/${s.st.station_id}`;
+      li.innerHTML = `<i style="background:${(SOURCE_STYLE[s.st.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(s.st.name || s.st.station_id)} <span class="muted">${escapeHtml((SOURCE_STYLE[s.st.source] || {}).label || s.st.source)} · ${fmt(s.area, 0)} km²</span><span class="dist">${s.dKm < 10 ? s.dKm.toFixed(1) : Math.round(s.dKm).toLocaleString()} km · Δ${s.dAttr.toFixed(2)}</span>`;
+      li.addEventListener("click", () => selectStation(li.dataset.key, { fly: true }));
+      ul.appendChild(li);
+    }
+    el.hidden = false;
+    addMethodOnce(target === "st" ? "methods" : "pt-methods", target === "st" ? "sec-methods" : "pt-sec-methods", SIMILAR_METHOD);
+  } catch (err) {
+    console.info("similar basins unavailable:", err && err.message);
   }
 }
 
@@ -811,6 +906,7 @@ function renderMethods(res) {
   $("sec-methods").hidden = ms.length === 0 && !res.attribution;
   if (!$("st-catchment").hidden) addMethodOnce("methods", "sec-methods", NLDI_METHOD);
   if (!$("st-basin").hidden) addMethodOnce("methods", "sec-methods", BASIN_METHOD);
+  if (!$("st-similar").hidden) addMethodOnce("methods", "sec-methods", SIMILAR_METHOD);
 }
 
 function renderFfaTable(ffa, unit) {

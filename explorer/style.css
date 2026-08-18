@@ -56,6 +56,8 @@ main { display: flex; flex: 1; min-height: 0; }
 .basin .kv b { font-weight: 600; white-space: nowrap; }
 .basin .basin-foot { margin-top: .3rem; font-size: .72rem; }
 .chip.basins-toggle i { border-radius: 2px; }
+.nearest.similar li { cursor: pointer; }
+.nearest.similar .dist { white-space: nowrap; }
 .btn { font: inherit; font-size: .8rem; padding: .35rem .65rem; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; text-decoration: none; }
 .btn:hover:not(:disabled) { background: #f4f7fb; }
 .btn:disabled { opacity: .5; cursor: default; }

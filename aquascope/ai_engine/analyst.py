@@ -54,6 +54,7 @@ Rules:
 - Find stations with find_stations before analysing; prefer stations with long records for flood questions.
 - Use analyze_station / flood_frequency for numbers; use anywhere(lat, lon) when the user names a place with no gauge.
 - Use describe_catchment(lat, lon) for the catchment itself: area, elevation, climate, land cover, soils, dams.
+- For an ungauged place, use similar_basins to find donor gauges, then analyze_station on the best donors.
 - Never invent values, station ids, or citations. If a tool returns an error or an empty record, say so.
 - Report units. Quote return levels with their confidence intervals when available.
 - Say which record (station, source, period, number of years) each number comes from.
@@ -135,6 +136,16 @@ def _tool_specs() -> list[ToolSpec]:
             {"type": "object", "properties": {"lat": num, "lon": num, "upstream": {"type": "boolean"}},
              "required": ["lat", "lon"]},
             t.describe_catchment,
+        ),
+        ToolSpec(
+            "similar_basins",
+            "Gauged basins whose catchments most resemble a point's (lat, lon) or a station's (source, station_id): "
+            "donor selection for ungauged sites. method: similarity | proximity | combined.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "source": {"type": "string"},
+                                              "station_id": {"type": "string"}, "k": {"type": "integer"},
+                                              "method": {"type": "string"},
+                                              "sources": {"type": "array", "items": {"type": "string"}}}},
+            t.similar_basins,
         ),
         ToolSpec(
             "describe_methods", "What each analysis computes and the reference to cite.",
@@ -256,6 +267,11 @@ def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskRe
                 "label": label, "period": period, "license": result.get("license"),
                 "attribution": result.get("attribution"),
             })
+    if name == "similar_basins" and result.get("stations"):
+        label = "similar-basins search"
+        if not any(d.get("label") == label for d in res.data_used):
+            res.data_used.append({"label": label, "period": None, "license": result.get("license"),
+                                  "attribution": result.get("attribution")})
     if name == "describe_catchment" and result.get("sub_basin"):
         label = f"catchment at {result.get('latitude')}, {result.get('longitude')}"
         if not any(d.get("label") == label for d in res.data_used):

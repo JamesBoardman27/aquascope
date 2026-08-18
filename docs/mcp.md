@@ -44,6 +44,7 @@ If `aquascope` is not on the client's PATH, use the interpreter explicitly:
 | `flood_frequency(source, station_id, years, bootstrap_ci)` | just the return-period table and its methods | yes |
 | `describe_methods()` | what each analysis computes and the reference to cite | no |
 | `describe_catchment(lat, lon, upstream=True)` | the BasinATLAS (HydroATLAS, CC BY 4.0) catchment of a point: sub-basin, upstream area, elevation, climate, land cover, soils, population, dams; `upstream=False` for the local sub-basin | no (Archive `basins/` files) |
+| `similar_basins(lat, lon | source, station_id, k, method, sources)` | the gauged basins whose catchments most resemble a point's or a station's (BasinATLAS attribute space and/or distance): donor selection for ungauged sites | no (Archive `basins/station_catchments.parquet`) |
 | `archive_health()` | per-source status of the last catalog harvest | no |
 
 Resources: `aquascope://sources` and `aquascope://methods` (JSON).

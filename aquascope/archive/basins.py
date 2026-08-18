@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass
@@ -562,7 +563,7 @@ def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None
     for key, (s_field, u_field, unit, how, label) in ATTRIBUTE_GUIDE.items():
         val = None
         source = None
-        has_u = u_field and u_field in df.columns and outlet in df.index and len(df) > 1
+        has_u = u_field and u_field in df.columns and outlet in df.index
         if has_u and pd.notna(df.at[outlet, u_field]) and float(df.at[outlet, u_field]) > NODATA:
             val, source, field = float(df.at[outlet, u_field]), "basinatlas_upstream", u_field
         elif s_field in df.columns:
@@ -587,6 +588,33 @@ def catchment_attributes(ids: list[int], attrs: pd.DataFrame, outlet: int | None
         if source == "area_weighted_mean" and not complete:
             entry["note"] = "aggregated over the sub-basins returned; the upstream set may be capped"
         out[key] = entry
+    return out
+
+
+def row_catchment_attributes(row: dict[str, Any] | pd.Series) -> dict[str, float]:
+    """Flat ``{guide key: value}`` for one BasinATLAS row, taking the upstream field where it exists.
+
+    The catchment closed at the row's sub-basin outlet, in real units (storage
+    multipliers undone, ``NODATA`` dropped). Used to tabulate every gauged
+    station's catchment for similarity search.
+    """
+    if isinstance(row, pd.Series):
+        row = row.to_dict()
+    out: dict[str, float] = {}
+    for key, (s_field, u_field, _unit, _how, _label) in ATTRIBUTE_GUIDE.items():
+        val = None
+        for f in (u_field, s_field):
+            if f and f in row and row[f] is not None:
+                try:
+                    v = float(row[f])
+                except (TypeError, ValueError):
+                    continue
+                if not math.isnan(v) and v > NODATA:
+                    val, field = v, f
+                    break
+        if val is None:
+            continue
+        out[key] = round(scale_value(field, val)[0], 4)
     return out
 
 

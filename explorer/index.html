@@ -88,6 +88,7 @@
             <li><strong>Taiwan CWA</strong>: daily rainfall, last 10 years.</li>
             <li>Click anywhere that is not a gauge: ERA5 rainfall, temperature, FAO-56 ET0, aridity, and GloFAS modelled discharge for that spot, plus the nearest gauges.</li>
             <li><strong>Catchments</strong>: for USGS gauges and any point in the US, the upstream drainage basin is drawn on the map (USGS NLDI over NHDPlus V2, public domain), with its area. Everywhere on land, the BasinATLAS sub-basin (HydroATLAS, CC BY 4.0) gives the upstream area, climate, land cover, soils and population of the catchment, and the upstream sub-basins light up on the map (toggle "Basins" in the legend).</li>
+            <li><strong>Similar gauged basins</strong>: for any point or station, the gauges whose catchments look most like it (attributes + distance), the donor list for an ungauged site.</li>
             <li><strong>Ask ✨</strong> (top right): a plain-language question, answered from real gauges with a Data and Methods section. Bring your own key (Groq and Hugging Face have free tiers).</li>
             <li>First analysis loads Python in your browser (about 15 MB, once). After that it is quick.</li>
           </ul>
@@ -101,6 +102,7 @@
           <div class="st-meta"><span id="pt-coords"></span> · ERA5 climate + GloFAS modelled discharge, last 10 years</div>
           <div id="pt-catchment" class="catchment" hidden></div>
           <div id="pt-basin" class="basin" hidden></div>
+          <section id="pt-similar" hidden></section>
           <div class="st-actions">
             <button id="btn-share-pt" class="btn" title="Copy a link to this point">Copy link</button>
           </div>
@@ -136,6 +138,7 @@
           </div>
           <div id="st-catchment" class="catchment" hidden></div>
           <div id="st-basin" class="basin" hidden></div>
+          <section id="st-similar" hidden></section>
           <div class="st-actions">
             <a id="st-agency" href="#" target="_blank" rel="noopener" class="btn">Agency page ↗</a>
             <button id="btn-share" class="btn" title="Copy a link to this station">Copy link</button>

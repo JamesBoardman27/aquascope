@@ -266,6 +266,36 @@ def describe_catchment(lat: float, lon: float, upstream: bool = True) -> dict[st
         return {"error": f"catchment lookup failed: {type(exc).__name__}: {exc}"}
 
 
+def similar_basins(
+    lat: float | None = None,
+    lon: float | None = None,
+    source: str | None = None,
+    station_id: str | None = None,
+    k: int = 10,
+    method: str = "combined",
+    sources: list[str] | None = None,
+) -> dict[str, Any]:
+    """The gauged basins in the Archive whose catchments most resemble a point's (or a station's) catchment:
+    donor selection for prediction in ungauged basins. Give lat/lon for a point, or source + station_id for a
+    station (itself excluded). method: 'similarity' (standardised BasinATLAS attribute space: area, relief,
+    climate, land cover, soils, human pressure), 'proximity' (distance on the ground) or 'combined'. Returns
+    up to k stations with ids you can pass to analyze_station, the per-feature deltas, and the citation.
+    """
+    from aquascope.archive.similar import similar_for_point, similar_for_station
+
+    k = max(1, min(int(k or 10), 50))
+    try:
+        if source and station_id:
+            return similar_for_station(source, station_id, k=k, method=method, sources=sources)
+        if lat is None or lon is None:
+            return {"error": "give lat and lon, or source and station_id"}
+        return similar_for_point(float(lat), float(lon), k=k, method=method, sources=sources)
+    except ImportError as exc:
+        return {"error": f"{exc}"}
+    except Exception as exc:  # noqa: BLE001 - the model gets to see it
+        return {"error": f"similar basins lookup failed: {type(exc).__name__}: {exc}"}
+
+
 def _default_years_note() -> str:
     today = date.today()
     return f"Records are requested back to {(today - timedelta(days=int(40 * 365.25))).isoformat()} by default."
@@ -284,6 +314,7 @@ def build_server():
     server.tool()(flood_frequency)
     server.tool()(describe_methods)
     server.tool()(describe_catchment)
+    server.tool()(similar_basins)
     server.tool()(archive_health)
 
     @server.resource("aquascope://sources")
