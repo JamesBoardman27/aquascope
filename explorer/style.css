@@ -49,6 +49,13 @@ main { display: flex; flex: 1; min-height: 0; }
 .st-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
 .catchment { font-size: .8rem; margin: -.3rem 0 .6rem; padding: .3rem .5rem; border-left: 3px solid #1565c0; background: #f4f7fb; border-radius: 0 6px 6px 0; }
 .catchment[hidden] { display: none; }
+.basin { font-size: .8rem; margin: -.2rem 0 .6rem; padding: .4rem .55rem; border-left: 3px solid #6a1b9a; background: #f8f4fb; border-radius: 0 6px 6px 0; }
+.basin[hidden] { display: none; }
+.basin .kv { display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .8rem; margin-top: .3rem; }
+.basin .kv div { display: flex; justify-content: space-between; gap: .4rem; border-bottom: 1px dotted var(--line); padding: .1rem 0; }
+.basin .kv b { font-weight: 600; white-space: nowrap; }
+.basin .basin-foot { margin-top: .3rem; font-size: .72rem; }
+.chip.basins-toggle i { border-radius: 2px; }
 .btn { font: inherit; font-size: .8rem; padding: .35rem .65rem; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; text-decoration: none; }
 .btn:hover:not(:disabled) { background: #f4f7fb; }
 .btn:disabled { opacity: .5; cursor: default; }

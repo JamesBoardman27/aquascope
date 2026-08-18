@@ -41,11 +41,21 @@ flowline (`/hydrolocation` then `/comid/<id>/basin`). Public domain, fetched
 straight from `api.water.usgs.gov` (CORS), nothing stored on our side, and the
 method and source are added to the citations panel.
 
-Why not everywhere: HydroBASINS (WWF HydroSHEDS v1) was checked first and its
-licence forbids distributing the data "as a stand-alone product" and requires
-an end-user licence, so we cannot host it as tiles on the free-tier archive;
-MERIT-Basins is CC BY-NC. Agencies that publish catchment boundaries under an
-open licence (UK NRFA under OGL, for instance) are the next candidates.
+Everywhere else on land, **BasinATLAS** (HydroATLAS v1.0, CC BY 4.0, from the
+Archive's `basins/` files) takes over: the level-12 sub-basin containing the
+station or point is found in the browser (FlatGeobuf range reads), its
+upstream sub-basins are walked in DuckDB-WASM and highlighted on the map
+(toggle "Basins" in the legend for the outlines), and a card shows the
+upstream area and BasinATLAS's own upstream-aggregated attributes: elevation,
+slope, precipitation, PET, aridity, temperature, snow, natural discharge,
+forest / cropland / urban / glacier / lake / karst extent, soil texture,
+population density, regulation by dams, human footprint. Citation in the
+methods panel.
+
+Why not HydroBASINS itself: the HydroSHEDS core licence forbids distributing
+the data "as a stand-alone product" and requires an end-user licence, so it
+cannot be hosted on the free-tier archive; HydroATLAS is CC BY 4.0, which is
+why BasinATLAS is what we mirror. MERIT-Basins is CC BY-NC.
 
 ## Ask ✨: the Analyst in the page
 

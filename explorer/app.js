@@ -27,27 +27,37 @@ dbg.state = state;
 
 // ── catalog ─────────────────────────────────────────────────────────────────
 
+// One DuckDB-WASM instance for the page: the catalog at boot, the basin
+// topology and attributes on demand (all read in place over HTTPS ranges).
+let duckPromise = null;
+function duck() {
+  if (duckPromise) return duckPromise;
+  duckPromise = (async () => {
+    trace("duckdb: import");
+    const duckdb = await import(CONFIG.duckdbModule);
+    const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+    trace(`duckdb: bundle ${bundle.mainModule}`);
+    const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
+    const worker = new Worker(workerUrl);
+    const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    URL.revokeObjectURL(workerUrl);
+    trace("duckdb: instantiated");
+    const conn = await db.connect();
+    return { db, conn };
+  })();
+  duckPromise.catch(() => { duckPromise = null; });
+  return duckPromise;
+}
+
 async function loadCatalogDuckDB() {
-  trace("duckdb: import");
-  const duckdb = await import(CONFIG.duckdbModule);
-  const bundles = duckdb.getJsDelivrBundles();
-  const bundle = await duckdb.selectBundle(bundles);
-  trace(`duckdb: bundle ${bundle.mainModule}`);
-  const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
-  const worker = new Worker(workerUrl);
-  const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-  trace("duckdb: instantiated");
-  URL.revokeObjectURL(workerUrl);
-  const conn = await db.connect();
+  const { conn } = await duck();
   const sql = `SELECT source, station_id, name, latitude, longitude, variables,
                       CAST(period_start AS VARCHAR) AS period_start, CAST(period_end AS VARCHAR) AS period_end, url
                FROM read_parquet('${CONFIG.stationsParquet}')`;
   const table = await conn.query(sql);
   trace(`duckdb: query returned ${table.numRows} rows`);
   const rows = table.toArray().map((r) => r.toJSON());
-  await conn.close();
-  await db.terminate();
   return rows.map((r) => ({
     source: r.source, station_id: r.station_id, name: r.name ?? null,
     lat: Number(r.latitude), lon: Number(r.longitude),
@@ -216,6 +226,12 @@ function buildLegend() {
     });
     el.appendChild(chip);
   }
+  const bchip = document.createElement("button");
+  bchip.className = "chip basins-toggle off"; bchip.id = "chip-basins";
+  bchip.innerHTML = `<i style="background:#6a1b9a"></i>Basins`;
+  bchip.title = "Toggle BasinATLAS sub-basin outlines (HydroATLAS, CC BY 4.0)";
+  bchip.addEventListener("click", () => setBasinsVisible(!basinsLayersOn));
+  el.appendChild(bchip);
 }
 
 function initSearch() {
@@ -282,6 +298,7 @@ function selectStation(key, { fly } = { fly: false }) {
   clearCatchment();
   requestAnalysis(r);
   requestCatchment({ station: r });
+  requestBasin(r.lat, r.lon, "st");
 }
 
 function setStatus(text, kind = "info") {
@@ -326,6 +343,7 @@ async function selectPoint(lat, lon) {
   for (const id of ["pt-sec-climate", "pt-sec-glofas", "pt-sec-notes", "pt-sec-methods"]) $(id).hidden = true;
   clearCatchment();
   requestCatchment({ point: { lat, lon } });
+  requestBasin(lat, lon, "pt");
   const near = nearestStations(lat, lon);
   $("pt-nearest").innerHTML = near.map(([d, r]) => `<li data-key="${escapeHtml(`${r.source}/${r.station_id}`)}"><i style="background:${(SOURCE_STYLE[r.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(r.name || r.station_id)} <span class="muted">${escapeHtml((SOURCE_STYLE[r.source] || {}).label || r.source)}</span><span class="dist">${d < 10 ? d.toFixed(1) : Math.round(d)} km</span></li>`).join("") || `<li class="muted">no gauges in the catalog</li>`;
   for (const li of $("pt-nearest").querySelectorAll("li[data-key]")) li.addEventListener("click", () => selectStation(li.dataset.key, { fly: true }));
@@ -383,6 +401,7 @@ function renderPoint(res) {
   $("pt-attribution").textContent = res.attribution ? `Data: ${res.attribution}` : "";
   $("pt-sec-methods").hidden = ms.length === 0;
   if (!$("pt-catchment").hidden) addMethodOnce("pt-methods", "pt-sec-methods", NLDI_METHOD);
+  if (!$("pt-basin").hidden) addMethodOnce("pt-methods", "pt-sec-methods", BASIN_METHOD);
 }
 
 // ── catchments (USGS NLDI, public domain) ───────────────────────────────────
@@ -430,8 +449,10 @@ function bboxOf(geom) {
 
 function clearCatchment() {
   catchmentReq++;
+  basinReq++;
   if (state.mapOk && map.getSource("catchment")) map.getSource("catchment").setData(EMPTY_FC);
-  for (const id of ["st-catchment", "pt-catchment"]) { const el = $(id); if (el) { el.textContent = ""; el.hidden = true; } }
+  for (const id of ["st-catchment", "pt-catchment", "st-basin", "pt-basin"]) { const el = $(id); if (el) { el.textContent = ""; el.hidden = true; } }
+  highlightBasins([]);
 }
 
 async function fetchJson(url) {
@@ -486,6 +507,179 @@ function addMethodOnce(listId, sectionId, m) {
   li.innerHTML = `<strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span>`;
   ol.appendChild(li);
   $(sectionId).hidden = false;
+}
+
+// ── BasinATLAS: catchments everywhere (HydroATLAS v1.0, CC BY 4.0) ─────────
+// The Archive publishes the level-12 sub-basins as PMTiles (drawn here), an
+// indexed FlatGeobuf (which sub-basin contains a point: a few range reads),
+// a topology parquet (upstream walk in DuckDB-WASM) and the attributes
+// parquet (one row per sub-basin, BasinATLAS's own upstream-aggregated fields).
+
+const BASIN_METHOD = {
+  name: "Catchment attributes from BasinATLAS (HydroATLAS v1.0)",
+  text: "Level-12 HydroBASINS sub-basin containing the point, its upstream sub-basins traced through NEXT_DOWN, and BasinATLAS's upstream-aggregated attributes (climate, land cover, soils, population, regulation) read for the outlet sub-basin.",
+  citation: "Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6. CC BY 4.0.",
+};
+// [key, label, upstream field, sub-basin field, unit, divisor]
+const BASIN_FIELDS = [
+  ["elev", "mean elevation", "ele_mt_uav", "ele_mt_sav", "m", 1],
+  ["slope", "mean slope", "slp_dg_uav", "slp_dg_sav", "°", 1],
+  ["pre", "precipitation", "pre_mm_uyr", "pre_mm_syr", "mm/yr", 1],
+  ["pet", "potential ET", "pet_mm_uyr", "pet_mm_syr", "mm/yr", 1],
+  ["ari", "aridity P/PET", "ari_ix_uav", "ari_ix_sav", "", 100],
+  ["tmp", "air temperature", "tmp_dc_uyr", "tmp_dc_syr", "°C", 10],
+  ["snw", "snow cover", "snw_pc_uyr", "snw_pc_syr", "%", 1],
+  ["dis", "natural discharge", "dis_m3_pyr", "dis_m3_pyr", "m³/s", 1],
+  ["for", "forest", "for_pc_use", "for_pc_sse", "%", 1],
+  ["crp", "cropland", "crp_pc_use", "crp_pc_sse", "%", 1],
+  ["urb", "urban", "urb_pc_use", "urb_pc_sse", "%", 1],
+  ["gla", "glacier", "gla_pc_use", "gla_pc_sse", "%", 1],
+  ["lka", "lakes", "lka_pc_use", "lka_pc_sse", "%", 1],
+  ["kar", "karst", "kar_pc_use", "kar_pc_sse", "%", 1],
+  ["cly", "clay in soil", "cly_pc_uav", "cly_pc_sav", "%", 1],
+  ["snd", "sand in soil", "snd_pc_uav", "snd_pc_sav", "%", 1],
+  ["ppd", "population density", "ppd_pk_uav", "ppd_pk_sav", "/km²", 1],
+  ["dor", "regulation by dams", "dor_pc_pva", "dor_pc_pva", "%", 1],
+  ["hft", "human footprint", "hft_ix_u09", "hft_ix_s09", "/100", 1],
+];
+let basinReq = 0;
+let basinsLayersOn = false;
+let basinsLayersAdded = false;
+let topoLoaded = null;
+
+function basinsUrl(name) { return CONFIG.basinsBase + name; }
+
+function ensureBasinsLayers() {
+  if (basinsLayersAdded || !state.mapOk || !globalThis.pmtiles) return;
+  try {
+    if (!maplibregl.__aqPmtiles) { maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile); maplibregl.__aqPmtiles = true; }
+    map.addSource("basins6", { type: "vector", url: `pmtiles://${basinsUrl("lev06.pmtiles")}` });
+    map.addSource("basins12", { type: "vector", url: `pmtiles://${basinsUrl("lev12.pmtiles")}` });
+    const before = map.getLayer("catchment-fill") ? "catchment-fill" : undefined;
+    map.addLayer({ id: "basins6-line", type: "line", source: "basins6", "source-layer": "basins6", minzoom: 1, maxzoom: 7,
+      layout: { visibility: "none" }, paint: { "line-color": "#6a1b9a", "line-opacity": 0.35, "line-width": 0.6 } }, before);
+    map.addLayer({ id: "basins12-line", type: "line", source: "basins12", "source-layer": "basins", minzoom: 6,
+      layout: { visibility: "none" }, paint: { "line-color": "#6a1b9a", "line-opacity": 0.4, "line-width": 0.5 } }, before);
+    map.addLayer({ id: "basins12-up", type: "fill", source: "basins12", "source-layer": "basins", minzoom: 4,
+      filter: ["in", ["get", "HYBAS_ID"], ["literal", []]],
+      paint: { "fill-color": "#6a1b9a", "fill-opacity": 0.18, "fill-outline-color": "#4a148c" } }, before);
+    basinsLayersAdded = true;
+  } catch (err) {
+    console.info("basins layers unavailable:", err && err.message);
+  }
+}
+
+function setBasinsVisible(on) {
+  basinsLayersOn = on;
+  ensureBasinsLayers();
+  if (!basinsLayersAdded) return;
+  for (const id of ["basins6-line", "basins12-line"]) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+  const chip = document.getElementById("chip-basins");
+  if (chip) chip.classList.toggle("off", !on);
+}
+
+function highlightBasins(ids) {
+  if (!basinsLayersAdded || !state.mapOk) return;
+  // HYBAS_ID is stored as a number in the tiles; keep the list bounded for the expression evaluator
+  const list = ids.slice(0, 20000).map(Number);
+  map.setFilter("basins12-up", ["in", ["get", "HYBAS_ID"], ["literal", list]]);
+}
+
+function pointInRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function pointInGeom(pt, geom) {
+  const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : [];
+  return polys.some((poly) => pointInRing(pt, poly[0]) && !poly.slice(1).some((hole) => pointInRing(pt, hole)));
+}
+
+async function subBasinAt(lat, lon) {
+  if (!globalThis.flatgeobuf) return null;
+  const d = 0.02;
+  const rect = { minX: lon - d, minY: lat - d, maxX: lon + d, maxY: lat + d };
+  let best = null;
+  for await (const f of flatgeobuf.deserialize(basinsUrl("lev12.fgb"), rect)) {
+    if (f && f.geometry && pointInGeom([lon, lat], f.geometry)) { best = f; break; }
+    if (f && !best) best = { ...f, __near: true };
+  }
+  if (!best) return null;
+  const p = best.properties || {};
+  const num = (k) => (p[k] === undefined || p[k] === null ? null : Number(p[k]));
+  return { hybas_id: num("hybas_id") ?? num("HYBAS_ID"), next_down: num("next_down") ?? num("NEXT_DOWN"), main_bas: num("main_bas") ?? num("MAIN_BAS"),
+    sub_area: num("sub_area") ?? num("SUB_AREA"), up_area: num("up_area") ?? num("UP_AREA"), pfaf_id: num("pfaf_id") ?? num("PFAF_ID"),
+    geometry: best.geometry, approximate: Boolean(best.__near) };
+}
+
+async function ensureTopology() {
+  if (topoLoaded) return topoLoaded;
+  topoLoaded = (async () => {
+    const { conn } = await duck();
+    await conn.query(`CREATE TABLE IF NOT EXISTS topo AS SELECT hybas_id, next_down, up_area, sub_area FROM read_parquet('${basinsUrl("lev12_topology.parquet")}')`);
+    return true;
+  })();
+  topoLoaded.catch(() => { topoLoaded = null; });
+  return topoLoaded;
+}
+
+async function upstreamIds(hybasId, limit = 20000) {
+  await ensureTopology();
+  const { conn } = await duck();
+  const res = await conn.query(`WITH RECURSIVE up AS (
+      SELECT hybas_id FROM topo WHERE hybas_id = ${Number(hybasId)}
+      UNION ALL SELECT t.hybas_id FROM topo t JOIN up ON t.next_down = up.hybas_id)
+    SELECT hybas_id FROM up LIMIT ${limit + 1}`);
+  return res.toArray().map((r) => Number(r.hybas_id));
+}
+
+async function basinAttributes(hybasId) {
+  const { conn } = await duck();
+  const res = await conn.query(`SELECT * FROM read_parquet('${basinsUrl("lev12_attributes.parquet")}') WHERE hybas_id = ${Number(hybasId)} LIMIT 1`);
+  const rows = res.toArray().map((r) => r.toJSON());
+  if (!rows.length) return null;
+  const row = rows[0];
+  const out = {};
+  for (const [key, label, uf, sf, unit, div] of BASIN_FIELDS) {
+    const raw = row[uf] ?? row[sf];
+    if (raw === undefined || raw === null) continue;
+    const v = Number(raw) / div;
+    if (!Number.isFinite(v)) continue;
+    out[key] = { label, value: v, unit, field: row[uf] !== undefined && row[uf] !== null ? uf : sf };
+  }
+  return out;
+}
+
+async function requestBasin(lat, lon, target) {
+  const my = ++basinReq;
+  const el = $(`${target}-basin`);
+  if (!el) return;
+  try {
+    const sb = await subBasinAt(lat, lon);
+    if (my !== basinReq) return;
+    if (!sb || sb.hybas_id === null) return;
+    const upArea = sb.up_area;
+    el.innerHTML = `Catchment (BasinATLAS): <strong>${fmt(upArea, 0)} km²</strong> upstream · sub-basin ${sb.hybas_id}${sb.approximate ? ' <span class="muted">(nearest)</span>' : ""} <span class="muted">· loading attributes…</span>`;
+    el.hidden = false;
+    setBasinsVisible(true);
+    const [ids, attrs] = await Promise.all([
+      upstreamIds(sb.hybas_id).catch((e) => { console.info("upstream walk unavailable:", e && e.message); return [sb.hybas_id]; }),
+      basinAttributes(sb.hybas_id).catch((e) => { console.info("basin attributes unavailable:", e && e.message); return null; }),
+    ]);
+    if (my !== basinReq) return;
+    highlightBasins(ids);
+    const capped = ids.length > 20000;
+    const kv = attrs ? Object.values(attrs).map((a) => `<div><span>${escapeHtml(a.label)}</span><b>${fmt(a.value, a.unit === "%" ? 0 : 1)}${a.unit ? " " + a.unit : ""}</b></div>`).join("") : "";
+    el.innerHTML = `Catchment (BasinATLAS level 12): <strong>${fmt(upArea, 0)} km²</strong> upstream, ${capped ? "over 20,000" : ids.length.toLocaleString()} sub-basins${sb.approximate ? ' <span class="muted">(nearest sub-basin)</span>' : ""}` +
+      (kv ? `<div class="kv">${kv}</div>` : `<div class="muted">attributes unavailable</div>`) +
+      `<div class="basin-foot muted">HydroATLAS v1.0, CC BY 4.0 (Linke et al. 2019). Upstream sub-basins highlighted on the map at zoom 4+.</div>`;
+    addMethodOnce(target === "st" ? "methods" : "pt-methods", target === "st" ? "sec-methods" : "pt-sec-methods", BASIN_METHOD);
+  } catch (err) {
+    console.info("basin lookup unavailable:", err && err.message);
+  }
 }
 
 // ── worker (Pyodide) ────────────────────────────────────────────────────────
@@ -615,6 +809,7 @@ function renderMethods(res) {
   $("attribution").textContent = res.attribution ? `Data: ${res.attribution}. Licence: ${res.license}. Computed with aquascope in your browser.` : "";
   $("sec-methods").hidden = ms.length === 0 && !res.attribution;
   if (!$("st-catchment").hidden) addMethodOnce("methods", "sec-methods", NLDI_METHOD);
+  if (!$("st-basin").hidden) addMethodOnce("methods", "sec-methods", BASIN_METHOD);
 }
 
 function renderFfaTable(ffa, unit) {

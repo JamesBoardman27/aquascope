@@ -155,10 +155,11 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           ls -la archive/basins/ >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
-      - name: Upload build.json as an artifact
+      - name: Upload the build as an artifact (whole folder for capped smoke runs, build.json otherwise)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: basins-build-${{ github.run_id }}
-          path: archive/basins/build.json
+          path: ${{ (github.event_name == 'push' || inputs.max_features != '') && 'archive/basins/' || 'archive/basins/build.json' }}
           if-no-files-found: ignore
+          retention-days: 7
