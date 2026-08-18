@@ -10,6 +10,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/aquascope.svg?color=blue&cacheSeconds=300&v=2)](https://pypi.org/project/aquascope/)
 [![Python](https://img.shields.io/pypi/pyversions/aquascope.svg?color=informational&cacheSeconds=300&v=2)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21903143.svg)](https://doi.org/10.5281/zenodo.21903143)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-brightgreen.svg)](#)
 [![Live demo](https://img.shields.io/badge/%F0%9F%8C%8A%20Live%20demo-Hugging%20Face%20Space-blue)](https://huggingface.co/spaces/Rekin226/aquascope-dashboard)
@@ -420,13 +421,15 @@ If you use AquaScope in your research, please cite:
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
   version = {0.11.0},
+  doi     = {10.5281/zenodo.21903143},
   license = {MIT}
 }
 ```
 
 Machine-readable metadata lives in [CITATION.cff](CITATION.cff); GitHub's "Cite this
 repository" button renders it in APA and BibTeX. Every tagged release is archived on
-Zenodo with a version DOI.
+Zenodo; `10.5281/zenodo.21903143` is the concept DOI that always resolves to the latest
+version (v0.11.0 is [10.5281/zenodo.21989509](https://doi.org/10.5281/zenodo.21989509)).
 
 ## 📄 License
 
