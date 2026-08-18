@@ -23,6 +23,7 @@
       <div id="search-results" class="search-results" hidden></div>
       <div id="legend" class="legend" title="Toggle sources"></div>
       <span id="count" class="count">loading catalog…</span>
+      <button id="btn-ask" class="btn ask-toggle" title="Ask a question in plain language; answered from real gauges by aquascope's tools, in your browser">Ask ✨</button>
     </div>
   </header>
 
@@ -30,6 +31,49 @@
     <div id="map" role="application" aria-label="World map of water gauges"></div>
 
     <aside id="panel" class="panel" aria-live="polite">
+      <div id="panel-ask" hidden>
+        <div class="station-head">
+          <span class="badge" style="background:#6a1b9a">Analyst</span>
+          <h2>Ask AquaScope</h2>
+          <div class="st-meta">A question in plain language. A model picks the tools (find stations, analyse a record, flood frequency,
+            climate of a point); aquascope runs them here in your browser; the answer ends with the data used and the
+            methods with citations, assembled from the tool results, not from the model.</div>
+        </div>
+        <details id="ask-settings" class="ask-settings" open>
+          <summary>Model and key</summary>
+          <div class="ask-grid">
+            <label>Provider
+              <select id="ask-provider">
+                <option value="groq">Groq (free tier, fast)</option>
+                <option value="huggingface">Hugging Face (free with an account)</option>
+                <option value="openai">OpenAI</option>
+                <option value="mistral">Mistral</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="custom">Custom OpenAI-compatible endpoint</option>
+              </select>
+            </label>
+            <label>Model <input id="ask-model" type="text" autocomplete="off" spellcheck="false" /></label>
+            <label id="ask-base-url-row" hidden>Base URL <input id="ask-base-url" type="url" placeholder="https://host/v1" autocomplete="off" spellcheck="false" /></label>
+            <label>API key <input id="ask-key" type="password" autocomplete="off" placeholder="paste your key" /></label>
+            <label class="ask-remember"><input id="ask-remember" type="checkbox" /> remember the key in this browser</label>
+          </div>
+          <p class="muted ask-privacy">Your key goes from this tab straight to the provider you chose (this page has no server), and the model
+            must support tool calling. Free keys: <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a>,
+            <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Hugging Face</a>.</p>
+        </details>
+        <textarea id="ask-question" rows="3" placeholder="e.g. What is the 100-year flood of the Thames at Kingston, and how sure can we be?"></textarea>
+        <div id="ask-examples" class="ask-examples"></div>
+        <div class="st-actions">
+          <button id="ask-run" class="btn primary">Ask</button>
+          <button id="ask-copy" class="btn" hidden>Copy Markdown</button>
+          <button id="ask-download" class="btn" hidden>Download .md</button>
+        </div>
+        <div id="ask-status" class="status" hidden></div>
+        <ol id="ask-log" class="ask-log" hidden></ol>
+        <div id="ask-stations" class="ask-stations" hidden></div>
+        <article id="ask-result" class="ask-result" hidden></article>
+      </div>
+
       <div id="panel-empty" class="panel-empty">
         <h2>Pick a gauge</h2>
         <p>Click any dot on the map, or search by name. You get the observed record straight from the agency,
@@ -43,6 +87,8 @@
             <li><strong>PEGELONLINE</strong>, <strong>Ireland OPW</strong>: the last ~month (that is all those feeds publish) → hydrograph.</li>
             <li><strong>Taiwan CWA</strong>: daily rainfall, last 10 years.</li>
             <li>Click anywhere that is not a gauge: ERA5 rainfall, temperature, FAO-56 ET0, aridity, and GloFAS modelled discharge for that spot, plus the nearest gauges.</li>
+            <li><strong>Catchments</strong>: for USGS gauges and any point in the US, the upstream drainage basin is drawn on the map (USGS NLDI over NHDPlus V2, public domain), with its area.</li>
+            <li><strong>Ask ✨</strong> (top right): a plain-language question, answered from real gauges with a Data and Methods section. Bring your own key (Groq and Hugging Face have free tiers).</li>
             <li>First analysis loads Python in your browser (about 15 MB, once). After that it is quick.</li>
           </ul>
         </details>
@@ -53,6 +99,7 @@
           <span class="badge" style="background:#455a64">Anywhere</span>
           <h2 id="pt-title">Point</h2>
           <div class="st-meta"><span id="pt-coords"></span> · ERA5 climate + GloFAS modelled discharge, last 10 years</div>
+          <div id="pt-catchment" class="catchment" hidden></div>
           <div class="st-actions">
             <button id="btn-share-pt" class="btn" title="Copy a link to this point">Copy link</button>
           </div>
@@ -86,6 +133,7 @@
             <span id="st-id"></span> · <span id="st-vars"></span>
             <span id="st-period"></span>
           </div>
+          <div id="st-catchment" class="catchment" hidden></div>
           <div class="st-actions">
             <a id="st-agency" href="#" target="_blank" rel="noopener" class="btn">Agency page ↗</a>
             <button id="btn-share" class="btn" title="Copy a link to this station">Copy link</button>

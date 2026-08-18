@@ -18,10 +18,11 @@ const VAR_LABEL = {
 };
 
 const $ = (id) => document.getElementById(id);
+const EMPTY_FC = { type: "FeatureCollection", features: [] };
 // Debug hooks (harmless in production): window.__aq.state, window.__aq.log
 const dbg = (window.__aq = { log: [], state: null });
 const trace = (msg) => { dbg.log.push(`${new Date().toISOString().slice(11, 19)} ${msg}`); };
-const state = { stations: [], byKey: new Map(), hidden: new Set(), selected: null, result: null, workerReady: false, pending: new Map(), reqId: 0, mapOk: false, marker: null, point: null };
+const state = { stations: [], byKey: new Map(), hidden: new Set(), selected: null, result: null, workerReady: false, pending: new Map(), reqId: 0, mapOk: false, marker: null, point: null, ask: { running: false, catalogSent: false, markdown: null, id: null } };
 dbg.state = state;
 
 // ── catalog ─────────────────────────────────────────────────────────────────
@@ -139,6 +140,9 @@ function initMapUnsafe() {
 }
 
 function addStationLayers(fc) {
+  map.addSource("catchment", { type: "geojson", data: EMPTY_FC });
+  map.addLayer({ id: "catchment-fill", type: "fill", source: "catchment", paint: { "fill-color": "#1565c0", "fill-opacity": 0.14 } });
+  map.addLayer({ id: "catchment-line", type: "line", source: "catchment", paint: { "line-color": "#0d47a1", "line-width": 1.6, "line-dasharray": [2, 1.5] } });
   map.addSource("stations", { type: "geojson", data: fc, cluster: true, clusterMaxZoom: 9, clusterRadius: 38 });
   map.addLayer({
     id: "clusters", type: "circle", source: "stations", filter: ["has", "point_count"],
@@ -259,6 +263,7 @@ function selectStation(key, { fly } = { fly: false }) {
 
   $("panel-empty").hidden = true;
   $("panel-point").hidden = true;
+  $("panel-ask").hidden = true;
   $("panel-station").hidden = false;
   if (state.marker) { state.marker.remove(); state.marker = null; }
   const st = SOURCE_STYLE[r.source] || { label: r.source, color: FALLBACK_COLOR };
@@ -274,7 +279,9 @@ function selectStation(key, { fly } = { fly: false }) {
   $("btn-ci").disabled = false;
   for (const id of ["sec-summary", "sec-hydro", "sec-ffa", "sec-fdc", "sec-trend", "sec-notes", "sec-methods"]) $(id).hidden = true;
   $("panel").scrollTop = 0;
+  clearCatchment();
   requestAnalysis(r);
+  requestCatchment({ station: r });
 }
 
 function setStatus(text, kind = "info") {
@@ -313,10 +320,12 @@ async function selectPoint(lat, lon) {
     state.marker = new maplibregl.Marker({ color: "#455a64" }).setLngLat([lon, lat]).addTo(map);
   }
   history.replaceState(null, "", `#p=${lat},${lon}`);
-  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-point").hidden = false;
+  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-ask").hidden = true; $("panel-point").hidden = false;
   $("pt-title").textContent = `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
   $("pt-coords").textContent = `lat ${lat}, lon ${lon}`;
   for (const id of ["pt-sec-climate", "pt-sec-glofas", "pt-sec-notes", "pt-sec-methods"]) $(id).hidden = true;
+  clearCatchment();
+  requestCatchment({ point: { lat, lon } });
   const near = nearestStations(lat, lon);
   $("pt-nearest").innerHTML = near.map(([d, r]) => `<li data-key="${escapeHtml(`${r.source}/${r.station_id}`)}"><i style="background:${(SOURCE_STYLE[r.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(r.name || r.station_id)} <span class="muted">${escapeHtml((SOURCE_STYLE[r.source] || {}).label || r.source)}</span><span class="dist">${d < 10 ? d.toFixed(1) : Math.round(d)} km</span></li>`).join("") || `<li class="muted">no gauges in the catalog</li>`;
   for (const li of $("pt-nearest").querySelectorAll("li[data-key]")) li.addEventListener("click", () => selectStation(li.dataset.key, { fly: true }));
@@ -373,6 +382,110 @@ function renderPoint(res) {
   $("pt-methods").innerHTML = ms.map((m) => `<li><strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span></li>`).join("");
   $("pt-attribution").textContent = res.attribution ? `Data: ${res.attribution}` : "";
   $("pt-sec-methods").hidden = ms.length === 0;
+  if (!$("pt-catchment").hidden) addMethodOnce("pt-methods", "pt-sec-methods", NLDI_METHOD);
+}
+
+// ── catchments (USGS NLDI, public domain) ───────────────────────────────────
+// Upstream drainage basins come from the agency that publishes them under an
+// open licence: the USGS Network Linked Data Index traces NHDPlus V2 catchments
+// for any NWIS gauge and for any point in the US (nearest flowline). Nothing is
+// stored on our side; HydroBASINS was ruled out because its licence forbids
+// stand-alone redistribution.
+
+const NLDI = "https://api.water.usgs.gov/nldi/linked-data";
+const NLDI_METHOD = {
+  name: "Upstream catchment (USGS NLDI)",
+  text: "Drainage basin upstream of the gauge (or of the NHDPlus V2 flowline nearest to a clicked point), traced by the USGS Network Linked Data Index over NHDPlus V2 catchments; simplified geometry, area computed on the sphere. US only.",
+  citation: "U.S. Geological Survey, Network Linked Data Index (NLDI) API, https://api.water.usgs.gov/nldi/; NHDPlus Version 2 (U.S. EPA and USGS). Public domain.",
+};
+let catchmentReq = 0;
+
+function inNldiExtent(lat, lon) { return lat > 17 && lat < 72 && lon > -170 && lon < -64; }
+
+function ringAreaKm2(ring) {
+  // spherical excess (Chamberlain & Duquette 2007), as turf.js does; ring = [[lon, lat], ...]
+  const R = 6371.0088, d2r = Math.PI / 180;
+  let sum = 0;
+  const n = ring.length;
+  if (n < 3) return 0;
+  for (let i = 0; i < n; i++) {
+    const p1 = ring[i], p2 = ring[(i + 1) % n], p3 = ring[(i + 2) % n];
+    sum += (p3[0] * d2r - p1[0] * d2r) * Math.sin(p2[1] * d2r);
+  }
+  return Math.abs(sum * R * R / 2);
+}
+function geojsonAreaKm2(geom) {
+  if (!geom) return 0;
+  const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : [];
+  let a = 0;
+  for (const poly of polys) { poly.forEach((ring, k) => { a += (k === 0 ? 1 : -1) * ringAreaKm2(ring); }); }
+  return a;
+}
+function bboxOf(geom) {
+  let w = 180, s = 90, e = -180, n = -90;
+  const walk = (c) => { if (typeof c[0] === "number") { w = Math.min(w, c[0]); e = Math.max(e, c[0]); s = Math.min(s, c[1]); n = Math.max(n, c[1]); } else c.forEach(walk); };
+  walk(geom.coordinates);
+  return [[w, s], [e, n]];
+}
+
+function clearCatchment() {
+  catchmentReq++;
+  if (state.mapOk && map.getSource("catchment")) map.getSource("catchment").setData(EMPTY_FC);
+  for (const id of ["st-catchment", "pt-catchment"]) { const el = $(id); if (el) { el.textContent = ""; el.hidden = true; } }
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
+async function requestCatchment({ station, point }) {
+  const my = ++catchmentReq;
+  let url = null, label = "";
+  if (station) {
+    if (station.source !== "usgs" || !/^USGS-\d+$/.test(station.station_id)) return;
+    url = `${NLDI}/nwissite/${station.station_id}/basin?simplified=true&splitCatchment=false`;
+    label = "st-catchment";
+  } else if (point) {
+    if (!inNldiExtent(point.lat, point.lon)) return;
+    label = "pt-catchment";
+  } else return;
+  try {
+    if (point) {
+      const hl = await fetchJson(`${NLDI}/hydrolocation?coords=POINT(${point.lon} ${point.lat})`);
+      const comid = (hl.features || []).map((f) => f.properties && f.properties.comid).find(Boolean);
+      if (!comid || my !== catchmentReq) return;
+      url = `${NLDI}/comid/${comid}/basin?simplified=true`;
+    }
+    const gj = await fetchJson(url);
+    if (my !== catchmentReq) return; // the user moved on
+    const feat = (gj.features || [])[0];
+    if (!feat || !feat.geometry) return;
+    const km2 = geojsonAreaKm2(feat.geometry);
+    if (state.mapOk && map.getSource("catchment")) {
+      map.getSource("catchment").setData({ type: "FeatureCollection", features: [feat] });
+      if (km2 > 5) map.fitBounds(bboxOf(feat.geometry), { padding: 40, maxZoom: 11, duration: 700 });
+    }
+    const el = $(label);
+    if (el) {
+      const areaTxt = km2 >= 100 ? Math.round(km2).toLocaleString() : km2.toFixed(1);
+      el.innerHTML = `${station ? "Upstream catchment" : "Catchment upstream of the nearest stream reach"}: <strong>${areaTxt} km²</strong> <span class="muted">(USGS NLDI, drawn on the map)</span>`;
+      el.hidden = false;
+    }
+    addMethodOnce(station ? "methods" : "pt-methods", station ? "sec-methods" : "pt-sec-methods", NLDI_METHOD);
+  } catch (err) {
+    console.info("catchment unavailable:", err && err.message);
+  }
+}
+
+function addMethodOnce(listId, sectionId, m) {
+  const ol = $(listId);
+  if (!ol || [...ol.querySelectorAll("li strong")].some((el) => el.textContent.startsWith(m.name))) return;
+  const li = document.createElement("li");
+  li.innerHTML = `<strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span>`;
+  ol.appendChild(li);
+  $(sectionId).hidden = false;
 }
 
 // ── worker (Pyodide) ────────────────────────────────────────────────────────
@@ -384,6 +497,7 @@ function ensureWorker() {
   worker.onmessage = (e) => {
     const m = e.data;
     if (m.type === "progress") { if (state.selected && !state.result) setStatus(m.text, "info"); return; }
+    if (m.type === "ask_progress") { askLog(m.text); return; }
     if (m.type === "ready") { state.workerReady = true; return; }
     const pending = state.pending.get(m.id);
     if (!pending) return;
@@ -500,6 +614,7 @@ function renderMethods(res) {
   $("methods").innerHTML = ms.map((m) => `<li><strong>${escapeHtml(m.name)}.</strong> ${escapeHtml(m.text)}<br><span class="cite">${escapeHtml(m.citation)}</span></li>`).join("");
   $("attribution").textContent = res.attribution ? `Data: ${res.attribution}. Licence: ${res.license}. Computed with aquascope in your browser.` : "";
   $("sec-methods").hidden = ms.length === 0 && !res.attribution;
+  if (!$("st-catchment").hidden) addMethodOnce("methods", "sec-methods", NLDI_METHOD);
 }
 
 function renderFfaTable(ffa, unit) {
@@ -531,6 +646,241 @@ function renderFfaPlot(ffa, unit, color) {
     traces.push({ x: [...rps, ...rps.slice().reverse()], y: [...b.ci.map((c) => c[1]), ...b.ci.map((c) => c[0]).reverse()], fill: "toself", fillcolor: "rgba(245,124,0,0.12)", line: { color: "transparent" }, name: "GEV 90 % CI", hoverinfo: "skip" });
   }
   Plotly.react("plot-ffa", traces, { ...PLOT_LAYOUT, height: 260, xaxis: { title: { text: "return period (years)" }, type: "log" }, yaxis: { title: { text: unit } }, legend: { orientation: "h", y: 1.15 } }, PLOT_CONFIG);
+}
+
+// ── Ask (the Analyst in the browser) ────────────────────────────────────────
+// aquascope.ai_engine.analyst.ask runs inside the Pyodide worker: the model
+// call goes from the worker straight to the provider (bring your own key), the
+// tools run on the catalog held here plus the agencies' APIs, and the report
+// ends with Data and Methods sections assembled from tool results.
+
+const ASK_PROVIDERS = {
+  groq: { base_url: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile" },
+  huggingface: { base_url: "https://router.huggingface.co/v1", model: "Qwen/Qwen2.5-72B-Instruct" },
+  openai: { base_url: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+  mistral: { base_url: "https://api.mistral.ai/v1", model: "mistral-small-latest" },
+  openrouter: { base_url: "https://openrouter.ai/api/v1", model: "openai/gpt-4o-mini" },
+  custom: { base_url: "", model: "" },
+};
+const ASK_EXAMPLES = [
+  "What is the 100-year flood of the Thames at Kingston, and how sure can we be?",
+  "Compare the low flows (Q95) of the Seine at Paris and the Loire at Blois.",
+  "Is the Potomac at Little Falls getting drier? Use the annual-mean trend.",
+  "How wet is Taipei compared with London, and what is the aridity class of each?",
+  "Which UK boreholes near Cambridge have the longest groundwater records?",
+];
+const ASK_STORE = "aquascope.ask.settings";
+
+function askSettings() {
+  try { return JSON.parse(localStorage.getItem(ASK_STORE) || sessionStorage.getItem(ASK_STORE) || "{}"); } catch { return {}; }
+}
+function saveAskSettings() {
+  const remember = $("ask-remember").checked;
+  const data = { provider: $("ask-provider").value, model: $("ask-model").value, base_url: $("ask-base-url").value, remember };
+  const withKey = { ...data, key: $("ask-key").value };
+  try {
+    if (remember) { localStorage.setItem(ASK_STORE, JSON.stringify(withKey)); sessionStorage.removeItem(ASK_STORE); }
+    else { sessionStorage.setItem(ASK_STORE, JSON.stringify(withKey)); localStorage.setItem(ASK_STORE, JSON.stringify(data)); }
+  } catch { /* storage blocked: fine, the tab keeps the values */ }
+}
+
+function initAsk() {
+  const provider = $("ask-provider"), model = $("ask-model"), baseRow = $("ask-base-url-row"), base = $("ask-base-url");
+  const saved = askSettings();
+  if (saved.provider && ASK_PROVIDERS[saved.provider]) provider.value = saved.provider;
+  const applyProvider = (keepModel) => {
+    const p = ASK_PROVIDERS[provider.value];
+    baseRow.hidden = provider.value !== "custom";
+    if (!keepModel) model.value = p.model;
+    if (provider.value !== "custom") base.value = p.base_url;
+    model.placeholder = p.model || "model id";
+  };
+  applyProvider(Boolean(saved.model));
+  if (saved.model) model.value = saved.model;
+  if (saved.base_url && provider.value === "custom") base.value = saved.base_url;
+  if (saved.key) $("ask-key").value = saved.key;
+  $("ask-remember").checked = Boolean(saved.remember);
+  $("ask-settings").open = !saved.key;
+  provider.addEventListener("change", () => applyProvider(false));
+  for (const el of [provider, model, base, $("ask-key"), $("ask-remember")]) el.addEventListener("change", saveAskSettings);
+
+  const ex = $("ask-examples");
+  for (const q of ASK_EXAMPLES) {
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = q;
+    b.addEventListener("click", () => { $("ask-question").value = q; $("ask-question").focus(); });
+    ex.appendChild(b);
+  }
+  $("btn-ask").addEventListener("click", openAsk);
+  $("ask-run").addEventListener("click", runAsk);
+  $("ask-question").addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") runAsk(); });
+  $("ask-copy").addEventListener("click", async () => {
+    if (!state.ask.markdown) return;
+    try { await navigator.clipboard.writeText(state.ask.markdown); $("ask-copy").textContent = "Copied!"; setTimeout(() => ($("ask-copy").textContent = "Copy Markdown"), 1500); }
+    catch { prompt("Copy the report", state.ask.markdown); }
+  });
+  $("ask-download").addEventListener("click", () => {
+    if (!state.ask.markdown) return;
+    const blob = new Blob([state.ask.markdown], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "aquascope-answer.md";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+}
+
+function openAsk() {
+  $("panel-empty").hidden = true; $("panel-station").hidden = true; $("panel-point").hidden = true;
+  $("panel-ask").hidden = false;
+  const q = $("ask-question");
+  if (state.selected && !q.value.trim()) {
+    const r = state.selected;
+    q.value = `Summarise the record of ${r.name || r.station_id} (${r.source} / ${r.station_id}): period, mean, trend, and the flood frequency if the record allows it.`;
+  }
+  const chip = document.getElementById("ask-this-station");
+  if (chip) chip.remove();
+  if (state.selected) {
+    const r = state.selected;
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.id = "ask-this-station";
+    b.textContent = `About ${r.name || r.station_id}`;
+    b.addEventListener("click", () => { q.value = `Summarise the record of ${r.name || r.station_id} (${r.source} / ${r.station_id}): period, mean, trend, and the flood frequency if the record allows it.`; q.focus(); });
+    $("ask-examples").prepend(b);
+  }
+  $("panel").scrollTop = 0;
+  q.focus();
+}
+
+function askStatus(text, kind = "info") {
+  const el = $("ask-status");
+  el.textContent = text; el.className = `status ${kind}`; el.hidden = !text;
+}
+function askLog(text) {
+  const log = $("ask-log");
+  log.hidden = false;
+  const li = document.createElement("li");
+  const m = String(text).match(/^tool (\w+)\((.*)\)$/);
+  li.innerHTML = m ? `<code>${escapeHtml(m[1])}</code>(${escapeHtml(m[2]).slice(0, 160)})` : escapeHtml(text);
+  log.appendChild(li);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function ensureCatalogInWorker() {
+  if (state.ask.catalogSent) return;
+  const rows = state.stations.map((r) => ({
+    source: r.source, station_id: r.station_id, name: r.name, latitude: r.lat, longitude: r.lon,
+    variables: r.variables || [], period_start: r.period_start, period_end: r.period_end, url: r.url,
+    agency: (SOURCE_STYLE[r.source] || {}).label || r.source,
+  }));
+  await call("catalog", { rows });
+  state.ask.catalogSent = true;
+}
+
+async function runAsk() {
+  if (state.ask.running) return;
+  const question = $("ask-question").value.trim();
+  const provider = $("ask-provider").value, key = $("ask-key").value.trim();
+  const model = $("ask-model").value.trim() || ASK_PROVIDERS[provider].model;
+  const base_url = provider === "custom" ? $("ask-base-url").value.trim() : ASK_PROVIDERS[provider].base_url;
+  if (!question) { askStatus("Type a question first.", "warn"); return; }
+  if (!key && provider !== "custom") { askStatus("Paste an API key (Groq and Hugging Face give free ones).", "warn"); $("ask-settings").open = true; return; }
+  if (provider === "custom" && !base_url) { askStatus("A custom endpoint needs its base URL (ending in /v1).", "warn"); return; }
+  saveAskSettings();
+  state.ask.running = true; state.ask.markdown = null;
+  $("ask-run").disabled = true; $("ask-run").textContent = "Working…";
+  $("ask-copy").hidden = true; $("ask-download").hidden = true;
+  $("ask-result").hidden = true; $("ask-stations").hidden = true;
+  $("ask-log").innerHTML = ""; $("ask-log").hidden = true;
+  askStatus(state.workerReady ? "Preparing…" : "Loading Python in your browser (once, ~15 MB)…");
+  try {
+    await ensureCatalogInWorker();
+    askStatus(`Asking ${model} via ${provider}…`);
+    const res = await call("ask", { question, provider: provider === "custom" ? "custom" : provider, model, api_key: key || (provider === "custom" ? "none" : null), base_url, max_steps: 8 });
+    askStatus("");
+    state.ask.markdown = res.markdown;
+    renderAsk(res);
+  } catch (err) {
+    askStatus(`The analyst could not finish: ${err.message}`, "error");
+  } finally {
+    state.ask.running = false;
+    $("ask-run").disabled = false; $("ask-run").textContent = "Ask";
+  }
+}
+
+function renderAsk(res) {
+  const out = $("ask-result");
+  out.innerHTML = mdToHtml(res.markdown);
+  out.hidden = false;
+  $("ask-copy").hidden = false; $("ask-download").hidden = false;
+  // chips for every station the tools touched: click to open it on the map
+  const chips = [];
+  for (const d of res.data_used || []) {
+    const m = String(d.label || "").match(/^(\S+) \/ (.+)$/);
+    if (!m) continue;
+    const key = `${m[1]}/${m[2]}`;
+    const r = state.byKey.get(key);
+    if (!r) continue;
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button";
+    b.innerHTML = `<i style="background:${(SOURCE_STYLE[r.source] || {}).color || FALLBACK_COLOR}"></i>${escapeHtml(r.name || r.station_id)}`;
+    b.title = "Open this station on the map";
+    b.addEventListener("click", () => selectStation(key, { fly: true }));
+    chips.push(b);
+  }
+  const box = $("ask-stations");
+  box.innerHTML = "";
+  if (chips.length) { const l = document.createElement("span"); l.className = "muted"; l.textContent = "Stations used: "; box.appendChild(l); for (const c of chips) box.appendChild(c); }
+  box.hidden = chips.length === 0;
+}
+
+// A small Markdown renderer for the analyst's reports (headings, lists,
+// tables, code, emphasis, links). Input is escaped first; only our own tags
+// come out.
+function mdToHtml(md) {
+  const lines = String(md || "").replace(/\r\n?/g, "\n").split("\n");
+  const html = [];
+  let i = 0, list = null, para = [];
+  const flushPara = () => { if (para.length) { html.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
+  const closeList = () => { if (list) { html.push(`</${list}>`); list = null; } };
+  const inline = (t) => escapeHtml(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^```/.test(line)) {
+      flushPara(); closeList();
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      html.push(`<pre><code>${escapeHtml(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { flushPara(); closeList(); html.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { flushPara(); closeList(); html.push("<hr>"); i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      flushPara(); closeList();
+      const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => inline(c.trim()));
+      const head = cells(line); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(cells(lines[i++]));
+      html.push(`<table><thead><tr>${head.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    const ul = line.match(/^\s*[-*+]\s+(.*)$/), ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (ul || ol) {
+      flushPara();
+      const kind = ul ? "ul" : "ol";
+      if (list !== kind) { closeList(); html.push(`<${kind}>`); list = kind; }
+      html.push(`<li>${inline((ul || ol)[1])}</li>`); i++;
+      continue;
+    }
+    if (!line.trim()) { flushPara(); closeList(); i++; continue; }
+    para.push(line.trim()); i++;
+  }
+  flushPara(); closeList();
+  return html.join("\n").replace(/<p>(Produced by aquascope[^<]*)<\/p>/, '<p class="foot">$1</p>');
 }
 
 // ── buttons ─────────────────────────────────────────────────────────────────
@@ -581,6 +931,7 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&a
   trace("boot");
   initButtons();
   initSearch();
+  initAsk();
   const mapReady = initMap();
   trace("map init called");
   const catalogReady = loadCatalog().then(() => true).catch((err) => {

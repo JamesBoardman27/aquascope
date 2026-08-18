@@ -75,6 +75,64 @@ analysis.to_csv(_STORE["result"])
   post("result", { id, result: out });
 }
 
+// The main thread already holds the station catalog (DuckDB-WASM); hand it to
+// Python once so find_stations() answers from memory instead of the Hub
+// (httpx / pyarrow do not run here).
+let catalogLoaded = false;
+async function catalog({ id, rows }) {
+  self.__aqCatalog = JSON.stringify(rows);
+  await pyodide.runPythonAsync(`
+import json
+from js import __aqCatalog
+from aquascope.archive import catalog as _catalog
+_catalog.set_catalog(json.loads(__aqCatalog))
+`);
+  self.__aqCatalog = null;
+  catalogLoaded = true;
+  post("result", { id, result: { n: rows.length } });
+}
+
+// The Analyst (aquascope.ai_engine.analyst.ask) runs unchanged in the browser:
+// the OpenAI-compatible call goes through urllib (sync XHR via pyodide-http),
+// straight from this worker to the provider the user picked. The key never
+// touches any server of ours (there is none).
+async function ask({ id, question, provider, model, api_key, base_url, max_steps }) {
+  self.__aqAskEvent = (text) => post("ask_progress", { id, text: String(text) });
+  self.__aqAsk = JSON.stringify({ question, provider, model, api_key, base_url, max_steps: Number(max_steps) || 8 });
+  const code = `
+import json
+from js import __aqAsk, __aqAskEvent
+from aquascope.ai_engine import analyst as _analyst
+_args = json.loads(__aqAsk)
+_res = _analyst.ask(
+    _args["question"],
+    provider=_args.get("provider") or None,
+    model=_args.get("model") or None,
+    api_key=_args.get("api_key") or None,
+    base_url=_args.get("base_url") or None,
+    max_steps=int(_args.get("max_steps") or 8),
+    on_event=lambda m: __aqAskEvent(m),
+)
+json.dumps({
+    "answer": _res.answer,
+    "markdown": _res.to_markdown(),
+    "model": _res.model,
+    "provider": _res.provider,
+    "steps": _res.steps,
+    "tool_calls": [{"name": c.name, "arguments": c.arguments, "ok": c.ok} for c in _res.tool_calls],
+    "data_used": _res.data_used,
+    "methods": _res.methods,
+})
+`;
+  try {
+    const out = await pyodide.runPythonAsync(code);
+    post("result", { id, result: JSON.parse(out) });
+  } finally {
+    self.__aqAsk = null;
+    self.__aqAskEvent = null;
+  }
+}
+
 self.onmessage = async (e) => {
   const m = e.data;
   try {
@@ -84,6 +142,8 @@ self.onmessage = async (e) => {
     if (m.type === "anywhere") return await anywhere(m);
     if (m.type === "flood_ci") return await floodCi(m);
     if (m.type === "csv") return await csv(m);
+    if (m.type === "catalog") return await catalog(m);
+    if (m.type === "ask") return await ask(m);
   } catch (err) {
     // Pyodide raises PythonError with the full traceback in .message; keep the
     // exception line (last non-empty) and log the whole thing for debugging.

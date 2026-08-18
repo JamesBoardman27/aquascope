@@ -24,6 +24,19 @@ logger = logging.getLogger(__name__)
 DEFAULT_REPO_ID = "Rekin226/aquascope-gauges"
 CACHE_TTL_SECONDS = 24 * 3600
 
+_OVERRIDE: list[dict[str, Any]] | None = None
+
+
+def set_catalog(rows: list[dict[str, Any]] | None) -> None:
+    """Make :func:`load_stations` return ``rows`` instead of downloading the catalog.
+
+    Used by the Explorer's browser worker, which already holds the catalog in
+    DuckDB-WASM and cannot use httpx or pyarrow; also handy in tests. Pass
+    ``None`` to go back to the Hub.
+    """
+    global _OVERRIDE
+    _OVERRIDE = list(rows) if rows is not None else None
+
 
 def catalog_url(repo_id: str = DEFAULT_REPO_ID, filename: str = "stations.parquet") -> str:
     return f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
@@ -54,6 +67,8 @@ def load_stations(*, repo_id: str = DEFAULT_REPO_ID, refresh: bool = False) -> l
     period_start, period_end, url, river, country, agency, license,
     redistributable, extra (dict)``.
     """
+    if _OVERRIDE is not None:
+        return _OVERRIDE
     try:
         import pyarrow.parquet as pq  # noqa: F401
     except ImportError:
