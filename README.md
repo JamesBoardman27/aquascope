@@ -58,7 +58,7 @@ MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_freq
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
 - 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 22 hydrological signatures.
-- 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 20 crops, irrigation scheduling, soil water balance with auto-irrigation.
+- 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 23 crops, irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
 - 📊 **Visualise + report** — 16 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
 - 🗺️ **Spatial hydrology** — DEM processing, D8 flow direction, watershed delineation, Strahler ordering.

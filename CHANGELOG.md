@@ -5,6 +5,7 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
+- Crop coefficients for **sorghum**, **groundnut** and **sugar beet** in `aquascope.agri.crop_water`: single-crop `KC_TABLE`, basal `KCB_TABLE` and `DEFAULT_STAGE_LENGTHS` entries, taken from FAO-56 Tables 12 and 17.
 
 ### Changed
 - `CITATION.cff` lists the v0.12.0 version DOI `10.5281/zenodo.21995649` (concept DOI unchanged).
