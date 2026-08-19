@@ -27,7 +27,7 @@ pip install "aquascope[all]"       # everything: ML, viz, spatial, dashboard
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, Taiwan MOENV / WRA, Japan MLIT, Korea WAMIS, OpenMeteo, and UN SDG 6, with one unified Python API.
 - 📈 **Run hydrological analyses**: Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, and 22 hydrological signatures.
-- 🌾 **Plan agricultural water**: FAO-56 Penman–Monteith ET₀, crop water requirements for 20 crops, irrigation scheduling, and soil water balance with auto-irrigation.
+- 🌾 **Plan agricultural water**: FAO-56 Penman–Monteith ET₀, crop water requirements for 23 crops, irrigation scheduling, and soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine**: describe your goal in plain English, get a recommended methodology scored against your dataset, and auto-execute it.
 - 📊 **Visualise and report**: 16 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
 - 🗺️ **Spatial hydrology**: DEM processing, D8 flow direction, watershed delineation, Strahler ordering.
