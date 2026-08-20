@@ -18,6 +18,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYODIDE_VERSION: "0.29.3" # The Pyodide version used for CI jobs on PRs and dispatched workflows
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -35,7 +38,14 @@ jobs:
           node-version: 24
 
       - name: Install pyodide
-        run: npm install pyodide
+        run: |
+          # PRs/dispatch: pinned to 0.29.3 so incompatible upstream releases don't fail contributor PRs.
+          # Scheduled Monday canary: float to detect new incompatibilities ear.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            npm install pyodide
+          else
+            npm install pyodide@${{ env.PYODIDE_VERSION }}
+          fi
 
       - name: Cache Pyodide packages
         uses: actions/cache@v5

@@ -5,7 +5,7 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
-- Add Pyodide/WASM smoke test CI job in order to test analyze_series runs on a synthetic 30-year series, dashboard imports using Pyodide and verify usage of the CachedHTTPClient Emscripten path. Pyodide packages are cached to improve performance, and after all smoke tests have passed, the Explorer site is assembled.
+- CI: a Pyodide/WASM smoke job builds the wheel, installs it under Pyodide and runs `analyze_series`, the dashboard import and the Emscripten HTTP path, so a dependency that stops being browser-installable fails CI instead of the live demo. Runs on PRs touching `aquascope/`, `explorer/` or `pyproject.toml`, plus a weekly canary. (#114)
 
 ### Changed
 - `CITATION.cff` lists the v0.12.0 version DOI `10.5281/zenodo.21995649` (concept DOI unchanged).
