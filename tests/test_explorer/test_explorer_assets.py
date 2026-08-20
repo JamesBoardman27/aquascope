@@ -112,6 +112,25 @@ def test_build_copies_the_modules_and_nothing_ships_with_a_build_token(tmp_path:
     assert json.loads((out / "wheels.json").read_text(encoding="utf-8"))["build"] == "abc1234"
 
 
+def test_the_recorded_showcase_traces_are_part_of_the_build(tmp_path: Path, monkeypatch) -> None:
+    """The traces the page replays live in explorer/showcase/, so they have to ship.
+
+    Without the glob they simply would not be copied, and the panel would be
+    empty in production while being full locally.
+    """
+    build = _build_module()
+    src = tmp_path / "explorer"
+    (src / "showcase").mkdir(parents=True)
+    (src / "index.html").write_text("<!-- page -->", encoding="utf-8")
+    (src / "showcase" / "index.json").write_text('{"examples": []}', encoding="utf-8")
+    (src / "showcase" / "kingston.json").write_text('{"id": "kingston"}', encoding="utf-8")
+    monkeypatch.setattr(build, "SRC", src)
+
+    files = build.text_files()
+    assert Path("showcase/index.json") in files
+    assert Path("showcase/kingston.json") in files
+
+
 pytestmark_node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 
 
@@ -297,3 +316,30 @@ def test_the_page_has_no_second_provider_list() -> None:
     # The fallback is deliberately one provider plus `custom`; more than that is drift.
     fallback = ask.split("let ASK_PROVIDERS = {", 1)[1].split("};", 1)[0]
     assert fallback.count("base_url:") <= 2, "the offline fallback grew into a second registry"
+
+
+# ── the tools the page offers to an in-browser agent (#236) ─────────────────
+
+
+def test_webmcp_registration_is_feature_detected() -> None:
+    """A browser without navigator.modelContext must be unaffected."""
+    src = (EXPLORER / "src" / "webmcp.js").read_text(encoding="utf-8")
+    assert "navigator.modelContext" in src
+    assert "webmcpAvailable()" in src
+    assert "if (!webmcpAvailable()) return false" in src
+
+
+def test_webmcp_tools_are_described_and_schema_d() -> None:
+    src = (EXPLORER / "src" / "webmcp.js").read_text(encoding="utf-8")
+    for name in ("aquascope_find_stations", "aquascope_analyze_station", "aquascope_anywhere",
+                 "aquascope_describe_catchment", "aquascope_show_on_map"):
+        assert name in src, f"{name} should be offered to an agent"
+    assert src.count("inputSchema") >= 5, "every tool needs a schema an agent can fill in"
+
+
+def test_place_search_uses_a_geocoder_whose_terms_allow_autocomplete() -> None:
+    """Photon allows autocomplete; OSM's Nominatim forbids it, so it must not be called."""
+    src = (EXPLORER / "src" / "search.js").read_text(encoding="utf-8")
+    assert "photon.komoot.io" in src
+    called = re.findall(r'https?://[^\s"\')]+', src)
+    assert not [u for u in called if "nominatim" in u.lower()], "Nominatim forbids autocomplete"
