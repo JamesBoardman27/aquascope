@@ -23,7 +23,34 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "explorer"
-TEXT_FILES = ("index.html", "app.js", "worker.js", "gr4j.js", "config.js", "style.css")
+# Every text asset of the app: the page, the ES modules in explorer/src/, and
+# the recorded Analyst traces in explorer/showcase/ that the page replays (#233).
+TEXT_GLOBS = ("*.html", "*.js", "*.css", "*.json", "src/*.js", "showcase/*.json")
+# Assets copied byte for byte: the social preview card (og.png, drawn by
+# make_og_image.py) is referenced by the page's og:image.
+BINARY_GLOBS = ("*.png", "*.ico")
+SKIP = {"build.py", "make_og_image.py"}
+
+
+def _matching(patterns: tuple[str, ...]) -> list[Path]:
+    out: list[Path] = []
+    for pattern in patterns:
+        for path in sorted(SRC.glob(pattern)):
+            rel = path.relative_to(SRC)
+            if rel.name in SKIP or rel in out:
+                continue
+            out.append(rel)
+    return out
+
+
+def binary_files() -> list[Path]:
+    """Assets copied byte for byte, relative to ``explorer/``."""
+    return _matching(BINARY_GLOBS)
+
+
+def text_files() -> list[Path]:
+    """Explorer sources to copy, relative to ``explorer/`` and in a stable order."""
+    return _matching(TEXT_GLOBS)
 
 
 def _git_sha() -> str:
@@ -46,9 +73,15 @@ def build_wheel() -> Path:
 
 def assemble(out: Path, wheel: Path, build: str, space_readme: bool = True) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    for name in TEXT_FILES:
-        text = (SRC / name).read_text(encoding="utf-8").replace("__BUILD__", build)
-        (out / name).write_text(text, encoding="utf-8")
+    for rel in text_files():
+        text = (SRC / rel).read_text(encoding="utf-8").replace("__BUILD__", build)
+        dest = out / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text, encoding="utf-8")
+    for rel in binary_files():
+        dest = out / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SRC / rel, dest)
     shutil.copy2(wheel, out / wheel.name)
     (out / "wheels.json").write_text(json.dumps({"wheel": wheel.name, "build": build}), encoding="utf-8")
     if space_readme:

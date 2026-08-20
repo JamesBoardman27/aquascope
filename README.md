@@ -15,11 +15,13 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-brightgreen.svg)](#)
 [![Live Demo – Runs in Your Browser](https://img.shields.io/badge/%F0%9F%8C%8A%20Live%20Demo-Runs%20in%20Your%20Browser-blue)](https://huggingface.co/spaces/Rekin226/aquascope-dashboard)
+[![Live Explorer Demo – Runs in Your Browser](https://img.shields.io/badge/%F0%9F%8C%8A%20Live%20demo-AquaScope%20Explorer-blue)](https://rekin226-aquascope-explorer.static.hf.space/)
 
 [![GitHub stars](https://img.shields.io/github/stars/Rekin226/aquascope?style=social)](https://github.com/Rekin226/aquascope/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Rekin226/aquascope?style=social)](https://github.com/Rekin226/aquascope/network/members)
 
-[**🌊 Live Demo - Runs in Your Browser, No Install Required**](https://huggingface.co/spaces/Rekin226/aquascope-dashboard) ·
+[**🌊 Live Dashboard Demo - Runs in Your Browser, No Install Required**](https://huggingface.co/spaces/Rekin226/aquascope-dashboard) ·
+[**🌊 Live Explorer Demo - Runs in Your Browser, No Install Required**](https://rekin226-aquascope-explorer.static.hf.space/) ·
 [**Install**](#-install) ·
 [**Examples**](#-examples) ·
 [**CLI**](#-cli) ·
@@ -59,7 +61,7 @@ MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_freq
 
 - 🌊 **Pull water data** from USGS, FAO AQUASTAT, FAO WaPOR, GEMStat, EU WFD, Copernicus ERA5, France Hub'Eau, Taiwan MOENV/WRA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, GRDC, CAMELS-CL, OpenMeteo, UN SDG 6, US Water Quality Portal — **one unified Python API**.
 - 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 22 hydrological signatures.
-- 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 20 crops, irrigation scheduling, soil water balance with auto-irrigation.
+- 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 23 crops, irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
 - 📊 **Visualise + report** — 16 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
 - 🗺️ **Spatial hydrology** — DEM processing, D8 flow direction, watershed delineation, Strahler ordering.
@@ -407,6 +409,7 @@ Thanks to these wonderful people who make AquaScope possible ([emoji key](CONTRI
     </tr>
     <tr>
       <td align="center" valign="top" width="20%"><a href="https://github.com/Prakshal0809"><img src="https://avatars.githubusercontent.com/u/116380035?v=4?s=100" width="100px;" alt="PRAKSHAL BHAVINKUMAR BHANDARI"/><br /><sub><b>PRAKSHAL BHAVINKUMAR BHANDARI</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=Prakshal0809" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="20%"><a href="https://github.com/Osheun"><img src="https://avatars.githubusercontent.com/u/138526540?v=4?s=100" width="100px;" alt="Osheun"/><br /><sub><b>Osheun</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=Osheun" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=Osheun" title="Tests">⚠️</a> <a href="https://github.com/Rekin226/aquascope/commits?author=Osheun" title="Documentation">📖</a></td>
     </tr>
   </tbody>
 </table>
