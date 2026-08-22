@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 env:
-  PYODIDE_VERSION: "0.29.3" # The Pyodide version used for CI jobs on PRs and dispatched workflows
+  PYODIDE_VERSION: "0.28.2" # Current version of Pyodide used by Explorer, found in explorer/config.js
 
 jobs:
   smoke:
