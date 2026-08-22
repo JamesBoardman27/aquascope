@@ -35,6 +35,25 @@ logger = logging.getLogger(__name__)
 
 MAX_TOOL_RESULT_CHARS = 14_000
 
+#: The whole conversation's budget, in characters (roughly four to a token).
+#: A per-result cap is not enough on a small window: three results at the cap
+#: exceed a free tier's 8,000 tokens a minute on their own, and the provider
+#: answers 413 "Request too large", which no amount of retrying will fix.
+#: 24,000 characters is about 6,000 tokens, leaving room for the reply.
+MAX_CONTEXT_CHARS = 24_000
+
+#: Below this there is no room for a useful tool result, so a 413 here is about
+#: something other than the conversation and should surface rather than loop.
+MIN_CONTEXT_CHARS = 3_000
+
+#: Said back to a model whose tool call the provider could not parse. Short on
+#: purpose: it is added to a conversation that may already be near the limit.
+TOOL_JSON_REMINDER = (
+    "Your last tool call could not be parsed. The arguments must be a single JSON object, "
+    'with any code as one JSON string: {"code": "import numpy as np\\nresult = 1"}. '
+    "Newlines and quotes inside it have to be escaped. Please make that call again."
+)
+
 # One registry for the whole project (aquascope.ai_engine.providers); this dict
 # is the shape the loop already used, kept so callers and tests do not change.
 PROVIDERS: dict[str, dict[str, str | None]] = {
@@ -351,6 +370,53 @@ def _truncate(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + f'... [truncated {len(text) - limit} chars]'
 
 
+def _conversation_size(messages: list[dict[str, Any]]) -> int:
+    """Everything that goes on the wire, not just the text a human would read.
+
+    An assistant turn carries its ``tool_calls`` with the arguments the model
+    wrote, which for a ``run_python`` call is a whole snippet. Counting only
+    ``content`` under-reads the request badly, which is how a conversation
+    budgeted at 6,000 tokens arrived as 9,300.
+    """
+    try:
+        return len(json.dumps(messages, ensure_ascii=False, default=str))
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return sum(len(str(m.get("content") or "")) for m in messages)
+
+
+def fit_context(messages: list[dict[str, Any]], budget: int = MAX_CONTEXT_CHARS) -> list[dict[str, Any]]:
+    """Shrink the oldest tool results until the conversation fits the budget.
+
+    The model needs the last result in full to answer; the older ones it has
+    usually already summarised into its own reasoning. So the oldest are cut
+    first, each keeping a readable head and saying what was removed, and the
+    most recent is left alone. Nothing else is touched: the system prompt, the
+    question and the assistant's own turns stay whole.
+    """
+    if _conversation_size(messages) <= budget:
+        return messages
+    out = [dict(m) for m in messages]
+    tool_indexes = [i for i, m in enumerate(out) if m.get("role") == "tool"]
+    for i in tool_indexes[:-1] if len(tool_indexes) > 1 else []:
+        if _conversation_size(out) <= budget:
+            break
+        content = str(out[i].get("content") or "")
+        if len(content) <= 400:
+            continue
+        out[i]["content"] = content[:400] + f"... [trimmed {len(content) - 400} chars to fit the context]"
+    # Still over: the newest result is itself too big, so cut that too. The
+    # note about the cut is part of the message, so leave room for it, or the
+    # conversation comes out just over the budget it was supposed to fit.
+    if _conversation_size(out) > budget and tool_indexes:
+        i = tool_indexes[-1]
+        content = str(out[i].get("content") or "")
+        note_allowance = 80
+        room = max(200, budget - (_conversation_size(out) - len(content)) - note_allowance)
+        if len(content) > room:
+            out[i]["content"] = content[:room] + f"... [trimmed {len(content) - room} chars to fit the context]"
+    return out
+
+
 def ask(
     question: str,
     *,
@@ -393,11 +459,38 @@ def ask(
     _SANDBOX_DATA.update(data or {})
     seen: list[dict[str, Any]] = []          # what each tool actually returned, for the checks
 
+    budget = MAX_CONTEXT_CHARS
     for step in range(1, max_steps + 1):
         result.steps = step
-        response = client.chat.completions.create(
-            model=cfg["model"], messages=messages, tools=tools, tool_choice="auto"
-        )
+        messages = fit_context(messages, budget)
+        # A 413 is the provider saying this request cannot fit its window, at
+        # any speed, so retrying it unchanged is pointless. Halve the budget and
+        # go again: the window belongs to the provider and is not ours to guess.
+        from aquascope.ai_engine.llm_transport import LLMHTTPError
+        malformed = 0
+        for attempt in range(6):
+            try:
+                response = client.chat.completions.create(
+                    model=cfg["model"], messages=messages, tools=tools, tool_choice="auto"
+                )
+                break
+            except LLMHTTPError as exc:
+                body = (exc.body or "").lower()
+                too_large = exc.status == 413 or "too large" in body
+                # Some providers reject the whole request when the model's own
+                # tool call will not parse as JSON. The model wrote it, so the
+                # model can write it again: say what was wrong and resample.
+                bad_call = exc.status == 400 and "tool_use_failed" in body
+                if too_large and attempt < 5 and budget > MIN_CONTEXT_CHARS:
+                    budget = max(MIN_CONTEXT_CHARS, budget // 2)
+                    say(f"the request was too large for the model's window, retrying within {budget} characters")
+                    messages = fit_context(messages, budget)
+                elif bad_call and malformed < 2:
+                    malformed += 1
+                    say("the model's tool call was not valid JSON, asking it to write that call again")
+                    messages = [*messages, {"role": "user", "content": TOOL_JSON_REMINDER}]
+                else:
+                    raise
         choice = response.choices[0]
         msg = choice.message
         calls = getattr(msg, "tool_calls", None) or []

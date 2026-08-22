@@ -15,10 +15,11 @@ quietly hoping.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
-__all__ = ["Check", "verify"]
+__all__ = ["Check", "normalise", "verify"]
 
 
 @dataclass
@@ -56,10 +57,65 @@ class Verification:
 
 _NUMBER = re.compile(r"-?\d[\d,]*\.?\d*")
 
+# A date is prose, not a claim: "1986-08-21 to 2026-08-19" should not put 8, 21
+# and 19 up for checking against the tool output.
+_DATE = re.compile(r"\b\d{4}-\d{1,2}-\d{1,2}\b")
 
-def _numbers(text: str) -> list[float]:
+# A percentage is nearly always a ratio the model worked out from two numbers
+# that *are* in the results ("the interval is about 7 % of the median"). Asking
+# for it verbatim in a tool result would flag correct arithmetic.
+_PERCENT = re.compile(r"-?\d[\d,]*\.?\d*\s*%")
+
+#: Dashes and minus signs a model reaches for, all meaning ASCII "-".
+_DASHES = dict.fromkeys(map(ord, "‐‑‒–—―−"), "-")
+
+#: A unit with a negative exponent, once folded: "mm yr-1", "m3 s-1", "W m-2".
+#: Without this the exponent reads as a claim of -1, repeatedly.
+_EXPONENT_UNIT = re.compile(r"\b[a-zA-Z][a-zA-Z0-9]{0,5}\s?-\d\b")
+
+#: And a positive one, written closed up: "km2", "m3", "km3". No space allowed
+#: here, or "gauge 3" would be swallowed along with it.
+_SQUARED_UNIT = re.compile(r"\b(?:k?m|ha|km|mi|ft|in)[23]\b")
+
+#: "68.6 W" is the longitude -68.6: the compass letter carries the sign, and the
+#: prose writes the magnitude. Read the sign off the letter rather than accepting
+#: either one, so a hemisphere error is still caught.
+_COMPASS = re.compile(r"(\d+\.?\d*)\s*°?\s*([NSEW])\b")
+
+#: Quantities a trend claim may be about that are *not* what analyze_station
+#: tests. Its Mann-Kendall runs on annual means, so "no significant trend in
+#: low flow" is a statement about something the test never measured.
+_OTHER_SERIES = re.compile(r"\b(low[- ]flow|q95|q05|q90|q10|baseflow|base flow|peak|maxim|minim|"
+                           r"groundwater|rainfall|precipitation)\b", re.I)
+
+#: Conventional thresholds, not claims about anyone's data.
+_CONVENTIONS = {0.05, 0.01, 0.1, 0.9, 0.95, 0.99}
+
+#: Digit grouping with a space: "14 555" is one number, not 14 and 555. Only
+#: before a group of exactly three digits, which is what grouping means.
+_GROUPED = re.compile(r"(?<=\d)[\s\u00a0\u202f\u2009](?=\d{3}\b)")
+
+
+def normalise(text: str) -> str:
+    """Fold a well-typeset answer onto the plain ASCII the checks compare against.
+
+    Good models write good typography: ``m³ s⁻¹`` for the unit, a non-breaking
+    hyphen inside a station id, a narrow space grouping ``14 555``. Every one of
+    those made a check fail on an answer that was correct, which is worse than
+    having no check at all, so the text is folded first: NFKC turns the
+    superscripts into digits, the dashes become ASCII, and grouped digits join up.
+    """
+    folded = unicodedata.normalize("NFKC", text or "").translate(_DASHES)
+    return _GROUPED.sub("", folded)
+
+
+def _numbers(text: str, *, claims_only: bool = False) -> list[float]:
+    """Numbers in the text. ``claims_only`` drops the dates and percentages."""
+    text = text or ""
+    if claims_only:
+        text = _SQUARED_UNIT.sub(" ", _EXPONENT_UNIT.sub(" ", _PERCENT.sub(" ", _DATE.sub(" ", text))))
     out = []
-    for token in _NUMBER.findall(text or ""):
+    for token in _NUMBER.findall(text):
         try:
             out.append(float(token.replace(",", "")))
         except ValueError:
@@ -87,6 +143,28 @@ def _walk(payload: Any) -> list[float]:
     return found
 
 
+def _identifiers(payload: Any) -> list[str]:
+    """Every station id and name anywhere in a result.
+
+    A flood-frequency payload carries the id and no name; the search that found
+    it carries the name. Looking only at the top level of each payload meant an
+    answer saying "Kingston" was reported as not naming its record.
+    """
+    found: list[str] = []
+    stack = [payload]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key in ("station_id", "name", "label"):
+                value = item.get(key)
+                if isinstance(value, str) and value.strip():
+                    found.append(value)
+            stack.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            stack.extend(item)
+    return found
+
+
 def _close(value: float, pool: list[float], *, rel: float = 0.02) -> bool:
     """Is this number in the tool output, allowing for rounding in the prose?"""
     for other in pool:
@@ -98,6 +176,33 @@ def _close(value: float, pool: list[float], *, rel: float = 0.02) -> bool:
     return False
 
 
+def units_in(ok_results: list[dict[str, Any]]) -> set[str]:
+    """The units the successful tool results reported."""
+    return {r["payload"].get("unit") for r in ok_results
+            if isinstance(r.get("payload"), dict) and r["payload"].get("unit")} - {None, ""}
+
+
+def _unit_spellings(unit: str) -> set[str]:
+    """The ways an answer may legitimately write a unit like ``m3/s``.
+
+    After :func:`normalise`, ``m³ s⁻¹`` reads as ``m3 s-1``, which is the same
+    unit and has to count. So does ``m^3/s``, and ``cumec`` for discharge.
+    """
+    u = normalise(unit).lower().replace(" ", "")
+    forms = {u, u.replace("/", ""), u.replace("^", "")}
+    if "/" in u:
+        top, _, bottom = u.partition("/")
+        forms |= {f"{top}{bottom}-1", f"{top} {bottom}-1", f"{top}per{bottom}"}
+    if u in {"m3/s", "m^3/s"}:
+        forms |= {"cumec", "cubicmetrespersecond", "cubicmeterspersecond"}
+    return {f for f in forms if f}
+
+
+def _unit_named(unit: str, answer: str) -> bool:
+    flat = answer.lower().replace(" ", "")
+    return any(form.replace(" ", "") in flat for form in _unit_spellings(unit))
+
+
 def verify(answer: str, tool_results: list[dict[str, Any]], *, question: str = "") -> Verification:
     """Run the deterministic checks over an answer and the results behind it.
 
@@ -105,7 +210,7 @@ def verify(answer: str, tool_results: list[dict[str, Any]], *, question: str = "
     "ok": bool}``, which is what the loop records as it goes.
     """
     v = Verification()
-    answer = answer or ""
+    answer = normalise(answer or "")
     ok_results = [r for r in tool_results if r.get("ok")]
 
     # 1. Did anything actually run?
@@ -118,9 +223,25 @@ def verify(answer: str, tool_results: list[dict[str, Any]], *, question: str = "
     pool: list[float] = []
     for r in ok_results:
         pool.extend(_walk(r.get("payload")))
+        # The arguments count as well: a coordinate the answer repeats back was
+        # given to a tool that accepted it, so it is not an invented number.
+        pool.extend(_walk(r.get("arguments")))
     # Years and small integers are usually prose, not claims; check the rest.
-    claimed = [n for n in _numbers(answer) if abs(n) >= 0.001 and not (1800 <= n <= 2100 and float(n).is_integer())]
-    unsupported = [n for n in claimed if not _close(n, pool)]
+    # Strip the units before reading numbers: "m3 s-1" is a unit, not a claim
+    # of 3 and -1, and flagging those would discredit the whole check.
+    prose = answer
+    for unit in units_in(ok_results):
+        for form in _unit_spellings(unit):
+            prose = re.sub(re.escape(form).replace(r"\ ", r"\s*"), " ", prose, flags=re.I)
+    claimed = [n for n in _numbers(prose, claims_only=True)
+               if abs(n) >= 0.001 and not (1800 <= n <= 2100 and float(n).is_integer())]
+    # A coordinate written "68.6 W" is -68.6 in the arguments the tool was given.
+    signed = {float(m.group(1)): (float(m.group(1)) if m.group(2) in "NE" else -float(m.group(1)))
+              for m in _COMPASS.finditer(answer)}
+    unsupported = [n for n in claimed
+                   if n not in _CONVENTIONS
+                   and not _close(n, pool)
+                   and not (n in signed and _close(signed[n], pool))]
     if pool:
         v.checks.append(Check(
             "numbers_come_from_tools", not unsupported,
@@ -150,10 +271,16 @@ def verify(answer: str, tool_results: list[dict[str, Any]], *, question: str = "
                 break
         if significance is not None:
             p = significance.get("p_value")
-            says_significant = bool(re.search(r"\bsignificant\b(?!ly no)", answer, re.I)) and not re.search(
-                r"\bno significant|not significant\b", answer, re.I)
+            # Only weigh sentences that are about the series the test ran on.
+            # An answer that says "no significant trend in low flow" while the
+            # tool tested annual means is being precise, not contradictory, and
+            # flagging it taught the reader to distrust the checks.
+            claims = [s for s in re.split(r"(?<=[.!?])\s+|\n", answer)
+                      if re.search(r"\bsignificant\b", s, re.I) and not _OTHER_SERIES.search(s)]
+            said = " ".join(claims)
+            says_significant = bool(said) and not re.search(r"\bno significant|not significant\b", said, re.I)
             actually = p is not None and p < 0.05
-            agrees = says_significant == actually or not re.search(r"\bsignificant\b", answer, re.I)
+            agrees = not said or says_significant == actually
             v.checks.append(Check(
                 "trend_matches_the_test", agrees,
                 "" if agrees else
@@ -161,10 +288,9 @@ def verify(answer: str, tool_results: list[dict[str, Any]], *, question: str = "
             ))
 
     # 5. Units: if every result carries a unit, the answer should name one.
-    units = {r["payload"].get("unit") for r in ok_results
-             if isinstance(r.get("payload"), dict) and r["payload"].get("unit")}
+    units = units_in(ok_results)
     if units and re.search(r"\b\d", answer):
-        named = any(u and u.lower().replace("³", "3") in answer.lower().replace("³", "3") for u in units)
+        named = any(u and _unit_named(u, answer) for u in units)
         listed = ", ".join(sorted(u for u in units if u))
         v.checks.append(Check(
             "units_are_named", named,
@@ -174,11 +300,7 @@ def verify(answer: str, tool_results: list[dict[str, Any]], *, question: str = "
     # 6. Did the answer name the record it used?
     stations = []
     for r in ok_results:
-        payload = r.get("payload")
-        if isinstance(payload, dict):
-            for key in ("station_id", "name"):
-                if isinstance(payload.get(key), str):
-                    stations.append(payload[key])
+        stations.extend(_identifiers(r.get("payload")))
     if stations:
         named = any(s and s.lower()[:12] in answer.lower() for s in stations)
         v.checks.append(Check(
