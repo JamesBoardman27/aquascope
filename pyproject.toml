@@ -113,6 +113,10 @@ basins = [
     "shapely>=2.0",
     "pyarrow>=14",
 ]
+benchmarks = [
+    "dataretrieval>=0.5",
+    "lmoments3>=1.0",
+]
 all = [
     "aquascope[ml,forecast,copernicus,viz,llm,scientific,dashboard,spatial,interop,archive,mcp,basins]",
 ]
