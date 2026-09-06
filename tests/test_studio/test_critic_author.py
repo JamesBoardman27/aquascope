@@ -36,15 +36,15 @@ def test_the_template_report_has_every_section_in_order_with_numbers_from_the_re
                                                               "value": 520, "unit": "m3/s", "step": "s3"}
     assert labels["Upstream area"]["value"] == 9948.0 and labels["Q95 (exceeded 95 % of days)"]["step"] == "s2"
     by_id = {s["id"]: s for s in report["sections"]}
-    assert "| Quantity | Value | Unit | Step |" in by_id["summary"]["text"]
+    assert "| Quantity |" not in by_id["summary"]["text"] and "3 step(s) ran" in by_id["summary"]["text"]
     assert "Intake: return_period = 100" in by_id["problem"]["text"]
     assert "| uk_ea:3400TH:discharge | station | discharge |" in by_id["site_data"]["text"]
     assert "Step s3: `flood_frequency(" in by_id["methodology"]["text"] and "1. " in by_id["methodology"]["text"]
     assert "Gates: min_years passed" in by_id["results-s2"]["text"]
     assert "Caveats, verbatim" in by_id["limitations"]["text"] and "Wasko" in by_id["limitations"]["text"]
-    assert by_id["recommendations"]["text"].startswith("- Quote the finding")
+    assert by_id["recommendations"]["text"].startswith("- ") and "The record at" not in by_id["recommendations"]["text"]
     refs = report["references"]
-    assert any("Bulletin 17C" in r for r in refs) and any("Hosking 1990" in r for r in refs)
+    assert any("Bulletin 17C" in r for r in refs) and sum(1 for r in refs if "Hosking" in r) == 1
     assert refs[-1].startswith("Rekin226 and contributors") and "10.5281/zenodo.21903143" in refs[-1]
     assert "aquascope run study.yaml" in by_id["appendix"]["text"] and "version: 3" in by_id["appendix"]["text"]
     assert report["footer"]["prose"] == "template" and report["footer"]["model"] is None
@@ -103,7 +103,7 @@ def test_the_model_writes_the_prose_and_the_critic_earns_one_rewrite(no_delivera
     report = author.author_report(ws, model)
     assert report["title"] == "Design flow at Kingston" and report["answer"].startswith("About 520")
     by_id = {s["id"]: s["text"] for s in report["sections"]}
-    assert by_id["summary"].startswith("One paragraph.") and "| Quantity |" in by_id["summary"]
+    assert by_id["summary"] == "One paragraph."
     assert by_id["results-s3"] == "The fit gives 520 m3/s." and by_id["results-s2"].startswith("The record at")
     assert report["footer"]["prose"] == "model"
     out = critic.critique(ws, model)

@@ -60,14 +60,18 @@ in the inventory, using only tools from the catalogue given. Reply:
  "limitations_expected": ["..."], "citations": ["..."]}}
 Arguments are the tool's own and concrete: a source and station id from the inventory, lat and lon from the
 site, an inventory id for load_table. No placeholders except "{{{{ result.<step id>.<path> }}}}" for a number an
-earlier step computed (then list that step in depends_on). Gates only from the vocabulary given, with thresholds
-the sufficiency table itself uses. A method the sufficiency table calls not_defensible is not used. Three to
-eight steps. When an exemplar is given it is the playbook tree's own plan for this site: keep what is sound and
-add what the brief needs. Cite only citations the catalogue or the exemplar carries.
+earlier step computed (then list that step in depends_on). A step's "method" must be one of the "methods" the
+catalogue lists for that tool, or be omitted. Gates only from the vocabulary given, with thresholds the
+sufficiency table itself uses. A method the sufficiency table calls not_defensible is not used. When "uploads"
+lists a table the brief points at, that table is the primary record: load_table first, then the table tools on
+it with from_step. Three to eight steps. When an exemplar is given it is the playbook tree's own plan for this
+site: keep what is sound and add what the brief needs. Cite only citations the catalogue or the exemplar carries.
 {RULES}"""
 
-METHODOLOGIST_REPAIR = f"""You are the Methodologist of AquaScope Studio. Your plan did not pass the validator. Fix
-exactly the errors listed, change nothing else, and reply with the whole plan object again (same shape as before).
+METHODOLOGIST_REPAIR = f"""You are the Methodologist of AquaScope Studio. Your plan did not pass the validator. Reply
+with the WHOLE plan object again (objective, methodology, steps, assumptions, ..., same shape as before): every
+valid step exactly as it was, and only the steps the errors name fixed or removed. A "method" must be one the
+catalogue lists for the tool, or be omitted. Never reply with an empty steps list.
 {RULES}"""
 
 METHODOLOGIST_CHANGE = f"""You are the Methodologist of AquaScope Studio. The client asks for a change to a study that
@@ -101,7 +105,9 @@ caveats. Write the prose:
 {{"title": "...", "answer": "<the finding in 2 to 4 sentences: the numbers with units and intervals, the record named>",
  "sections": {{"summary": "...", "problem": "...", "site_data": "...", "methodology": "...",
    "results-<step id>": "...", "limitations": "...", "recommendations": "..."}}}}
-Markdown paragraphs, no headings. Every number must be in the results given, with its unit. Say which record
+Markdown paragraphs, no headings. Every number in steps[*].result and steps[*].fallback.result may be quoted, with
+its unit; key_numbers is the subset the summary table shows, not a whitelist. A number in none of them is not
+written. Say which record
 (source, station id, period) each number comes from and which method produced it. Confidence intervals are 90 %
 bands unless a result says otherwise. What failed a gate or did not run is said, not hidden. State no cause for a
 trend. Under 200 words per section.
