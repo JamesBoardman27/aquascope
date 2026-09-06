@@ -31,14 +31,14 @@ from typing import Any
 from aquascope.studio.workspace import Artifact, Brief, Dataset, Inventory, Message, Question, Workspace
 
 __all__ = [
-    "Artifact", "Brief", "Dataset", "Inventory", "Message", "Question", "Workspace", "Studio",
+    "Artifact", "Brief", "Dataset", "Inventory", "Message", "Question", "Reply", "Workspace", "Studio",
 ]
 
 
 def __getattr__(name: str) -> Any:
     # The Coordinator imports the roles; keep the package import light for the workspace-only users.
-    if name == "Studio":
-        from aquascope.studio.coordinator import Studio
+    if name in ("Studio", "Reply"):
+        from aquascope.studio import coordinator
 
-        return Studio
+        return getattr(coordinator, name)
     raise AttributeError(name)
