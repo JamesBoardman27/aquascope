@@ -95,9 +95,9 @@ function updateForgetButton() {
   $("ask-forget").hidden = !has;
 }
 
-// The model Ask is set up with, for Solve to borrow: one key, one settings
-// block, stored once. Null when there is none; Solve then runs keyless, which
-// is a complete run on its own.
+// The model Ask is set up with, for Study to borrow: one key, one settings
+// block, stored once. Null when there is none; Study then runs keyless, which
+// is a complete study on its own.
 export function askModelConfig() {
   const provider = $("ask-provider").value;
   const chosen = ASK_PROVIDERS[provider];

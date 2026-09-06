@@ -1,9 +1,10 @@
-"""Solve's on-device intake: the sentence read into a playbook and its fields.
+"""Study's on-device brief: the first sentence read into a decision, quantities, a return period, timescales.
 
 The page asks a small model on the reader's device for one JSON object and
-hands what it wrote to the worker, where aquascope.playbooks.coerce_intake
-makes it safe. These checks cover the pure half of the page (the prompt, the
-schema, the reply reader) with node, and the wiring between the modules.
+hands what it wrote to the worker as the brief and the intake; the Consultant's
+own rules fill the rest and ask for what is missing. These checks cover the
+pure half of the page (the prompt, the schema, the reply reader) with node, and
+the wiring between the modules.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 EXPLORER = ROOT / "explorer"
 INTAKE = EXPLORER / "src" / "intake.js"
-PLAYBOOKS = EXPLORER / "playbooks.json"
 
 needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 
@@ -31,66 +31,57 @@ def _node(script: str) -> dict:
 
 
 @needs_node
-def test_the_prompt_and_schema_come_from_the_shipped_playbooks() -> None:
+def test_the_prompt_and_schema_ask_for_one_object_and_no_invented_numbers() -> None:
     got = _node(f"""
     const m = await import({json.dumps(INTAKE.as_uri())});
-    const fs = await import("node:fs/promises");
-    const pbs = JSON.parse(await fs.readFile({json.dumps(str(PLAYBOOKS))}, "utf8")).playbooks;
-    console.log(JSON.stringify({{ prompt: m.intakePrompt(pbs), schema: m.intakeSchema(pbs) }}));
+    console.log(JSON.stringify({{ prompt: m.briefPrompt(), schema: m.briefSchema() }}));
     """)
     prompt, schema = got["prompt"], got["schema"]
-    for pid in ("flood_risk", "groundwater_decline", "ungauged_flow"):
-        assert f"- {pid}:" in prompt
-    assert "return_period: Return period (years) (int, default 100, at least 2)" in prompt
-    assert "one of: design flow, risk screening, insurance, inundation extent" in prompt
-    assert "ONE JSON object" in prompt and '"none"' in prompt
-    shipped = [pb["id"] for pb in json.loads(PLAYBOOKS.read_text(encoding="utf-8"))["playbooks"]]
-    assert schema["properties"]["playbook"]["enum"] == [*sorted(shipped), "none"]
-    assert {"flood_risk", "groundwater_decline", "ungauged_flow"} <= set(shipped)
-    fields = schema["properties"]["intake"]["properties"]
-    assert fields["return_period"] == {"type": "integer"}
-    assert fields["attribute_cause"] == {"type": "boolean"}
-    assert fields["decision"]["enum"][0] == "design flow"
+    assert "ONE JSON object" in prompt and "Never invent a number" in prompt
+    for field in ("decision", "quantities", "return_period", "timescales"):
+        assert field in prompt and field in schema["properties"]
+    assert schema["properties"]["return_period"] == {"type": "integer"}
+    assert schema["properties"]["timescales"]["items"] == {"type": "integer"}
     assert "—" not in prompt and "–" not in prompt
 
 
 @needs_node
-def test_the_reply_reader_keeps_known_playbooks_and_drops_the_rest() -> None:
+def test_the_reply_reader_keeps_what_is_usable_and_drops_the_rest() -> None:
     got = _node(f"""
     const m = await import({json.dumps(INTAKE.as_uri())});
-    const pbs = [{{ id: "flood_risk", intake: [] }}, {{ id: "ungauged_flow", intake: [] }}];
     console.log(JSON.stringify([
-      m.parseIntakeReply('{{"playbook": "flood_risk", "intake": {{"return_period": 50}}}}', pbs),
-      m.parseIntakeReply('Sure! {{"playbook": "flood_risk"}} there you go', pbs),
-      m.parseIntakeReply('{{"playbook": "none", "intake": {{}}}}', pbs),
-      m.parseIntakeReply('{{"playbook": "drought"}}', pbs),
-      m.parseIntakeReply('{{"playbook": "flood_risk", "intake": [1, 2]}}', pbs),
-      m.parseIntakeReply('not json at all', pbs),
-      m.parseIntakeReply('', pbs),
-      m.parseIntakeReply('[{{"playbook": "flood_risk"}}]', pbs),
+      m.parseBriefReply('{{"decision": "size a culvert", "quantities": ["the 100-year flow"], "return_period": 100}}'),
+      m.parseBriefReply('Sure! {{"return_period": 200}} there you go'),
+      m.parseBriefReply('{{"timescales": [1, 3, 12, 0, 500, "x"]}}'),
+      m.parseBriefReply('{{"return_period": 1}}'),
+      m.parseBriefReply('{{"return_period": 50.5, "decision": "   "}}'),
+      m.parseBriefReply('{{"quantities": "not a list"}}'),
+      m.parseBriefReply('not json at all'),
+      m.parseBriefReply(''),
+      m.parseBriefReply('[{{"return_period": 100}}]'),
     ]));
     """)
-    assert got[0] == {"playbook": "flood_risk", "intake": {"return_period": 50}}
-    assert got[1] == {"playbook": "flood_risk", "intake": {}}      # prose around the object is tolerated
-    assert got[2] is None                                           # "none" is the model's own decline
-    assert got[3] is None                                           # an unknown playbook: keyword rules
-    assert got[4] == {"playbook": "flood_risk", "intake": {}}      # a list is not an intake
-    assert got[5] is None and got[6] is None
-    assert got[7] == {"playbook": "flood_risk", "intake": {}}      # the object inside a list is still found
+    assert got[0] == {"brief": {"decision": "size a culvert", "quantities": ["the 100-year flow"]},
+                      "intake": {"return_period": 100}}
+    assert got[1] == {"brief": {}, "intake": {"return_period": 200}}      # prose around the object is tolerated
+    assert got[2] == {"brief": {}, "intake": {"timescales": [1, 3, 12]}}  # out-of-range months are dropped, not clamped
+    assert got[3] is None                                                  # a 1-year return period is not one
+    assert got[4] is None                                                  # no fraction, no blank
+    assert got[5] is None and got[6] is None and got[7] is None
+    assert got[8] == {"brief": {}, "intake": {"return_period": 100}}      # the object inside a list is still found
 
 
-def test_the_page_the_worker_and_the_package_agree_on_the_intake_path() -> None:
-    solve = (EXPLORER / "src" / "solve.js").read_text(encoding="utf-8")
+def test_the_page_the_worker_and_the_package_agree_on_the_brief_path() -> None:
+    studio = (EXPLORER / "src" / "studio.js").read_text(encoding="utf-8")
     worker = (EXPLORER / "worker.js").read_text(encoding="utf-8")
     local = (EXPLORER / "src" / "local-model.js").read_text(encoding="utf-8")
-    # the page sends the model's reply to the worker, which applies the package's rules
-    assert 'call("coerce_intake"' in solve
-    assert 'm.type === "coerce_intake"' in worker and "_pbk.coerce_intake" in worker
-    # the on-device call is one bounded call with a schema, never a download started from Solve
-    assert "generateJsonLocally" in solve and "localModelReady" in solve
-    assert re.search(r'availability\(\)\) === "available"', local), "Solve must not start a model download"
+    # the on-device call is one bounded call with a schema, never a download started from Study
+    assert "generateJsonLocally" in studio and "localModelReady" in studio
+    assert "briefPrompt()" in studio and "briefSchema()" in studio and "parseBriefReply" in studio
+    assert re.search(r'availability\(\)\) === "available"', local), "Study must not start a model download"
     assert "timeoutMs" in local and "responseConstraint" in local
-    # the fallback is said in one line
-    assert "the keyword rules read your words" in solve
-    for text in (solve, worker, local, INTAKE.read_text(encoding="utf-8")):
+    # what the device read travels as the brief and the intake, and the worker marks the source
+    assert "intake, brief" in studio
+    assert 'a.get("intake")' in worker and 'a.get("brief")' in worker and 'source = "device"' in worker
+    for text in (studio, worker, local, INTAKE.read_text(encoding="utf-8")):
         assert "—" not in text and "–" not in text

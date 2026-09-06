@@ -300,7 +300,7 @@ async function basinRow(hybasId) {
 // DuckDB hands 64-bit integers back as BigInt, which JSON cannot carry.
 const plain = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "bigint" ? Number(v) : v]));
 
-// What a Solve run needs to describe the catchment in the worker, where
+// What a Study run needs to describe the catchment in the worker, where
 // BasinATLAS cannot be read: the sub-basin the page found and the outlet's raw
 // row, for aquascope.archive.basins.describe_catchment_from_row. The outlet
 // row's upstream fields already describe the whole catchment, so the upstream

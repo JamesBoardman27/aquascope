@@ -213,12 +213,12 @@ export function bootDone() {
 // inspector's place now and names what it came from, so the station is still
 // there in a line of text and one click away.
 //
-// One drawer, two modes: Ask (a question) and Solve (a problem at a place),
-// switched by the segmented control in its head. Never both at once.
+// One drawer, two modes: Ask (a question) and Study (a complete study at a
+// place), switched by the segmented control in its head. Never both at once.
 
 let releaseDrawer = null;
-const MODES = ["ask", "solve"];
-const modeButton = (mode) => $(mode === "solve" ? "btn-solve" : "btn-ask");
+const MODES = ["ask", "study"];
+const modeButton = (mode) => $(mode === "study" ? "btn-study" : "btn-ask");
 
 export function drawerMode() {
   return state.drawerMode;
@@ -237,7 +237,7 @@ export function setDrawerMode(mode) {
     const btn = modeButton(m);
     if (btn) btn.setAttribute("aria-expanded", state.drawerOpen && m === mode ? "true" : "false");
   }
-  d.setAttribute("aria-label", mode === "solve" ? "Solve a problem at this place" : "Ask AquaScope");
+  d.setAttribute("aria-label", mode === "study" ? "Study this place" : "Ask AquaScope");
   d.dispatchEvent(new CustomEvent("drawermode", { detail: { mode, open: state.drawerOpen } }));
   if (state.drawerOpen) writeUrl();
 }
@@ -269,7 +269,7 @@ export function openDrawer({ mode = state.drawerMode } = {}) {
   // is not modal. Switching modes in an open drawer keeps the focus it has.
   if (!wasOpen) releaseDrawer = captureFocus(d, { onEscape: closeDrawer, restoreTo: modeButton(mode) });
   syncMapPadding();
-  announce(mode === "solve" ? "Solve panel opened" : "Ask panel opened");
+  announce(mode === "study" ? "Study panel opened" : "Ask panel opened");
 }
 
 export function closeDrawer() {
