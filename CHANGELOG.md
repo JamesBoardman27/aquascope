@@ -5,6 +5,7 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
+- **CLI results can be saved as JSON or CSV** (#27). `aquascope recommend`, every `aquascope hydro` analysis, and `aquascope agri plan` now share `--output/-o` and `--format`; when `--format` is omitted, a `.csv` suffix selects CSV and other suffixes select JSON.
 - **Explorer: discharge can be displayed in ft³/s (cfs)** (#316). A "Show ft³/s" button in the station header converts the KPIs, hydrograph, flood-frequency table and chart, flow-duration curve, trend slope and GR4J plot at render time. The choice persists in localStorage. Everything internal is untouched: the worker, the model and the CSV downloads stay in the agency's unit.
 - The showcase and repair workflows accept `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID`) as repository secrets, so both can run on Claude (#325).
 

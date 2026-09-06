@@ -90,7 +90,9 @@ class TestPlanIrrigation:
 
 
 class TestAgriCli:
-    def test_collect_help_lists_fao_sources(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_collect_help_lists_fao_sources(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         monkeypatch.setattr(sys, "argv", ["aquascope", "collect", "--help"])
 
         with pytest.raises(SystemExit) as excinfo:
@@ -101,13 +103,20 @@ class TestAgriCli:
         assert "aquastat" in help_text
         assert "wapor" in help_text
 
-    def test_agri_plan_cli_from_files(self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    @pytest.mark.parametrize("output_format", ["json", "csv"])
+    def test_agri_plan_cli_from_files(
+        self,
+        output_format: str,
+        tmp_path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         n_days = sum(DEFAULT_STAGE_LENGTHS["maize"].values()) + 10
         dates = pd.date_range("2024-04-01", periods=n_days, freq="D")
 
         eto_path = tmp_path / "eto.csv"
         precip_path = tmp_path / "precip.csv"
-        output_path = tmp_path / "plan.json"
+        output_path = tmp_path / f"plan.{output_format}"
 
         pd.DataFrame({"date": dates.strftime("%Y-%m-%d"), "eto_mm": [5.0] * n_days}).to_csv(eto_path, index=False)
         pd.DataFrame({"date": dates.strftime("%Y-%m-%d"), "precipitation_sum": [1.0] * n_days}).to_csv(
@@ -132,6 +141,8 @@ class TestAgriCli:
                 str(precip_path),
                 "--output",
                 str(output_path),
+                "--format",
+                output_format,
             ],
         )
 
@@ -141,7 +152,13 @@ class TestAgriCli:
         assert "AquaScope — Irrigation Plan" in output
         assert output_path.exists()
 
-        data = json.loads(output_path.read_text())
-        assert data["crop"] == "maize"
-        assert data["schedule"]
-        assert data["balance"]
+        if output_format == "json":
+            data = json.loads(output_path.read_text())
+            assert data["crop"] == "maize"
+            assert data["schedule"]
+            assert data["balance"]
+        else:
+            data = pd.read_csv(output_path).iloc[0]
+            assert data["crop"] == "maize"
+            assert json.loads(data["schedule"])
+            assert json.loads(data["balance"])
