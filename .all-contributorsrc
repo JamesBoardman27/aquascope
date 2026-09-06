@@ -206,7 +206,8 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/64578610?v=4",
       "profile": "http://harikp.com",
       "contributions": [
-        "code"
+        "code",
+        "test"
       ]
     },
     {
@@ -223,6 +224,16 @@
       "name": "Talia Pulsifer",
       "avatar_url": "https://avatars.githubusercontent.com/u/70988138?v=4",
       "profile": "https://github.com/taliapulsifer",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "mikemikimike",
+      "name": "mikemikimike",
+      "avatar_url": "https://avatars.githubusercontent.com/u/186855910?v=4",
+      "profile": "https://github.com/mikemikimike",
       "contributions": [
         "code",
         "test"
