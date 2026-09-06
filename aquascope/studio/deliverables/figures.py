@@ -180,7 +180,8 @@ def _series(payload: dict[str, Any], unit: str | None, site: dict[str, Any] | No
     ax.set_ylabel(_ylabel(variable, u))
     ax.set_title(f"{variable[:1].upper()}{variable[1:]} at {record_name(payload, site)}")
     if marked:
-        ax.legend(loc="upper right", frameon=False)
+        # Below the axis, so the legend never covers the maxima it names (the PNG is saved with a tight box).
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=2, frameon=False)
     res = resolution_word(dates)
     period = period_of(payload, dates)
     caption = f"{res + ' ' if res else ''}{variable} at {record_name(payload, site)}"
