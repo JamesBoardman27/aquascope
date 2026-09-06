@@ -505,10 +505,14 @@ def _recommendations(ws: Workspace, study: Study, missing: list[str]) -> list[st
     return out[:4]
 
 
+_SENTENCE_END = re.compile(r"(?<!\bal)(?<!\bet)(?<!\bvs)(?<![A-Z])[.!?](?=\s+[A-Z(]|$)")
+
+
 def _first_sentence(text: str) -> str:
+    """The first sentence, with "et al.", "vs." and initials not taken for its end."""
     text = " ".join(text.split())
-    m = re.match(r"(.+?[.!?])(\s|$)", text)
-    return m.group(1) if m else text
+    m = _SENTENCE_END.search(text)
+    return text[:m.end()] if m else text
 
 
 def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]], key: list[dict[str, Any]],
