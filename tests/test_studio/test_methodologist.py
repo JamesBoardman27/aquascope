@@ -121,6 +121,15 @@ def test_an_invalid_plan_gets_one_repair_call():
     assert any("frobnicate" in e for e in repair["errors"]) and any("min_yearz" in e for e in repair["errors"])
 
 
+def test_a_repair_reply_wrapped_as_plan_is_unwrapped():
+    ws = _ws()
+    broken = dict(VALID_PLAN, steps=[dict(VALID_PLAN["steps"][0], tool="frobnicate")])
+    client = FakeModel({"methodologist": [broken, {"plan": VALID_PLAN}]})
+    model = Model.resolve(ws, client=client, model="fake", provider="custom")
+    study = methodologist.plan(ws, model)
+    assert study is not None and study.author == "methodologist" and len(study.steps) == 4
+
+
 def test_an_unrepairable_plan_falls_back_to_the_tree_or_declines():
     ws = _ws()
     broken = dict(VALID_PLAN, steps=[dict(VALID_PLAN["steps"][0], tool="frobnicate")])

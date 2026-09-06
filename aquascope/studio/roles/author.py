@@ -363,8 +363,9 @@ def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]
         rows.append([d.id, d.kind, d.variable or "", who, d.name or "", f"{d.years:g}" if d.years else "",
                      d.resolution or "", d.distance_km if d.distance_km is not None else "", span,
                      (d.quality or {}).get("verdict") or ""])
+    # No count in the prose: the Critic holds every number to a tool result, and a count is ours, not a tool's.
     head = (f"Site: {site.get('lat')}, {site.get('lon')}. "
-            + (f"{len(rows)} dataset(s) within reach or attached." if rows else "No inventory."))
+            + ("The datasets within reach or attached:" if rows else "No inventory."))
     tbl = _md_table(rows, ["Id", "Kind", "Variable", "Source", "Name", "Years", "Resolution", "km", "Period",
                            "Quality"])
     notes = "\n".join(f"- {n}" for n in (inv.notes[:8] if inv else []))
