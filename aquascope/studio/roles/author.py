@@ -218,10 +218,11 @@ def key_numbers(study: Study, results: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def software_citation() -> str:
-    from aquascope.reporting.builder import ReportBuilder, ReportMetadata
+    from aquascope.reporting.builder import ReportBuilder
 
-    return ReportBuilder(ReportMetadata(title="study", author="Rekin226 and contributors", doi=SOFTWARE_DOI)) \
-        .software_citation()
+    builder = ReportBuilder("AquaScope Studio report", author="Rekin226 and contributors")
+    builder.metadata.doi = SOFTWARE_DOI
+    return builder.software_citation()
 
 
 def references(ws: Workspace) -> list[str]:
@@ -267,19 +268,27 @@ def _md_table(rows: list[list[Any]], header: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _answer_from(prose: str, key: list[dict[str, Any]]) -> str:
-    """The finding in two to four sentences: the paragraph of the template prose that quotes the most key
-    numbers (the last one when tied, the main step usually comes last)."""
+_STOP = frozenset({"the", "and", "with", "its", "for", "from", "over", "a", "an", "of", "at", "in", "on", "to", "per",
+                   "requested", "their", "current", "status"})
+
+
+def _answer_from(prose: str, key: list[dict[str, Any]], quantities: list[str] | None = None) -> str:
+    """The finding in two to four sentences: the paragraph of the template prose that speaks of the brief's
+    quantities and quotes the most key numbers (the last one when tied, the main step usually comes last)."""
     from aquascope.ai_engine.verify import _numbers
 
     values = {float(k["value"]) for k in key if isinstance(k.get("value"), (int, float))
               and not isinstance(k.get("value"), bool)}
-    best, best_score = None, -1
+    words = {w for q in (quantities or []) for w in re.findall(r"[a-z0-9]+", q.lower()) if len(w) > 2
+             and w not in _STOP}
+    best, best_score = None, -1.0
     for para in prose.split("\n\n"):
         if para.lower().startswith("plan ") or not re.search(r"\d", para):
             continue
         found = set(_numbers(para, claims_only=True))
+        low = para.lower()
         score = sum(1 for v in values if any(abs(v - f) <= max(abs(v), 1e-9) * 0.005 + 1e-9 for f in found))
+        score += 3 * sum(1 for w in words if re.search(rf"\b{re.escape(w)}", low))
         if score >= best_score:
             best, best_score = para, score
     if best is not None:
@@ -322,16 +331,11 @@ def _step_prose(sid: str, r: dict[str, Any], study: Study) -> str:
 
 
 def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]], key: list[dict[str, Any]],
-                       missing: list[str], refs: list[str]) -> dict[str, str]:
-    from aquascope.ai_engine.team import _template_answer
-    from aquascope.studio.roles.analysts import prior_run
-
+                       missing: list[str], refs: list[str], answer: str) -> dict[str, str]:
     b = ws.brief
     plan = study.plan or {}
     site = ws.site or {}
     sections: dict[str, str] = {}
-    prose = _template_answer(study, prior_run(ws))
-    answer = _answer_from(prose, key)
     table = _md_table([[k["label"], _fmt(k["value"]), k.get("unit") or "", k["step"]] for k in key[:20]],
                       ["Quantity", "Value", "Unit", "Step"])
     sections["summary"] = answer + ("\n\n" + table if table else "")
@@ -461,13 +465,22 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
         from aquascope.studio.roles.critic import not_established
 
         missing = not_established(ws)
-    texts = _template_sections(ws, study, results, key, missing, refs)
+    from aquascope.ai_engine.team import _template_answer
+    from aquascope.studio.roles.analysts import prior_run
+
+    quantities = ws.brief.quantities
+    if not quantities:
+        from aquascope.studio.roles.consultant import _rules_quantities
+
+        quantities = _rules_quantities(ws.brief.playbook, ws.brief.intake)
+    answer = _answer_from(_template_answer(study, prior_run(ws)), key, quantities)
+    texts = _template_sections(ws, study, results, key, missing, refs, answer)
     site = ws.site or {}
     title = str(plan.get("objective") or ws.brief.decision or ws.brief.problem)[:80]
     if site:
         title += f" ({site.get('lat')}, {site.get('lon')})"
-    answer = _answer_from(texts["summary"].split("\n\n")[0], key)
     prose_by = "template"
+    summary_by_model = False
     if model:
         previous = ws.report or {}
         context: dict[str, Any] = {
@@ -510,6 +523,7 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
                     if sid == "summary":
                         rest = texts["summary"].split("\n\n", 1)
                         texts["summary"] = text.strip() + ("\n\n" + rest[1] if len(rest) > 1 else "")
+                        summary_by_model = True
                     else:
                         texts[sid] = text.strip()
                     n += 1
@@ -519,7 +533,8 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
             ws.event("author", "template", "the model gave no usable prose; template prose stands")
     else:
         ws.event("author", "template", f"{len(texts)} section(s) from the template")
-    if not model or not (ws.report or {}).get("answer") or not issues:
+    if not summary_by_model:
+        # The summary opens with the answer (the model's when it wrote one), then the key numbers table.
         texts["summary"] = answer + ("\n\n" + texts["summary"].split("\n\n", 1)[1]
                                      if "\n\n" in texts["summary"] else "")
     report = {

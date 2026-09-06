@@ -218,8 +218,9 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
     run_ = run_study(study, on_event=say, prior=prior, tools=callables)
     _draw(ws, run_, drawn, on_artifact)
     replans = 0
-    while run_.stop_reason and replans < max_replans:
-        replans += 1
+    attempts = 0
+    while run_.stop_reason and attempts < max_replans:
+        attempts += 1
         if run_.replan:
             branch = run_.replan["branch"]
             if pb is None:
@@ -235,6 +236,7 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
                                           "reason": run_.replan.get("reason")}
             ws.event("analyst", "replan", f"branch {branch} after {run_.stop_reason}", step=run_.stopped_at)
             study = new
+            replans += 1
             run_ = run_study(study, on_event=say, prior=run_, tools=callables)
             _draw(ws, run_, drawn, on_artifact)
             continue
@@ -276,6 +278,7 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
         study.plan = dict(study.plan or {})
         study.plan.setdefault("replans", []).append({"step": step.id, "reason": run_.stop_reason, "fallback": fb_step})
         ws.event("analyst", "replan", f"fallback {fb_step['tool']}: {fb_step['rationale']}", step=step.id)
+        replans += 1
         run_ = run_study(study, on_event=say, prior=run_, tools=callables)
         _draw(ws, run_, drawn, on_artifact)
 

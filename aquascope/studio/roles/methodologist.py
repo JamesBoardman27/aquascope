@@ -408,7 +408,7 @@ def revise(ws: Workspace, model: Model | None, edits: dict[str, Any] | list[dict
                 raise ValueError(f"the edit for step {sid} must be a mapping or null")
             s = dict(s)
             if isinstance(override.get("arguments"), dict):
-                s["arguments"] = {**(s.get("arguments") or {}), **override["arguments"]}
+                s["arguments"] = {**(s.get("arguments") or {}), **_split_overrides(s, override["arguments"])}
             for key in ("expects", "depends_on", "outputs"):
                 if isinstance(override.get(key), list):
                     s[key] = override[key]
@@ -441,6 +441,20 @@ def revise(ws: Workspace, model: Model | None, edits: dict[str, Any] | list[dict
     ws.event("methodologist", "edited", f"{len(study.steps)} step(s) after the user's edits")
     ws.say("methodologist", plan_text(ws.study), kind="plan", payload={"study": ws.study})
     return study
+
+
+def _split_overrides(step: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    """An override that is not one of the tool's arguments but a key of one of the step's gates (``return_period``)
+    lands on those gates; the rest are arguments, which the validator then judges."""
+    entry = catalogue.get(str(step.get("tool") or ""))
+    args: dict[str, Any] = {}
+    for key, value in overrides.items():
+        gates = [g for g in (step.get("expects") or []) if isinstance(g, dict) and key in g]
+        if entry is not None and key not in entry.arguments and gates:
+            step["expects"] = [dict(g, **{key: value}) if key in g else g for g in step["expects"]]
+            continue
+        args[key] = value
+    return args
 
 
 def change(ws: Workspace, model: Model | None, request: str, *, intake: dict[str, Any] | None = None) -> Study | None:

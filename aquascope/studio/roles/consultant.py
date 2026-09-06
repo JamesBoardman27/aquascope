@@ -246,15 +246,25 @@ def _answer(ws: Workspace, model: Model | None, text: str) -> Message:
                 q.answer = q.default if q.default is not None else ""
     else:
         hints = intake_hints(text, b.playbook)
+        fields = {f.name: f for f in known[b.playbook].intake} if b.playbook in known else {}
         for q in open_qs:
             if q.id in hints:
                 q.answer = hints[q.id]
-        rest = [q for q in open_qs if q.answer is None]
-        parts = [p for p in _SPLIT.split(text) if p.strip()] if len(rest) > 1 else [text.strip()]
-        for q, part in zip(rest, parts):
-            q.answer = _match_option(part, q.options) if q.options else part.strip()
+        parts = [p.strip() for p in _SPLIT.split(text) if p.strip()]
+        if len(parts) == len(open_qs):
+            # one part per question, in the order they were asked
+            pairs = list(zip(open_qs, parts))
+        else:
+            rest = [q for q in open_qs if q.answer is None]
+            pairs = list(zip(rest, parts if len(rest) > 1 else [text.strip()]))
+        for q, part in pairs:
+            if q.answer is None:
+                q.answer = _coerce_answer(part, q, fields.get(q.id))
         for k, v in hints.items():
-            b.intake.setdefault(k, v)
+            if open_qs:
+                b.intake.setdefault(k, v)
+            else:
+                b.intake[k] = v      # no question open: the text changes the brief
 
     for q in b.questions:
         if q.answer is None or q.answer == "":
@@ -277,6 +287,24 @@ def _answer(ws: Workspace, model: Model | None, text: str) -> Message:
     ws.event("consultant", "answers", f"{len(open_qs) - len(b.open_questions)} answered, "
              f"{len(b.open_questions)} open")
     return _message(ws)
+
+
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _coerce_answer(part: str, q: Question, field: Any) -> Any:
+    """A free-text answer as the field wants it: the number in "200 years" for an int field, the option a word
+    points at, else the text."""
+    ftype = getattr(field, "type", None)
+    if ftype in ("int", "float"):
+        m = _NUMBER.search(part)
+        if m:
+            value = float(m.group(0))
+            return int(value) if ftype == "int" and value.is_integer() else value
+        return part
+    if q.options:
+        return _match_option(part, q.options)
+    return part.strip()
 
 
 def _match_option(text: str, options: list[str] | None) -> Any:
