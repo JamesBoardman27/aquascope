@@ -179,11 +179,31 @@ def _numbers_for(sid: str, tool: str, p: dict[str, Any], rp: Any) -> list[dict[s
         add("CCME WQI", ccme.get("score"), "of 100")
     elif tool == "who_screen":
         add("WHO guideline alerts", p.get("n_alerts"), "")
+    elif tool == "return_periods":
+        periods = p.get("return_periods") or []
+        levels = p.get("return_levels") or []
+        dist = str(p.get("distribution") or "").upper()
+        try:
+            idx = [float(x) for x in periods].index(float(rp))
+        except (ValueError, TypeError):
+            idx = None
+        if idx is not None and idx < len(levels):
+            add(f"{rp}-year return level, {dist or 'fit'} on the table", levels[idx])
+            lo, hi = (p.get("lower_bound") or []), (p.get("upper_bound") or [])
+            if idx < len(lo) and idx < len(hi):
+                add(f"{rp}-year {dist} interval, low", lo[idx])
+                add(f"{rp}-year {dist} interval, high", hi[idx])
+        add("Years of annual maxima", p.get("n_years"), "years")
     elif tool == "flow_duration":
         pct = p.get("percentiles") or {}
-        for key in ("q95", "q50", "q10", "Q95", "Q50", "Q10"):
-            if pct.get(key) is not None:
-                add(key.upper(), pct[key])
+        wanted = {95: "Q95", 50: "Q50", 10: "Q10"}
+        for key, value in (pct.items() if isinstance(pct, dict) else []):
+            try:
+                number = float(str(key).lower().lstrip("q"))
+            except ValueError:
+                continue
+            if number in wanted and value is not None:
+                add(wanted[int(number)], value)
     return out
 
 
@@ -225,35 +245,66 @@ def software_citation() -> str:
     return builder.software_citation()
 
 
+_DOI = re.compile(r"10\.\d{4,9}/[^\s,;)\]]+", re.I)
+_YEAR_IN = re.compile(r"\b(1[89]\d\d|20\d\d)\b")
+_AUTHOR = re.compile(r"([A-Z][A-Za-z'\-]+)")
+
+
+def _ref_key(text: str) -> str:
+    """One key per work: the DOI when there is one, else the first author's surname and the year."""
+    m = _DOI.search(text)
+    if m:
+        return "doi:" + m.group(0).rstrip(".").lower()
+    year = _YEAR_IN.search(text)
+    author = _AUTHOR.search(text)
+    if year and author:
+        return f"{author.group(1).lower()}:{year.group(1)}"
+    return " ".join(text.lower().split())
+
+
 def references(ws: Workspace) -> list[str]:
-    """Registry citations of the methods the steps name, the payloads' own method citations, the playbook's
-    citations and the software citation; in that order, once each."""
+    """The works behind the study, once each: the registry citations of the methods the steps name, the
+    payloads' own method citations, the playbook's citations and the software citation. Two entries for the
+    same work (a DOI, or the same first author and year) collapse to the fuller one."""
     from aquascope.methods import METHODS
 
     study = ws.study_obj()
-    out: list[str] = []
+    order: list[str] = []
+    best: dict[str, str] = {}
 
     def add(text: str | None) -> None:
         text = " ".join(str(text or "").split())
-        if text and text not in out:
-            out.append(text)
+        if not text:
+            return
+        # A registry line may cite two works ("England et al. (2019) ...; Hosking (1990) ..."): split them.
+        parts = [p.strip() for p in text.split(";")] if _YEAR_IN.search(text) and text.count("(") >= 2 \
+            and "; " in text and not _DOI.search(text) else [text]
+        for part in parts:
+            if not part:
+                continue
+            key = _ref_key(part)
+            if key not in best:
+                order.append(key)
+                best[key] = part
+            elif len(part) > len(best[key]):
+                best[key] = part
 
     for s in (study.steps if study else []):
         m = METHODS.get(s.method or "")
         if m is not None and m.citation:
-            add(f"{m.label}: {m.citation}")
+            add(m.citation)
     for r in (ws.run or {}).get("results") or []:
         payloads = [r.get("result")] + ([r["fallback"].get("result")] if isinstance(r.get("fallback"), dict) else [])
         for p in payloads:
             for m in ((p or {}).get("methods") or []) if isinstance(p, dict) else []:
                 if isinstance(m, dict) and m.get("citation"):
-                    add(f"{m.get('name')}: {m['citation']}")
+                    add(m["citation"])
                 elif isinstance(m, str):
                     add(m)
     for c in ((study.plan or {}).get("citations") or []) if study else []:
         add(c)
     add(software_citation())
-    return out
+    return [best[k] for k in order]
 
 
 # ── template prose ──────────────────────────────────────────────────────────
@@ -300,6 +351,40 @@ def _answer_from(prose: str, key: list[dict[str, Any]], quantities: list[str] | 
     return "No step produced a number; see what the study does not establish."
 
 
+def _record_names(ws: Workspace) -> list[tuple[str, str, str]]:
+    """``(source, station_id, name)`` for every named record the run touched or the inventory lists."""
+    out: dict[tuple[str, str], str] = {}
+    for r in (ws.run or {}).get("results") or []:
+        for p in (r.get("result"), (r.get("fallback") or {}).get("result") if isinstance(r.get("fallback"), dict)
+                  else None):
+            if isinstance(p, dict) and p.get("source") and p.get("station_id"):
+                name = p.get("station_name") or p.get("name")
+                if isinstance(name, str) and name.strip() and name.strip() != str(p["station_id"]):
+                    out.setdefault((str(p["source"]), str(p["station_id"])), name.strip())
+    for d in (ws.inventory.datasets if ws.inventory else []):
+        if d.source and d.station_id and d.name and d.name != d.station_id:
+            out.setdefault((str(d.source), str(d.station_id)), d.name)
+    return [(k[0], k[1], v) for k, v in out.items()]
+
+
+def name_records(text: str, names: list[tuple[str, str, str]]) -> str:
+    """"Kingston (uk_ea 8496ce69...)" the first time a record is named, "Kingston" after that."""
+    for source, sid, name in names:
+        full = f"{name} ({source} {sid})"
+        first = [full not in text]
+        pat = re.compile(rf"(?:\b(?:station|gauge|well|rain gauge)\s+)?(?<![(\w])"
+                         rf"{re.escape(source)}\s+{re.escape(sid)}(?![\w-])")
+
+        def swap(m: re.Match[str]) -> str:
+            if first[0]:
+                first[0] = False
+                return full
+            return name
+
+        text = pat.sub(swap, text)
+    return text
+
+
 def _step_prose(sid: str, r: dict[str, Any], study: Study) -> str:
     from aquascope.ai_engine.team import _sentences_for
 
@@ -330,15 +415,109 @@ def _step_prose(sid: str, r: dict[str, Any], study: Study) -> str:
     return " ".join(lines)
 
 
+def _summary_paragraph(ws: Workspace, study: Study, results: list[dict[str, Any]], key: list[dict[str, Any]],
+                       missing: list[str], answer: str) -> str:
+    """One paragraph: what was asked, on what record, what ran and how the gates went, the headline number."""
+    plan = study.plan or {}
+    run = ws.run or {}
+    records = []
+    for r in results:
+        p = r.get("result")
+        if isinstance(p, dict) and p.get("source") and p.get("station_id"):
+            label = p.get("station_name") or p.get("name")
+            label = f"{label} ({p['source']} {p['station_id']})" if label else f"{p['source']} {p['station_id']}"
+            if p.get("years"):
+                label += f", {_fmt(p['years'])} years"
+            if label not in records:
+                records.append(label)
+    gates = run.get("gates") or []
+    passed = sum(1 for g in gates if g.get("passed"))
+    bits = [f"{plan.get('objective') or ws.brief.problem}."]
+    if records:
+        bits.append("The record: " + "; ".join(records[:3]) + ".")
+    bits.append(f"{len(results)} step(s) ran" + (f" ({plan.get('author')} plan"
+                + (f", playbook {plan['playbook']}" if plan.get("playbook") else "") + ")")
+                + (f"; {passed} of {len(gates)} gates passed" if gates else "")
+                + (f"; the study stopped at {run.get('stopped_at')}" if run.get("stop_reason") else "") + ".")
+    head = [s for s in _SENTENCE.split(answer) if re.search(r"\d", s)]
+    if head:
+        bits.append(head[-1] if len(head[-1]) > 40 else head[0])
+    if missing:
+        bits.append(f"{len(missing)} point(s) are listed under what this study does not establish.")
+    return " ".join(bits)
+
+
+def _site_rows(ws: Workspace, study: Study) -> tuple[list[list[Any]], int]:
+    """The inventory rows worth a line (a year of record or more, or used by the plan) and how many short
+    records were left out (G)."""
+    inv = ws.inventory
+    if inv is None:
+        return [], 0
+    used = {(str(st.arguments.get("source")), str(st.arguments.get("station_id"))) for st in study.steps
+            if st.arguments.get("station_id")}
+    rows: list[list[Any]] = []
+    short = 0
+    for d in inv.datasets:
+        listed = d.kind != "station" or (d.years or 0) >= 1 or (str(d.source), str(d.station_id)) in used
+        if not listed:
+            short += 1
+            continue
+        who = f"{d.source} {d.station_id}" if d.station_id else (d.source or "")
+        end = d.end or ("present" if d.start else "?")
+        span = f"{d.start or '?'} to {end}" if (d.start or d.end) else ""
+        rows.append([d.id, d.kind, d.variable or "", who, d.name or "", f"{d.years:g}" if d.years else "",
+                     d.resolution or "", d.distance_km if d.distance_km is not None else "", span,
+                     (d.quality or {}).get("verdict") or ""])
+    return rows, short
+
+
+def _recommendations(ws: Workspace, study: Study, missing: list[str]) -> list[str]:
+    """Two to four bullets from the gates' outcomes, the registry's marginal verdicts and the playbook's caveats;
+    never the answer again (H)."""
+    from aquascope.methods import METHODS
+
+    run = ws.run or {}
+    plan = study.plan or {}
+    out: list[str] = []
+    for g in (run.get("failed_gates") or [])[:2]:
+        out.append(f"Before relying on step {g.get('step')}, settle the failed gate {g.get('check')}: "
+                   f"{g.get('detail')}. A longer record or another source would.")
+    if run.get("replans") or any(r.get("fallback_used") for r in run.get("results") or []):
+        out.append("A fallback ran after a failed gate; its numbers are indicative, not a substitute for the "
+                   "step that failed.")
+    suff = {r.get("method"): r for r in (ws.inventory.sufficiency if ws.inventory else []) if isinstance(r, dict)}
+    for st in study.steps:
+        row = suff.get(st.method)
+        if row and row.get("status") == "marginal" and len(out) < 3:
+            label = METHODS[st.method].label if st.method in METHODS else st.method
+            out.append(f"{label} is marginal here ({row.get('reason')}); a longer record would firm it up.")
+    for g in run.get("gates") or []:
+        if g.get("check") == "spread_within" and g.get("passed") and len(out) < 3:
+            out.append(f"Quote both fits with their intervals: {g.get('detail')}.")
+            break
+    for c in (plan.get("caveats") or []):
+        if len(out) >= 4:
+            break
+        out.append(f"Read the numbers with this caveat: {_first_sentence(str(c))}")
+    if not out:
+        out.append("Re-run the study file when the record is updated; the gates will say whether the estimate "
+                   "moved.")
+    return out[:4]
+
+
+def _first_sentence(text: str) -> str:
+    text = " ".join(text.split())
+    m = re.match(r"(.+?[.!?])(\s|$)", text)
+    return m.group(1) if m else text
+
+
 def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]], key: list[dict[str, Any]],
                        missing: list[str], refs: list[str], answer: str) -> dict[str, str]:
     b = ws.brief
     plan = study.plan or {}
     site = ws.site or {}
     sections: dict[str, str] = {}
-    table = _md_table([[k["label"], _fmt(k["value"]), k.get("unit") or "", k["step"]] for k in key[:20]],
-                      ["Quantity", "Value", "Unit", "Step"])
-    sections["summary"] = answer + ("\n\n" + table if table else "")
+    sections["summary"] = _summary_paragraph(ws, study, results, key, missing, answer)
 
     parts = [b.problem]
     if b.decision:
@@ -356,28 +535,23 @@ def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]
     sections["problem"] = " ".join(parts)
 
     inv = ws.inventory
-    rows = []
-    for d in (inv.datasets if inv else []):
-        who = f"{d.source} {d.station_id}" if d.station_id else (d.source or "")
-        span = f"{d.start or '?'} to {d.end or '?'}" if (d.start or d.end) else ""
-        rows.append([d.id, d.kind, d.variable or "", who, d.name or "", f"{d.years:g}" if d.years else "",
-                     d.resolution or "", d.distance_km if d.distance_km is not None else "", span,
-                     (d.quality or {}).get("verdict") or ""])
-    # No count in the prose: the Critic holds every number to a tool result, and a count is ours, not a tool's.
+    rows, short = _site_rows(ws, study)
     head = (f"Site: {site.get('lat')}, {site.get('lon')}. "
             + ("The datasets within reach or attached:" if rows else "No inventory."))
     tbl = _md_table(rows, ["Id", "Kind", "Variable", "Source", "Name", "Years", "Resolution", "km", "Period",
                            "Quality"])
+    tail = (f"and {short} more short record(s) within reach, under a year of record each, not listed."
+            if short else "")
     notes = "\n".join(f"- {n}" for n in (inv.notes[:8] if inv else []))
-    sections["site_data"] = "\n\n".join(x for x in (head, tbl, notes) if x)
+    sections["site_data"] = "\n\n".join(x for x in (head, tbl, tail, notes) if x)
 
     meth = [f"Objective: {plan.get('objective')}." if plan.get("objective") else ""]
     meth.append("\n".join(f"{i}. {m}" for i, m in enumerate(plan.get("methodology") or [], 1)))
-    for s in study.steps:
-        args = ", ".join(f"{k}={v!r}" for k, v in s.arguments.items())
+    for st in study.steps:
+        args = ", ".join(f"{k}={v!r}" for k, v in st.arguments.items())
         gates = "; ".join(f"{g.get('check')}" + (f" {g['value']}" if g.get("value") is not None else "")
-                          + f" on {g.get('path') or ', '.join(g.get('paths') or [])}" for g in s.expects)
-        meth.append(f"Step {s.id}: `{s.tool}({args})`" + (f", method {s.method}" if s.method else "")
+                          + f" on {g.get('path') or ', '.join(g.get('paths') or [])}" for g in st.expects)
+        meth.append(f"Step {st.id}: `{st.tool}({args})`" + (f", method {st.method}" if st.method else "")
                     + (f"; gates: {gates}" if gates else "; no gate") + ".")
     if plan.get("assumptions"):
         meth.append("Assumptions: " + "; ".join(str(a) for a in plan["assumptions"]) + ".")
@@ -385,6 +559,8 @@ def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]
         alts = [f"{a.get('method')}: {a.get('why_not')}" if isinstance(a, dict) else str(a)
                 for a in plan["alternatives"]]
         meth.append("Alternatives considered: " + "; ".join(alts) + ".")
+    if plan.get("notes"):
+        meth.append("Notes from planning: " + "; ".join(str(n) for n in plan["notes"]) + ".")
     sections["methodology"] = "\n\n".join(m for m in meth if m)
 
     for r in results:
@@ -400,20 +576,7 @@ def _template_sections(ws: Workspace, study: Study, results: list[dict[str, Any]
         lim.append("Expected at planning:\n" + "\n".join(f"- {c}" for c in plan["limitations_expected"]))
     sections["limitations"] = "\n\n".join(lim)
 
-    recs = []
-    if key:
-        recs.append(f"Quote the finding with its record and interval: {answer}")
-    for m in missing[:5]:
-        recs.append(f"Before relying on the affected number, address: {m}")
-    run = ws.run or {}
-    if run.get("replans"):
-        recs.append("A replan ran after a failed gate; the fallback's numbers are indicative, not a substitute.")
-    for d in (inv.uploads() if inv else []):
-        if (d.quality or {}).get("verdict") == "check":
-            recs.append(f"Check the gaps and warnings in {d.id} before quoting statistics from it.")
-    if not recs:
-        recs.append("The numbers stand as computed; re-run the study file when the records are updated.")
-    sections["recommendations"] = "\n".join(f"- {r}" for r in recs)
+    sections["recommendations"] = "\n".join(f"- {r}" for r in _recommendations(ws, study, missing))
 
     sections["references"] = "\n".join(f"{i}. {r}" for i, r in enumerate(refs, 1))
 
@@ -474,8 +637,12 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
         from aquascope.studio.roles.consultant import _rules_quantities
 
         quantities = _rules_quantities(ws.brief.playbook, ws.brief.intake)
-    answer = _answer_from(_template_answer(study, prior_run(ws)), key, quantities)
+    names = _record_names(ws)
+    answer = name_records(_answer_from(_template_answer(study, prior_run(ws)), key, quantities), names)
     texts = _template_sections(ws, study, results, key, missing, refs, answer)
+    for sid in list(texts):
+        if sid.startswith("results-") or sid == "summary":
+            texts[sid] = name_records(texts[sid], names)
     site = ws.site or {}
     title = str(plan.get("objective") or ws.brief.decision or ws.brief.problem)[:80]
     if site:
@@ -493,11 +660,13 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
             "steps": [{"id": r.get("id"), "tool": r.get("tool"), "arguments": r.get("arguments"),
                        "rationale": r.get("rationale"), "ok": r.get("ok"), "error": r.get("error"),
                        "gates": r.get("gates"), "fallback_used": r.get("fallback_used"),
-                       "result": compact(r.get("result")),
+                       "result": compact(r.get("result"), max_list=24),
                        "fallback": compact({k: v for k, v in (r.get("fallback") or {}).items()
-                                            if k in ("tool", "arguments", "ok", "gates", "result")})
+                                            if k in ("tool", "arguments", "ok", "gates", "result")}, max_list=24)
                        if r.get("fallback") else None} for r in results],
             "key_numbers": key,
+            "numbers_rule": "every number in steps[*].result and steps[*].fallback.result may be quoted; "
+                            "key_numbers is the summary table's subset, not a whitelist",
             "not_established": missing,
             "inventory": [{k: v for k, v in d.to_dict().items() if k in ("id", "kind", "variable", "source",
                                                                           "station_id", "name", "years")}
@@ -521,12 +690,9 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
             n = 0
             for sid, text in written.items():
                 if sid in texts and sid not in ("references", "appendix") and isinstance(text, str) and text.strip():
+                    texts[sid] = text.strip()
                     if sid == "summary":
-                        rest = texts["summary"].split("\n\n", 1)
-                        texts["summary"] = text.strip() + ("\n\n" + rest[1] if len(rest) > 1 else "")
                         summary_by_model = True
-                    else:
-                        texts[sid] = text.strip()
                     n += 1
             prose_by = "model"
             ws.event("author", "prose", f"model wrote {n} section(s)" + (" after the Critic's fixes" if issues else ""))
@@ -534,10 +700,8 @@ def author_report(ws: Workspace, model: Model | None, *, issues: list[dict[str, 
             ws.event("author", "template", "the model gave no usable prose; template prose stands")
     else:
         ws.event("author", "template", f"{len(texts)} section(s) from the template")
-    if not summary_by_model:
-        # The summary opens with the answer (the model's when it wrote one), then the key numbers table.
-        texts["summary"] = answer + ("\n\n" + texts["summary"].split("\n\n", 1)[1]
-                                     if "\n\n" in texts["summary"] else "")
+    if summary_by_model and answer and not texts["summary"].startswith(answer[:40]):
+        pass  # the model's summary stands as one paragraph; the answer is the report's own field
     report = {
         "title": title,
         "answer": answer,
@@ -565,6 +729,10 @@ def to_markdown(ws: Workspace) -> str:
     r = ws.report or {}
     by_id = {a.id: a for a in ws.artifacts}
     lines = [f"# {r.get('title') or ws.brief.problem or 'Study'}", "", str(r.get("answer") or ""), ""]
+    table = _md_table([[k["label"], _fmt(k["value"]), k.get("unit") or "", k["step"]]
+                       for k in (r.get("key_numbers") or [])[:20]], ["Quantity", "Value", "Unit", "Step"])
+    if table:
+        lines += [table, ""]
     for s in r.get("sections") or []:
         lines += [f"## {s.get('title')}", "", str(s.get("text") or ""), ""]
         for fid in s.get("figures") or []:

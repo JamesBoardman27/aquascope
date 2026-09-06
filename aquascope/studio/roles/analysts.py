@@ -19,7 +19,9 @@ no thread pool here, in Pyodide or out of it.
 from __future__ import annotations
 
 import functools
+import hashlib
 import io
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -29,7 +31,92 @@ from aquascope.studio.prompts import SPECIALIST
 from aquascope.studio.workspace import Artifact, Workspace
 from aquascope.study import Study, StudyRun, run_study
 
-__all__ = ["load_table", "prior_run", "run"]
+__all__ = ["KINDS_BY_METHOD", "analyze_station_full", "load_table", "prior_run", "run"]
+
+#: The figure kinds a station step draws when its plan names a method (E); no method draws every kind of the tool.
+KINDS_BY_METHOD: dict[str, list[str]] = {
+    "trend_mann_kendall": ["series", "trend"],
+    "at_site_flood_frequency": ["annual_maxima", "frequency_curve"],
+    "flow_duration": ["fdc"],
+    "low_flow_frequency": ["fdc"],
+    "groundwater_trend": ["series", "trend"],
+}
+#: Payload keys stripped before a result goes into the workspace (the figures read them first).
+_BULK_KEYS = ("series",)
+
+
+# ── the station analysis with its series kept for the figures ───────────────
+
+
+def analyze_station_full(source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False,
+                         variable: str | None = None) -> dict[str, Any]:
+    """``aquascope.explore.analyze_station`` with the daily series and the full flow-duration curve kept in the
+    payload (the runner's own ``analyze_station`` drops them, so the hydrograph, trend and FDC figures never
+    drew); the bootstrap band as the runner adds it. The Analysts strip the series before the payload is stored."""
+    from aquascope import mcp_server as registry
+    from aquascope.explore import analyze_station as _analyze
+    from aquascope.explore import flood_ci
+
+    sources = getattr(registry, "SOURCES", None)
+    variables = getattr(registry, "VARIABLES", None)
+    if sources is not None and source not in sources:
+        return {"error": f"unknown source {source!r}"}
+    if variable and variables is not None and variable not in variables:
+        return {"error": f"unknown variable {variable!r}; allowed: {list(variables)}"}
+    store: dict[str, Any] = {}
+    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable)
+    if bootstrap_ci and res.get("ffa") and store.get("series") is not None:
+        try:
+            ci = flood_ci(store["series"])
+            res["ffa"]["fits"]["gev_bootstrap"] = {
+                k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded") if k in ci
+            }
+            res.setdefault("methods", []).append(ci["method"])
+        except Exception as exc:  # noqa: BLE001 - the band is optional
+            res.setdefault("notes", []).append(f"bootstrap CI failed: {exc}")
+    return res
+
+
+def _name_stations(ws: Workspace, run: StudyRun) -> None:
+    """``station_name`` (and ``name`` when the agency gave none) from the inventory on every station payload,
+    so captions, tables and the template prose say "Kingston (uk_ea 8496ce69...)" and not the id alone (D)."""
+    inv = ws.inventory
+    if inv is None:
+        return
+    names = {(d.source, d.station_id): d.name for d in inv.datasets if d.station_id and d.name
+             and d.name != d.station_id}
+    for r in run.results:
+        payloads = [r.get("result")]
+        fb = r.get("fallback")
+        if isinstance(fb, dict):
+            payloads.append(fb.get("result"))
+        for p in payloads:
+            if not isinstance(p, dict) or not p.get("source") or not p.get("station_id"):
+                continue
+            name = names.get((str(p["source"]), str(p["station_id"])))
+            if name:
+                p.setdefault("station_name", name)
+                if not p.get("name"):
+                    p["name"] = name
+
+
+def _strip_bulk(run: StudyRun, study: Study) -> None:
+    """Drop the daily series from the stored results (a workspace must not carry 50k points) and rehash."""
+    for r in run.results:
+        recs = [r]
+        if isinstance(r.get("fallback"), dict):
+            recs.append(r["fallback"])
+        for rec in recs:
+            p = rec.get("result")
+            if not isinstance(p, dict) or not any(k in p for k in _BULK_KEYS):
+                continue
+            for k in _BULK_KEYS:
+                p.pop(k, None)
+            blob = json.dumps(p, ensure_ascii=False, default=str, sort_keys=True)
+            rec["sha256"] = hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+        sid = str(r.get("id"))
+        if sid in study.results and r.get("sha256"):
+            study.results[sid]["sha256"] = r["sha256"]
 
 
 # ── the table loader ────────────────────────────────────────────────────────
@@ -86,6 +173,18 @@ def load_table(ws: Workspace, table: str, value_column: str | None = None,
 # ── figures and tables per step ─────────────────────────────────────────────
 
 
+def _kind_of(item: Any, sid: str) -> str | None:
+    """The figure kind of a maker's artifact: ``meta["kind"]`` or the ``fig-{step}-{kind}`` id."""
+    meta = getattr(item, "meta", None) if not isinstance(item, dict) else item.get("meta")
+    if isinstance(meta, dict) and meta.get("kind"):
+        return str(meta["kind"])
+    ident = str(getattr(item, "id", None) if not isinstance(item, dict) else item.get("id") or "")
+    prefix = f"fig-{sid}-"
+    if ident.startswith(prefix):
+        return ident[len(prefix):].removesuffix("-svg")
+    return None
+
+
 def _as_artifact(item: Any) -> Artifact | None:
     if isinstance(item, Artifact):
         return item
@@ -94,8 +193,16 @@ def _as_artifact(item: Any) -> Artifact | None:
     return None
 
 
-def _draw(ws: Workspace, run: StudyRun, drawn: set[str], on_artifact: Any) -> None:
-    """Call the deliverables' makers on every result not drawn yet; an event when they cannot be."""
+def _kinds_for(study: Study, sid: str) -> list[str] | None:
+    step = study.step_by_id(sid)
+    if step is None or not step.method:
+        return None
+    return KINDS_BY_METHOD.get(step.method)
+
+
+def _draw(ws: Workspace, run: StudyRun, drawn: set[str], on_artifact: Any, study: Study | None = None) -> None:
+    """Call the deliverables' makers on every result not drawn yet (the figure kinds limited by the step's
+    method when it names one); an event when they cannot be."""
     try:
         from aquascope.studio.deliverables.figures import figures_for
         from aquascope.studio.deliverables.tables import tables_for
@@ -115,8 +222,19 @@ def _draw(ws: Workspace, run: StudyRun, drawn: set[str], on_artifact: Any) -> No
             drawn.add(sid)
             payload = rec["result"]
             made: list[Any] = []
+            kinds = _kinds_for(study, sid) if study is not None else None
             try:
-                made += list(figures_for(sid, rec.get("tool"), payload, unit=payload.get("unit"), site=ws.site) or [])
+                if kinds is not None:
+                    try:
+                        figs = figures_for(sid, rec.get("tool"), payload, unit=payload.get("unit"), site=ws.site,
+                                           kinds=kinds)
+                    except TypeError:  # a maker without the kinds argument: filter what it drew
+                        figs = [a for a in (figures_for(sid, rec.get("tool"), payload, unit=payload.get("unit"),
+                                                        site=ws.site) or [])
+                                if _kind_of(a, sid) in kinds]
+                else:
+                    figs = figures_for(sid, rec.get("tool"), payload, unit=payload.get("unit"), site=ws.site)
+                made += list(figs or [])
             except Exception as exc:  # noqa: BLE001 - a figure that cannot be drawn is a note, not a stop
                 ws.event("analyst", "figures_skipped", f"{type(exc).__name__}: {exc}", step=sid)
             try:
@@ -211,12 +329,22 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
                  step=event.get("step"))
 
     callables = catalogue.callables({**(tools or {}), catalogue.LOAD_TABLE: functools.partial(load_table, ws)})
+    if "analyze_station" not in (tools or {}):
+        # Only the registry's own analyze_station is swapped for the one that keeps the series; a caller's tool
+        # (the browser's, a test's) stands.
+        try:
+            from aquascope.mcp_server import analyze_station as registry_analyze
+        except ImportError:  # pragma: no cover
+            registry_analyze = None
+        if callables.get("analyze_station") is registry_analyze:
+            callables["analyze_station"] = analyze_station_full
     prior = _reusable(prior, study)
     drawn: set[str] = set()
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     ws.event("analyst", "start", f"{len(study.steps)} step(s)")
     run_ = run_study(study, on_event=say, prior=prior, tools=callables)
-    _draw(ws, run_, drawn, on_artifact)
+    _name_stations(ws, run_)
+    _draw(ws, run_, drawn, on_artifact, study)
     replans = 0
     attempts = 0
     while run_.stop_reason and attempts < max_replans:
@@ -238,7 +366,8 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
             study = new
             replans += 1
             run_ = run_study(study, on_event=say, prior=run_, tools=callables)
-            _draw(ws, run_, drawn, on_artifact)
+            _name_stations(ws, run_)
+            _draw(ws, run_, drawn, on_artifact, study)
             continue
         if not model:
             break
@@ -268,8 +397,10 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
                    "rationale": str(proposal.get("rationale") or "proposed by the specialist after the gate failed"),
                    "expects": [g for g in (proposal.get("expects") or []) if isinstance(g, dict)]}
         ids = {s.id for s in study.steps if s.id}
+        from aquascope.studio.roles.methodologist import sufficiency_for_validation
+
         errors = catalogue.validate_step({"id": f"{step.id}.fallback", **fb_step}, known_ids=ids,
-                                         sufficiency=ws.inventory.sufficiency if ws.inventory else None)
+                                         sufficiency=sufficiency_for_validation(ws))
         if errors:
             ws.event("analyst", "no_fallback", "the proposal did not pass the validator: " + "; ".join(errors[:3]),
                      step=step.id)
@@ -280,8 +411,10 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
         ws.event("analyst", "replan", f"fallback {fb_step['tool']}: {fb_step['rationale']}", step=step.id)
         replans += 1
         run_ = run_study(study, on_event=say, prior=run_, tools=callables)
-        _draw(ws, run_, drawn, on_artifact)
+        _name_stations(ws, run_)
+        _draw(ws, run_, drawn, on_artifact, study)
 
+    _strip_bulk(run_, study)
     ws.set_study(study)
     ws.run = {
         "ok": bool(run_.ok), "results": [dict(r) for r in run_.results], "gates": run_.gates,
