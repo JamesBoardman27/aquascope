@@ -493,25 +493,29 @@ def _signatures_band(payload: dict[str, Any], unit: str | None, site: dict[str, 
     if not groups:
         return None
     units = list(groups)[:4]
-    rows = max(len(groups[u]) for u in units)
-    fig, axes = _figure(1, len(units), height=max(3.0, 0.42 * rows + 1.4))
+    total = sum(len(groups[u]) for u in units)
+    # One panel per unit, stacked, so every label has its own row and nothing overlaps.
+    import matplotlib.pyplot as plt
     import numpy as np
 
+    fig, axes = plt.subplots(len(units), 1, figsize=(7.0, max(3.2, 0.36 * total + 0.9 * len(units) + 0.8)),
+                             gridspec_kw={"height_ratios": [len(groups[u]) + 0.6 for u in units]})
     axes = list(np.atleast_1d(axes))
     for ax, u in zip(axes, units):
         items = groups[u]
         y = np.arange(len(items))
         vals = np.array([i[1] for i in items])
         err = np.array([[max(i[1] - i[2], 0.0) for i in items], [max(i[3] - i[1], 0.0) for i in items]])
-        ax.barh(y, vals, xerr=err, color=PRIMARY, alpha=0.85, error_kw={"ecolor": DARK, "capsize": 3})
+        ax.barh(y, vals, xerr=err, color=PRIMARY, alpha=0.85, height=0.6, error_kw={"ecolor": DARK, "capsize": 3})
         ax.set_yticks(y)
-        ax.set_yticklabels([i[0] for i in items], fontsize=8)
+        ax.set_yticklabels([i[0] if len(i[0]) <= 58 else i[0][:55] + "..." for i in items], fontsize=8)
         ax.invert_yaxis()
-        ax.set_xlabel(u or "value")
+        ax.set_xlabel(u or "value", fontsize=9)
+        ax.grid(axis="y", visible=False)
     k = payload.get("k") or (payload.get("similarity") or {}).get("k")
     if not k:
         k = next((e.get("n_donors") for e in est.values() if isinstance(e, dict) and e.get("n_donors")), None)
-    axes[0].set_title(f"Transferred flow signatures at {record_name(payload, site)}", fontsize=11, loc="left")
+    fig.suptitle(f"Transferred flow signatures at {record_name(payload, site)}", fontsize=11)
     fig.tight_layout()
     caption = (f"Flow signatures transferred to the site from {k or 'the'} donor catchments, with the "
                f"one-standard-deviation band across donors as error bars" +
@@ -572,7 +576,10 @@ def _glofas_series(payload: dict[str, Any], unit: str | None, site: dict[str, An
         if not am:
             close(fig)
             return None
+        from matplotlib.ticker import MaxNLocator
+
         ax.plot(am[0], am[1], "o-", color=PRIMARY, linewidth=1.2, markersize=4)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.set_xlabel("Year")
         what = "Annual maxima of the modelled discharge"
     ax.set_ylabel(_ylabel("discharge", u))
