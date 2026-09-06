@@ -288,6 +288,8 @@ class Workspace:
     follow_ups: list[dict[str, Any]] = field(default_factory=list)
     declined_reason: str | None = None
     version: int = WORKSPACE_VERSION
+    #: A face's callback for every event as it happens (the Coordinator sets it); not serialised.
+    listener: Any = field(default=None, repr=False, compare=False)
 
     # ── conversation and events ──
 
@@ -299,6 +301,11 @@ class Workspace:
     def event(self, role: str, event: str, detail: str, *, step: str | None = None) -> dict[str, Any]:
         e = {"role": role, "step": step, "event": event, "detail": detail, "at": now()}
         self.events.append(e)
+        if self.listener is not None:
+            try:
+                self.listener(e)
+            except Exception:  # noqa: BLE001 - a face's printing must not stop the study
+                pass
         return e
 
     def set_status(self, status: str) -> None:

@@ -82,6 +82,9 @@ class Model:
                 say(event)
 
         inner, cfg = _model_for(provider, model, api_key, base_url, client, ws.ledger, timeline, relay)
+        if inner is not None:
+            # The Methodologist reads the catalogue, which is longer than a Solve role's context.
+            inner.max_context_chars = MAX_CONTEXT_CHARS
         ws.model = cfg.get("model")
         ws.provider = cfg.get("provider")
         return cls(inner, ws, say=say)

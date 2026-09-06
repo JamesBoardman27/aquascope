@@ -116,6 +116,8 @@ nav:
     - The Analyst (ask, ingest): analyst.md
     - Solve (a problem at a place, planned first): solve.md
     - Solve design contract: solve-design.md
+    - Studio (a complete study at a place, by a crew): studio.md
+    - Studio design contract: studio-design.md
     - HydroGym (an environment for hydrologic agents): gym.md
     - HydroGym benchmark (agents on the playbooks): hydrogym.md
     - Use cases: use_cases.md

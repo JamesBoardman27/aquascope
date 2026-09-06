@@ -323,11 +323,13 @@ class _Model:
         self.cost = cost
         self.timeline = timeline
         self.say = say
+        #: The context cap per call; the Studio raises it for the Methodologist, whose catalogue is longer.
+        self.max_context_chars = MAX_CONTEXT_CHARS
 
     def call(self, role: str, system: str, context: dict[str, Any], *, step: str | None = None) -> str | None:
         user = json.dumps(context, ensure_ascii=False, default=str)
-        if len(user) > MAX_CONTEXT_CHARS:
-            user = user[:MAX_CONTEXT_CHARS] + '... [truncated]"}'
+        if len(user) > self.max_context_chars:
+            user = user[:self.max_context_chars] + '... [truncated]"}'
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         try:
             response = self.client.chat.completions.create(model=self.model, messages=messages)
