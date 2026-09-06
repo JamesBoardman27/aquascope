@@ -227,7 +227,15 @@ def _normalise(steps: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _unwrap(obj: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A repair reply that echoes the context's shape (``{"plan": {...}}``) is the plan inside it."""
+    if isinstance(obj, dict) and "steps" not in obj and isinstance(obj.get("plan"), dict):
+        return obj["plan"]
+    return obj
+
+
 def _check(obj: dict[str, Any] | None, ws: Workspace) -> tuple[list[dict[str, Any]], list[str]]:
+    obj = _unwrap(obj)
     if not obj:
         return [], ["the model returned no plan"]
     steps = _normalise(obj.get("steps"))
@@ -313,6 +321,7 @@ def _model_plan(ws: Workspace, model: Model) -> tuple[Study | None, list[str]]:
             "plan": obj, "errors": errors, "catalogue": context["catalogue"], "gates": list(CHECKS),
             "inventory": context["inventory"],
         })
+        repaired = _unwrap(repaired)
         steps2, errors2 = _check(repaired, ws)
         if repaired is not None and not errors2:
             obj, steps, errors = repaired, steps2, []
@@ -484,8 +493,8 @@ def change(ws: Workspace, model: Model | None, request: str, *, intake: dict[str
         steps, errors = _check(obj, ws)
         if errors and obj is not None:
             ws.event("methodologist", "invalid", "; ".join(errors[:6]))
-            repaired = model.call_json("methodologist", METHODOLOGIST_REPAIR, {
-                "plan": obj, "errors": errors, "gates": list(CHECKS)})
+            repaired = _unwrap(model.call_json("methodologist", METHODOLOGIST_REPAIR, {
+                "plan": obj, "errors": errors, "gates": list(CHECKS)}))
             steps2, errors2 = _check(repaired, ws)
             if repaired is not None and not errors2:
                 obj, steps, errors = repaired, steps2, []
