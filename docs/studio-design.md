@@ -158,7 +158,7 @@ this study does not establish, Recommendations, References, Appendix
 
 - **CLI**: `aquascope studio "PROBLEM" --lat --lon [--data FILE ...] [--provider ...] [--out DIR] [--yes] [--resume workspace.json]`.
 - **MCP**: `studio_start`, `studio_say`, `studio_approve`, `studio_follow_up`, `studio_export`, the workspace dict in and out.
-- **Explorer**: the `studio` worker message (`op`: start, say, approve, follow_up, export) with the workspace dict in and out, `studio_progress` events, artifact events carrying PNG bytes as base64; matplotlib with `loadPackage`, openpyxl and python-docx with micropip, only when a study runs.
+- **Explorer**: Study mode in the drawer (`explorer/src/studio.js`), a thin face over one worker message, `studio`, with `op` start, say, approve, follow_up, file, export (and table, an XLSX to CSV). `start` builds the Studio at the page's site with the attached tables and the page's catchment row (`describe_catchment` from it) and calls `say`; the others rebuild it with `Studio.from_dict` and call the method. Every reply is `{reply, workspace, status}` with the workspace WITHOUT artifact bytes; the worker keeps its own copy WITH them by workspace id, so `file` returns one artifact by id as base64 and `export` the bundle zip. `studio_progress` posts every event as it happens; `studio_artifact` posts every artifact, PNG figures with their bytes, SVG and CSV without. matplotlib is loaded with `loadPackage` before the first run, openpyxl and python-docx with micropip before the first bundle, never on a visit that runs no study.
 
 ## The honesty rules, kept
 
