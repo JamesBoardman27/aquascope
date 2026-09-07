@@ -22,7 +22,9 @@ aquascope gym leaderboard results/*.jsonl --out leaderboard.md
 
 The Phase 0 calibration environment (GR4J on one basin, the gymnasium API)
 is documented in [gym.md](gym.md); `aquascope gym leaderboard` without
-result files still plays those baselines.
+result files still plays those baselines. [Phase 2](#phase-2-plan-quality)
+asks the harder question, whether the *plan* an agent writes is the one a
+hydrologist would write, against expert reference plans at real sites.
 
 ## Tasks
 
@@ -154,6 +156,152 @@ tasks = tasks_from_playbooks(suggest_sites(12, seed=7), ["flood_risk", "ungauged
 results = run_bench(tasks, "team", provider="anthropic", model="claude-sonnet-5", limit=8, unsolvable=2)
 print(leaderboard(results))
 ```
+
+
+## Phase 2: plan quality
+
+Phase 1 asks whether an agent lands on the branch the tree selects; an agent
+that is the tree scores 100 percent by construction, and so, in the plan-first
+team, does every model. Phase 2 ([#367](https://github.com/Rekin226/aquascope/issues/367),
+epic [#363](https://github.com/Rekin226/aquascope/issues/363)) scores the
+plan itself. The key is a set of reference plans written by hand as a
+hydrologist would write them, at real catalog sites whose reconnaissance is
+saved with the case, so a plan can be produced and scored with no network:
+the tree needs none, the Studio Methodologist needs the model call only, and
+a plan produced elsewhere (a device model, a notebook) is scored from its
+JSON.
+
+```bash
+aquascope gym plans list                       # the cases
+aquascope gym plans show flood_at_site_potomac # one case, the YAML
+aquascope gym plans validate                   # every case against the catalogue, the registry and its recon
+aquascope gym plans score offtree_atsite_vs_regional_potomac            # the tree's plan, scored, explained
+aquascope gym plans score gw_well_tetbury --candidate my_plan.json      # any plan JSON
+aquascope gym bench --agent tree --out results/plans-tree.jsonl
+aquascope gym bench --agent methodologist --provider anthropic --model claude-sonnet-5 \
+    --repeats 2 --timeout 300 --resume --out results/plans-methodologist-claude-sonnet-5.jsonl
+aquascope gym bench --agent file --candidates plans_from_a_device_model/ --model my-4b-model \
+    --out results/plans-device.jsonl
+aquascope gym leaderboard results/plans-*.jsonl --out leaderboard.md
+```
+
+### The cases
+
+A case (`aquascope/gym/plans/<id>.yaml`, the authoring rules in
+`_authoring.yaml`) is a brief in a client's words at a real site, the
+playbook it maps to and the intake the brief fixes, the site with the name of
+its saved reconnaissance (`plans/recon/<site>.json`, `assess_site(lat, lon)`
+captured on 2026-09-07 and never edited by hand), and the expert plan: the
+steps in order, each with its tool, the registry method it applies, the gates
+it must carry (`{check, path}`, the path as the catalogue lists it), and
+whether it is optional (a step a good plan may add or leave out: never
+required, never extraneous); the tools and methods that are not defensible at
+that site for that brief (the registry's verdict on the saved reconnaissance,
+or a table tool with no table); or `decline: true` with the kind of decline
+when the data or the brief cannot carry the question. The registry
+(`aquascope.methods`) decides what is defensible; the playbook branch is the
+starting point and the off-tree briefs go beyond it.
+
+Twenty-five cases on seven sites, from three sources and two continents (the
+Potomac at Little Falls, USGS, 96 years of discharge and sampled water
+quality; the Malad River near Gooding on the Snake River plain, USGS, 110
+years, discharge and water quality; Fish Creek near Battle Mountain, USGS,
+8.5 years that ended in 1985; a bare point in the Big Smoky Valley, Nevada,
+no gauge within 50 km; Tetbury, Environment Agency, a 35-year rain gauge with
+a 48-year discharge gauge 0.7 km away and a 50-year borehole 3.9 km away; a
+bare point on the Warm Springs reservation, Oregon, a 22-year gauge 10 km
+away; La Vègre à Asnières-sur-Vègre, Hub'Eau, 46 years):
+
+| playbook | case | the plan, in short |
+| --- | --- | --- |
+| flood_risk | `flood_at_site_potomac` | trend pre-test, two fits with a band and the spread, T = 100 at 96 years |
+| | `flood_short_record_fish_creek` | 8.5 years: the record summarised, the fit forbidden (below the 10-year floor), donors and transferred signatures, T = 50 |
+| | `flood_regional_nevada` | no gauge: catchment, donors, transferred signatures; every station tool forbidden |
+| | `flood_inundation_declined_potomac` | inundation extent: declined |
+| ungauged_flow | `ungauged_at_gauge_oregon` | the 22-year gauge's flow-duration curve, the signatures transferred to the point beside it |
+| | `ungauged_regional_nevada` | catchment, donors, signatures with band and skill |
+| groundwater_decline | `gw_well_tetbury` | Sen's slope with Mann-Kendall at the 50-year borehole, the SGI, recharge optional; the drawdown tool forbidden (no T, S, Q) |
+| | `gw_regional_potomac` | no well in the catalog: the ERA5 water balance, the baseflow at the gauge as the one local proxy; the well methods forbidden |
+| | `gw_cause_declined_tetbury` | the cause asked without abstraction data: declined |
+| drought_status | `drought_gauge_tetbury` | SPI and SPEI on the 35-year gauge; the river and the well optional |
+| | `drought_reanalysis_snake_plain` | no rain gauge: ERA5 indices, the low-flow context at the 110-year gauge required; SPI and SPEI on a gauge forbidden |
+| | `drought_flash_declined_tetbury` | a flash drought asked of monthly indices: declined |
+| supply_reliability | `supply_gauged_vegre` | the flow-duration curve and the screening rule on 46 years, 0.5 m3/s |
+| | `supply_regional_nevada` | catchment (for the area), donors, the screening on transferred Q95, median and Q05 as a band |
+| | `supply_storage_declined_vegre` | a reservoir: declined |
+| irrigation_feasibility | `irrigation_with_gauge_snake_plain` | ET0, the crop demand of 40 ha of maize, the peak month screened against the Malad |
+| | `irrigation_demand_only_nevada` | ET0 and the demand of 20 ha of alfalfa; supply not checked, every supply tool forbidden |
+| | `irrigation_schedule_declined_snake_plain` | a daily schedule: declined |
+| water_quality | `wq_drinking_potomac` | the samples, the WHO screen, the CCME index against the drinking guidelines |
+| | `wq_irrigation_snake_plain` | the samples, the CCME index against FAO 29, SAR, sodium percentage and RSC |
+| | `wq_no_samples_declined_tetbury` | no sampled water quality within reach: declined |
+| | `wq_health_verdict_declined_potomac` | a safe-to-drink verdict: declined |
+| off-tree (flood_risk) | `offtree_atsite_vs_regional_potomac` | the at-site fit *and* the donor transfer as required steps, so the two 100-year figures can be compared |
+| off-tree (irrigation_feasibility) | `offtree_supply_crop_vegre` | the crop demand first, the gauge's record in its own right, then the screening of the peak demand |
+| off-tree (drought_status) | `offtree_drought_well_river_tetbury` | the indices, the propagation to the borehole, the borehole's trend and the river's low-flow context, all required |
+
+Seven cases decline. One data-driven decline of the playbooks (fewer than
+three donors at an ungauged point) does not arise at any real site, because
+the donor pool is the whole archive (37,053 gauged catchments), so the
+declines are the intake rules and the water-quality rule. The
+Heytesbury A36 gauge in Wiltshire (8.3 years) was captured and left out: a
+53-year gauge sits 300 m away, which the reconnaissance does not see because
+it takes the nearest station's span per variable, so no defensible reference
+could be written for it that the Studio's validator would accept (see the
+[discussion](../aquascope/gym/results/2026-09-07/discussion.md)).
+
+### Scoring
+
+`aquascope.gym.plans.score_plan(reference, candidate)` scores a candidate
+plan (a study dict, a workspace dict, or `{"declined": true}`) against a
+reference. On a solvable case:
+
+| part | meaning | weight |
+| --- | --- | --- |
+| `coverage_tools` | the fraction of the reference's required tools the plan uses | 0.30 |
+| `coverage_methods` | the fraction of its required registry methods the plan names (on any step) | 0.25 |
+| `coverage_gates` | the fraction of its required `(tool, check, path)` gates the plan carries on a step with that tool (a longer path matches, a `paths` list is joined as the catalogue writes it) | 0.20 |
+| `clean`, from `forbidden_used` | 1 when no step (nor a step's fallback) uses a forbidden tool or method, else 0 | 0.15 |
+| `parsimony`, `1 - extraneous` | `extraneous` is the fraction of the plan's steps whose tool is neither in the reference (required or optional) nor a framing tool (`describe_catchment`, `find_stations`, `assess_site`) | 0.10 |
+
+`score` is the weighted sum; a part the reference cannot judge (a reference
+with no method, or no gate) is left out and the other weights are
+renormalised. A plan with no steps scores 0 on every part and a plan that
+declines a solvable case scores 0. On a case whose reference declines, the
+score is 1 when the candidate declines and 0 otherwise (`decline_correct`),
+and the coverage parts are not computed. `validator_errors_first_try` is the
+number of errors the Studio's validator raised on the model's first plan (0
+for the tree and for a model plan accepted at once; the Studio lists at most
+six), and `fallback_to_tree` says whether the plan that stands is the tree's
+because the model's did not pass after one repair; both are reported, not
+scored. Every row carries `explain`, one sentence per finding ("missing gate
+min_donors on similar_basins (k)", "forbidden in step s4: method
+at_site_flood_frequency").
+
+Three candidates: `tree` is `playbooks.plan` on the saved reconnaissance;
+`methodologist` is the Studio's Methodologist (`aquascope.studio.roles.methodologist.plan`)
+on a workspace whose brief is the case's (problem text, playbook, intake) and
+whose inventory is built from the saved reconnaissance, so the one network
+call is the model's (keyless, it is the tree); `file` reads
+`<candidates>/<case id>.json`, a study, a workspace or a decline object, with
+`model`, `provider` and `usage` taken from the file when present. With
+`--repeats N` a model plays every case N times and the leaderboard reports
+the spread of the per-run means. Tokens and cost come from the Methodologist's
+ledger and the Phase 1 price table.
+
+### How to add a case
+
+Pick a real site and capture its reconnaissance once
+(`aquascope.explore.assess_site(lat, lon)`, saved as
+`plans/recon/<site>.json` under `{"site", "captured", "recon"}`); write the
+brief as a client would say it, name the playbook and the intake, and write
+the steps as a hydrologist would, reading the registry's verdicts in the
+saved sufficiency table for what is forbidden; the playbook branch is the
+starting point, the brief decides what goes beyond it; then
+`aquascope gym plans validate` and `aquascope gym plans score <id>` for the
+tree's score and its explanation. The rules are in `_authoring.yaml`.
+
+<!-- PHASE2-LEADERBOARD -->
 
 ## Leaderboard
 
