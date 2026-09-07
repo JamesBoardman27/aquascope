@@ -209,12 +209,26 @@ question is answered from the workspace, a change is planned, run and
 re-authored.
 
 Keyless by default, which is a complete study; the key Ask holds is offered
-on one line for the prose; an on-device model that is already there reads
-the first sentence into a brief. Drop a CSV or an XLSX, or attach the table
-open in My data, and the Scout lists it with its QA next to the gauges. The
-figures and the documents are made in the worker and stay there until you
-ask for one; the plotting and document libraries load once, before the first
-run, never on a visit that runs no study. See [studio.md](studio.md#in-the-explorer).
+on one line for the prose. An on-device model that is already there (Chrome's
+built-in model, or the small model Ask loaded) joins the keyless crew: it
+reads the first sentence into a brief, writes the plan at review (the
+engine's validator checks it before the card shows it; the playbook's plan
+stands when it fails, and the card says why) and, after the run, the prose
+(four calls at most; the Critic's checks drop a sentence with a number the
+results do not carry, and the line under the answer says how many). The
+card says who wrote what, and nothing is ever downloaded for it.
+
+Drop a CSV or an XLSX (turned into CSV in the worker), or attach the table
+open in My data, and the Scout lists it with its QA next to the gauges.
+**Stop** terminates the worker and boots it again; the plan is kept and the
+next Approve rebuilds the study. A study is saved in the browser after every
+reply (IndexedDB, the last five): opening Study at the same place offers
+**Resume the last study**, and a `workspace.json` from a bundle dropped on
+the board resumes too. The figures and the documents are made in the worker
+and stay there until you ask for one; the plotting and document libraries
+load once, before the first run, and the Study modules themselves load on
+first use, never on a visit that runs no study. See
+[studio.md](studio.md#in-the-explorer).
 
 ### For an assistant already in your browser
 
@@ -270,12 +284,17 @@ loop is nine times faster, same numbers to 1e-14), which is what makes
   registry), `catalog.js` (DuckDB-WASM over the archive's GeoParquet, GeoJSON
   fallback), `search.js`, `shell.js` and `url.js` (the map-first shell and
   URL-as-state), the `panel-*.js` inspectors, `charts.js` (Plotly), `ask.js`
-  with `showcase.js` and `local-model.js`, `studio.js` with `intake.js` (Study),
-  and `webmcp.js`. `app.js` wires them together.
+  with `showcase.js` and `local-model.js`, `studio.js` with `intake.js`,
+  `studio-device.js` and `study-store.js` (Study, loaded on first use), and
+  `webmcp.js`. `app.js` wires them together.
 - `worker.js`: a Web Worker that loads Pyodide, numpy / scipy / pandas, and the
   aquascope wheel, then calls `aquascope.explore`; the `studio` message drives
   `aquascope.studio.Studio` for Study, loading matplotlib and the document
-  libraries only when a study runs.
+  libraries only when a study runs. Its ops: `start`, `say` (with a
+  `proposed` brief), `approve` (with a `plan`), `follow_up`, `narrate`,
+  `context` (a role's compact context with its system prompt), `check_plan`,
+  `prompts`, `file`, `export` and `table` (an XLSX to CSV), each guarded on
+  the engine having the method.
 - `aquascope.explore` (in the package): the Python half, the same
   `(source, station) -> answer` entry point the CLI and the MCP server use.
   It runs unchanged in CPython, which is how it is tested (`tests/test_explore.py`).

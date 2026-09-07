@@ -210,7 +210,13 @@ board above the input shows one thing at a time:
    why and keeps the plan); **Decline** keeps the input open for a change of
    brief, or start again.
 3. **Running**: the timeline as it happens, one line per event, and the
-   figures as they are drawn. **Stop** abandons the run.
+   figures as they are drawn. **Stop** means stop: Python cannot be
+   interrupted mid-call, so the worker is terminated and boots again (the
+   progress bar as at first load, a few seconds when the runtime is cached).
+   The page keeps its copy of the study, so the board returns to the plan
+   with one line, "stopped; the figures made so far are gone, the plan is
+   kept", and the next Approve rebuilds the study in the fresh worker from
+   that copy. The table open in My data is handed to the new worker again.
 4. **Done**: the answer, the key numbers, the figures, what the study does
    not establish when the Critic listed anything, **Download bundle** (the
    zip) and links for the Word, Excel, Markdown, notebook and `study.yaml`
@@ -221,13 +227,58 @@ board above the input shows one thing at a time:
 
 The tiers are Ask's. Keyless by default, which is a complete study: the
 playbook tree plans, the gates check, templates write. When Ask holds a key,
-one line offers it for the prose and the composed methodology. When Chrome's
-built-in model is already on the device, or Ask has loaded a small model in
-this tab, the page runs the crew's own prompts on it (`say(proposed=...)`,
-`approve(plan=...)`, `narrate(...)` above): the brief before the Consultant
-sees it, the plan through the validator, the prose through the Critic's
-checks; nothing is downloaded for that, and a wrong reading costs one
-question or a dropped sentence, never a wrong number.
+one line offers it for the prose and the composed methodology.
+
+**The device model on the crew.** When Chrome's built-in model is already on
+the device, or Ask has loaded a small model in this tab, it joins the keyless
+crew in three bounded places, and the card says who wrote what:
+
+- the **brief**: it reads the first sentence (the decision, the quantities, a
+  return period or drought timescales when stated) before the Consultant sees
+  it, and a wrong reading costs one question, never a wrong number;
+- the **plan**: at review, the page asks the worker for the Methodologist's
+  context (the same compact JSON the crew's own model would read, with its
+  system prompt) and the exported prompts (`explorer/prompts.json`, or the
+  engine's own when the page has none), the model writes a plan in one call,
+  and the engine's validator checks it before the card shows it. The card
+  then says "planned on this device with Chrome's built-in model", or keeps
+  the tree's plan and says "the playbook's plan (the device model's plan did
+  not pass the validator: ...)" with the first error. Approve sends the
+  device's plan, with any inline edits, and the engine validates it again
+  before running it; the foot of the answer says which plan ran;
+- the **prose**: after the run, the model writes the summary and the
+  recommendations in one call and, while it is quick, one call per result
+  step, four calls at most, and the engine's narrate keeps only what the
+  Critic's checks allow (a sentence with a number the results do not carry
+  is dropped). The line under the answer says "written on this device with
+  Chrome's built-in model; N sentences dropped by the checks".
+
+Every call has the 25 s limit Ask's on-device brief has; on a timeout or a
+reply that is not a plan or a section, the keyless result stands and one
+line says so. Nothing is downloaded for any of this: Study never starts a
+model download, it only uses one that is already there. The device-model
+path cannot run in a headless browser (no WebGPU, no Prompt API), so it is
+tested against a fake model under node and by hand in Chrome.
+
+**Saved studies.** After every reply the workspace (without its bytes) and
+the PNG figures are saved in the browser's IndexedDB, the last five studies
+kept, nothing sent anywhere. Opening Study at a place where a study was made
+(or a `#study=1` link there) offers a **Resume the last study** chip that
+reopens its board in its state, figures included; the documents are remade
+by the next run. A `workspace.json` from a bundle (or from the CLI) dropped
+on the board resumes that study the same way. Where the browser blocks
+storage (a private window, a quota), nothing is saved and nothing is said.
+
+**Tables.** A CSV travels as it is; an `.xlsx` is turned into CSV in the
+worker (pandas, through the same `table` op) before the study starts, so
+every table sits in the workspace the same way and round-trips through the
+bundle. The Scout lists it with its QA next to the gauges, and keyless the
+plan runs on it (`load_table`, then the workbench tools).
+
+The Study modules (`studio.js`, `intake.js`, `studio-device.js`,
+`study-store.js`) load on first use of the Study button, the drawer's
+radio, **Study this place** or a `#study=1` link, not on a first visit that
+runs no study.
 
 The bytes stay in the worker. The page holds the workspace without the
 artifact data; a figure travels as a PNG when it is drawn, a document only

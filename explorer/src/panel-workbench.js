@@ -10,7 +10,7 @@ import { $, actions, downloadBlob, escapeHtml, fmt, state } from "./core.js?v=__
 import { plot } from "./charts.js?v=__BUILD__";
 import { addMethodOnce, renderMethodList } from "./methods.js?v=__BUILD__";
 import { hideCard, selectTab, setCard, setTab, showSurface } from "./shell.js?v=__BUILD__";
-import { call } from "./worker-client.js?v=__BUILD__";
+import { call, onWorkerRestart } from "./worker-client.js?v=__BUILD__";
 import { writeUrl } from "./url.js?v=__BUILD__";
 
 const root = () => $("panel-workbench");
@@ -58,6 +58,7 @@ const ANALYSES = {
 };
 
 let table = null;      // { n, columns, insights, label }
+let tableCsv = null;   // the CSV the worker holds, kept so a restarted worker gets it again
 let runSeq = 0;
 
 export function hasTable() { return Boolean(table); }
@@ -86,7 +87,8 @@ async function loadFile(file) {
     const text = await file.text();
     const res = await call("ingest", { text, filename: file.name });
     // The cleaned series is now the worker's table; ask it to describe itself.
-    const loaded = await call("load_table", { csv: seriesToCsv(res), label: file.name });
+    tableCsv = { csv: seriesToCsv(res), label: file.name };
+    const loaded = await call("load_table", tableCsv);
     setCard($("wb-load-card"), "ready");
     renderQa(res);
     await afterLoad(loaded, file.name);
@@ -107,10 +109,21 @@ function seriesToCsv(res) {
   return lines.join("\n");
 }
 
+// The record on screen as the two-column table the worker builds from it, so a
+// restarted worker can be handed the same table.
+function stationCsv(res) {
+  const t = (res && res.series && res.series.t) || [];
+  const v = (res && res.series && res.series.v) || [];
+  const lines = ["date,discharge"];
+  for (let i = 0; i < t.length; i++) lines.push(`${t[i]},${v[i]}`);
+  return lines.join("\n");
+}
+
 async function loadPasted(text) {
   setCard($("wb-load-card"), "loading", { message: "Reading what you pasted…" });
   try {
-    const loaded = await call("load_table", { csv: text, label: "pasted table" });
+    tableCsv = { csv: text, label: "pasted table" };
+    const loaded = await call("load_table", tableCsv);
     setCard($("wb-load-card"), "ready");
     hideCard($("wb-qa-card"));
     await afterLoad(loaded, "pasted table");
@@ -125,9 +138,11 @@ export async function openStationInWorkbench() {
   setCard($("wb-load-card"), "loading", { message: "Handing this record to the workbench…" });
   try {
     const loaded = await call("frame_from_station", {});
+    const label = state.selected.name || state.selected.station_id;
+    tableCsv = { csv: stationCsv(state.result), label };
     setCard($("wb-load-card"), "ready");
     hideCard($("wb-qa-card"));
-    await afterLoad(loaded, state.selected.name || state.selected.station_id);
+    await afterLoad(loaded, label);
   } catch (err) {
     setCard($("wb-load-card"), "error", { message: `Could not open this record: ${err.message}` });
   }
@@ -389,6 +404,10 @@ export function initWorkbench() {
     writeUrl({ push: true });
   });
   renderMethodList("wb-methods", []);
+  // A Stop in Study terminates the worker; the table it held comes back from here.
+  onWorkerRestart(() => {
+    if (tableCsv) call("load_table", tableCsv).catch((err) => console.info("table not re-sent:", err && err.message));
+  });
   actions.openWorkbench = openWorkbench;
   actions.openStationInWorkbench = openStationInWorkbench;
 }
