@@ -698,8 +698,11 @@ def test_the_study_surface_writes_with_plain_hyphens() -> None:
 @pytestmark_node
 def test_the_node_tests_of_the_pure_modules_pass() -> None:
     """explorer/tests/*.test.mjs are node:test suites over the pure modules (studio-showcase.js, #366)."""
+    # The files themselves, not the directory: Node 22 reads a directory argument as a pattern and finds nothing.
+    files = sorted(str(f) for f in (EXPLORER / "tests").glob("*.test.mjs"))
+    assert files, "no node suites under explorer/tests"
     out = subprocess.run(
-        ["node", "--test", str(EXPLORER / "tests")],
+        ["node", "--test", *files],
         capture_output=True,
         text=True,
         encoding="utf-8",
