@@ -51,8 +51,9 @@ tools, aquascope runs them in your browser, and the answer ends with the data us
 Press **Study** (or "Study this place" on any gauge or point) to hand a whole problem to a crew of roles: it writes the
 brief with you, inventories the data in reach and the table you drop in, proposes a methodology you approve, runs it with
 a check after every step, and hands back a zip with a Word report, an Excel workbook, PNG and SVG figures, a notebook that
-re-runs the study and the study.yaml. Keyless it still does all of that from the playbooks; your own key puts a model
-behind every role ([docs](docs/studio.md)).
+re-runs the study and the study.yaml. Keyless it still does all of that from the playbooks, and with the on-device
+model Ask already loads it plans and writes on your machine; your own key puts a model behind every role. Twelve
+recorded studies on the board show what a full run looks like and re-run live in your browser ([docs](docs/studio.md)).
 Not a Python user? The same files open in [R, QGIS, DuckDB and Julia](docs/readers.md) in place; `integrations/qgis/` has a
 drag-and-drop layer definition.
 
