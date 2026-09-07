@@ -63,7 +63,7 @@ export const state = {
   ask: { running: false, catalogSent: false, markdown: null, run: 0 },
   // One drawer, two modes (Ask, Study); an open Study drawer is part of the URL.
   drawerOpen: false, drawerMode: "ask",
-  study: { running: false },
+  study: { running: false, recorded: null },
 };
 dbg.state = state;
 

@@ -55,7 +55,7 @@ function initStudyLoader() {
 // The Study drawer, after the selection it belongs to has been applied (a
 // selection closes the drawer, so the order matters).
 function openStudyIf(url) {
-  if (url.study) actions.openStudy();
+  if (url.study) actions.openStudy(url.studyId ? { recorded: url.studyId } : {});
 }
 
 // Everything that can arrive from a URL: a station, a point, a tab, the map

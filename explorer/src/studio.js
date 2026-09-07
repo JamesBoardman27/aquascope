@@ -12,7 +12,10 @@
 // run, the prose (the Critic's checks drop what the results do not carry).
 // The card says who wrote what. Nothing is downloaded for that; nothing is
 // uploaded, ever. A study is saved in this browser after every reply, so a
-// reload offers it back; Stop terminates the worker and keeps the plan.
+// reload offers it back; Stop terminates the worker and keeps the plan. The
+// recorded studies (explorer/showcase/studies, made once with a model) are
+// chips on the intake board: one opens as its finished board, as recorded,
+// and Re-run live runs its plan again here, keyless.
 
 import { $, actions, escapeHtml, fmt, sourceStyle, state, stationKey } from "./core.js?v=__BUILD__";
 import { shapeSvg } from "./shapes.js?v=__BUILD__";
@@ -28,6 +31,13 @@ import { briefPrompt, briefSchema, parseBriefReply } from "./intake.js?v=__BUILD
 import { hasTable, tableLabel } from "./panel-workbench.js?v=__BUILD__";
 import { narrateOnDevice, planLine, planOnDevice, proseLine } from "./studio-device.js?v=__BUILD__";
 import { agoWords, latestStudy, loadStudy, saveStudy } from "./study-store.js?v=__BUILD__";
+import { loadRecorded, recordedIndex, replayBrief, replayPlan } from "./studio-showcase.js?v=__BUILD__";
+import {
+  recordedChipsHtml, recordedFigures, recordedFilesHtml, recordedNoteHtml, recordedPlanLine,
+} from "./studio-recorded.js?v=__BUILD__";
+import { writeUrl } from "./url.js?v=__BUILD__";
+
+const RECORDED_BASE = "./showcase/studies/";
 
 const DONOR_K = 10;
 const BRIEF_TIMEOUT_MS = 25000;
@@ -107,6 +117,11 @@ const S = {
   proseLine: null,      // who wrote the prose, in words
   prompts: undefined,   // the crew's exported prompts and schemas: undefined (not asked), null (none), or the dict
   resume: null,         // a saved study offered on the intake board: { id, at, site }
+  index: undefined,     // the recorded studies' index rows: undefined (not asked), else the list
+  moreRecorded: false,  // every recorded chip shown, not just the first six
+  recorded: null,       // the recording on the board: { id, meta, workspace, report, figures, files }
+  planSource: null,     // "recorded" while a re-run's plan is with the engine, for the words on the foot
+  planModel: null,      // the model that wrote the recorded plan being re-run
 };
 
 const note = (text, kind = "info") => setStatusEl($("study-status"), text, kind);
@@ -204,7 +219,8 @@ function intakeHtml() {
   const resume = !started && S.resume
     ? `<p class="study-resume"><button type="button" class="chip" data-act="resume" title="${escapeHtml(`${S.resume.site.text}, ${agoWords(S.resume.at)}`)}">Resume the last study${w ? "" : ` at ${escapeHtml(S.resume.site.text)}`}</button></p>`
     : "";
-  return `<p class="study-where">${w ? w.html : `<span class="muted">Pick a gauge or a spot on the map first.</span>`}</p>${model}${data}${resume}`;
+  const recorded = !started ? recordedChipsHtml(S.index, { showAll: S.moreRecorded }) : "";
+  return `<p class="study-where">${w ? w.html : `<span class="muted">Pick a gauge or a spot on the map first.</span>`}</p>${model}${data}${resume}${recorded}`;
 }
 
 const fmtArg = (v) => (typeof v === "string" ? v : JSON.stringify(v));
@@ -329,8 +345,9 @@ function doneHtml() {
   const report = S.ws.report || {};
   const numbers = (report.key_numbers || []).slice(0, 12);
   const artifacts = S.ws.artifacts || [];
-  const figs = artifacts.filter((a) => a.kind === "figure" && a.media_type === "image/png");
   const not = report.not_established || [];
+  if (S.recorded) return recordedDoneHtml(report, numbers, not);
+  const figs = artifacts.filter((a) => a.kind === "figure" && a.media_type === "image/png");
   const docs = DOCS.filter(([id]) => artifacts.some((a) => a.id === id));
   return `<article class="study-answer ask-result" tabindex="-1" aria-label="The answer">${mdToHtml(report.answer || "No answer was produced.")}</article>` +
     (numbers.length
@@ -347,6 +364,25 @@ function doneHtml() {
     (docs.length ? `<p class="study-docs muted">${docs.map(([id, label]) => `<a href="#" data-file="${id}">${label}</a>`).join(" · ")}</p>` : "") +
     `<p class="study-foot muted">${escapeHtml(footLine())}</p>` +
     `<p class="study-by muted">${escapeHtml(crewLine())}</p>`;
+}
+
+// A recording, as recorded: the note first (the numbers are the recording's), the answer, the key numbers,
+// the figures from their PNG urls, the recorded files as links, Re-run live. No worker call is made.
+function recordedDoneHtml(report, numbers, not) {
+  const rec = S.recorded;
+  return recordedNoteHtml(rec.meta) +
+    `<article class="study-answer ask-result" tabindex="-1" aria-label="The answer">${mdToHtml(report.answer || "No answer was produced.")}</article>` +
+    (numbers.length
+      ? `<table class="ffa study-numbers"><tbody>${numbers.map((k) => `<tr><td>${escapeHtml(k.label)}</td><td>${escapeHtml(numValue(k))}</td></tr>`).join("")}</tbody></table>`
+      : "") +
+    (S.figures.size ? `<div class="study-figs">${[...S.figures.values()].map(figHtml).join("")}</div>` : "") +
+    (not.length
+      ? `<div class="ask-checks warn"><strong>Not established</strong><ul>${not.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul></div>`
+      : "") +
+    `<div class="row-actions"><button type="button" class="btn primary" data-act="rerun" title="Run the recorded plan again here, keyless">Re-run live</button>` +
+    `<button type="button" class="btn" data-act="again">New study</button></div>` +
+    recordedFilesHtml(rec.files) +
+    `<p class="study-foot muted">${escapeHtml(footLine())}</p>`;
 }
 
 function declinedHtml() {
@@ -382,11 +418,11 @@ const PLACEHOLDER = {
 function renderCompose(status) {
   const text = $("study-text"), send = $("study-send"), go = $("study-go");
   const questions = openQuestions().length > 0;
-  const canType = !S.busy && !S.writing && status !== "running";
+  const canType = !S.busy && !S.writing && !S.recorded && status !== "running";
   text.disabled = !canType;
   send.disabled = !canType || (!S.ws && !where());
   go.hidden = !(questions && canType);
-  text.placeholder = PLACEHOLDER[questions ? "questions" : status] || PLACEHOLDER.intake;
+  text.placeholder = S.recorded ? "Re-run live to go on here" : PLACEHOLDER[questions ? "questions" : status] || PLACEHOLDER.intake;
 }
 
 // A figure the page has not seen (the worker was restarted, or the study came
@@ -505,7 +541,12 @@ function applyReply(res, op) {
   if (r.kind === "plan") { S.proposal = null; S.planLine = null; S.proseLine = null; }
   if (r.kind === "report" && (op === "approve" || op === "follow_up")) {
     S.proposal = null;
-    if (p.plan_used) S.planLine = planLine({ used: p.plan_used, errors: p.plan_errors || [], model: deviceLabel() });
+    if (p.plan_used && S.planSource === "recorded") {
+      S.planLine = recordedPlanLine({ used: p.plan_used, errors: p.plan_errors || [], model: S.planModel });
+    } else if (p.plan_used) {
+      S.planLine = planLine({ used: p.plan_used, errors: p.plan_errors || [], model: deviceLabel() });
+    }
+    S.planSource = null;
     S.proseLine = null;
   }
   renderAll();
@@ -681,7 +722,7 @@ async function maybeNarrateOnDevice() {
 
 // ── start, say, approve ─────────────────────────────────────────────────────
 
-async function start(text) {
+async function start(text, { intake: given = null } = {}) {
   const w = where();
   if (!w) { note("Pick a gauge or a spot on the map first.", "warn"); return; }
   const my = ++S.run;
@@ -697,8 +738,8 @@ async function start(text) {
   setBusy(true);
   note(state.workerReady ? "" : "Loading Python in your browser (about 15 MB, once)…");
   try {
-    let intake = null, brief = null;
-    if (await deviceOnCrew()) {
+    let intake = given, brief = null;
+    if (!given && await deviceOnCrew()) {
       const read = await readOnDevice(text);
       if (my !== S.run) return;
       if (read) ({ intake, brief } = read);
@@ -844,9 +885,13 @@ function reset() {
   S.proposal = null;
   S.planLine = null;
   S.proseLine = null;
+  S.planSource = null;
+  S.recorded = null;
+  state.study.recorded = null;
   note("");
   renderAll();
   refreshResume();
+  if (drawerOpen()) writeUrl();
 }
 
 // ── saved studies ───────────────────────────────────────────────────────────
@@ -898,9 +943,93 @@ function openWorkspace(ws, figures, lines = {}) {
   S.proposal = null;
   S.planLine = lines.plan || null;
   S.proseLine = lines.prose || null;
+  S.recorded = null;
+  state.study.recorded = null;
   note("");
   renderAll();
   announce(`Study resumed: ${statusWord(ws.status)}.`);
+}
+
+// ── the recorded studies ────────────────────────────────────────────────────
+// Made once with a model and committed under showcase/studies/ (docs/studio.md,
+// "Recorded studies"). The index is read once and offered as chips; a chip
+// opens the recording as its finished board, with no worker call; Re-run live
+// starts the same study at the recorded site and approves the recorded plan,
+// which runs here keyless through the validator and the gates.
+
+async function loadIndex() {
+  if (S.index !== undefined) return S.index;
+  try {
+    const data = await recordedIndex(RECORDED_BASE, { version: "__BUILD__" });
+    S.index = data.studies.filter((r) => r && r.id);
+  } catch (err) {
+    console.info("recorded studies unavailable:", err && err.message);
+    S.index = [];
+  }
+  if (!S.ws && !S.busy && drawerOpen() && drawerMode() === "study") renderBoard();
+  return S.index;
+}
+
+async function openRecorded(id) {
+  note("Opening the recorded study…");
+  let rec;
+  try {
+    rec = await loadRecorded(RECORDED_BASE, id, { version: "__BUILD__" });
+  } catch (err) {
+    note(`Could not open that recording: ${err.message}`, "error");
+    return;
+  }
+  if (!rec.workspace || !rec.workspace.status) { note("That recording carries no study.", "warn"); return; }
+  S.run++;
+  if (S.cancel) S.cancel();
+  const site = (rec.meta && rec.meta.site) || rec.workspace.site || {};
+  S.ws = rec.workspace;
+  S.recorded = rec;
+  S.site = siteFrom({ lat: site.lat, lon: site.lon, text: site.name, key: `rec/${rec.id}` });
+  S.siteReady = false;
+  S.declined = null;
+  S.editing = false;
+  S.busy = false;
+  S.writing = false;
+  state.study.running = false;
+  state.study.recorded = rec.id;
+  S.files = [];
+  S.events = [];
+  S.figures = new Map(recordedFigures(rec).map((f) => [f.id, f]));
+  S.proposal = null;
+  S.planLine = null;
+  S.proseLine = null;
+  S.planSource = null;
+  note("");
+  renderAll();
+  if (drawerOpen()) writeUrl();
+  focusBoard(".study-answer");
+  announce(`Recorded study opened: ${(rec.meta && rec.meta.title) || rec.id}.`);
+}
+
+// The same study at the recorded site, live: the point on the map (so the URL and the header say where),
+// the recorded text and intake as the brief, the defaults for any question, the recorded plan approved.
+async function rerunRecorded() {
+  const rec = S.recorded;
+  if (!rec || S.busy) return;
+  const b = replayBrief(rec.workspace);
+  const plan = replayPlan(rec.workspace);
+  if (!Number.isFinite(Number(b.lat)) || !Number.isFinite(Number(b.lon))) { note("This recording has no site.", "warn"); return; }
+  const model = (rec.meta && rec.meta.model) || null;
+  S.recorded = null;
+  state.study.recorded = null;
+  S.ws = null;
+  S.figures = new Map();
+  S.files = Object.entries(b.tables || {}).filter(([, csv]) => typeof csv === "string" && csv).map(([id, csv]) => ({ id, csv }));
+  S.useMyData = false;
+  try { actions.selectPoint(Number(b.lat), Number(b.lon), { fly: true, push: true }); } catch (err) { console.warn(err); }
+  openDrawer({ mode: "study" });
+  await start(b.text || (rec.meta && rec.meta.problem) || "", { intake: b.intake });
+  if (S.ws && S.ws.status === "intake" && openQuestions().length) await callStudio("say", { text: "just go" });
+  if (!S.ws || S.ws.status !== "review") return;
+  S.planSource = plan ? "recorded" : null;
+  S.planModel = model;
+  await callStudio("approve", plan ? { plan: { ...plan, source: "recorded" }, edits: null } : { edits: null });
 }
 
 async function resumeSaved() {
@@ -1020,13 +1149,15 @@ function appendFigure(f) {
 
 // ── open, wire ──────────────────────────────────────────────────────────────
 
-export function openStudy({ fresh = false } = {}) {
+export function openStudy({ fresh = false, recorded = null } = {}) {
   const w = where();
   // "Study this place" on a panel: a study made elsewhere is finished with; one made here goes on.
   if (fresh && S.ws && (!w || !S.site || w.key !== S.site.key)) reset();
   openDrawer({ mode: "study" });
   renderAll();
   refreshResume();
+  loadIndex();
+  if (recorded) { openRecorded(recorded); return; }
   if (!S.busy) $("study-text").focus({ preventScroll: true });
 }
 
@@ -1046,8 +1177,12 @@ function onBoardClick(e) {
     else if (what === "again") reset();
     else if (what === "my-data") { S.useMyData = !S.useMyData; renderBoard(); }
     else if (what === "resume") resumeSaved();
+    else if (what === "rerun") rerunRecorded();
+    else if (what === "more-recorded") { S.moreRecorded = true; renderBoard(); }
     return;
   }
+  const chip = e.target.closest("[data-recorded]");
+  if (chip) { openRecorded(chip.dataset.recorded); return; }
   const file = e.target.closest("[data-file]");
   if (file) { e.preventDefault(); downloadArtifact(file.dataset.file); return; }
   const remove = e.target.closest("[data-remove]");
@@ -1089,7 +1224,7 @@ export function initStudy() {
     const chip = e.target.closest("[data-answer]");
     if (chip) send(chip.dataset.answer);
   });
-  $("drawer").addEventListener("drawermode", (e) => { if (e.detail.mode === "study") { renderAll(); refreshResume(); } });
+  $("drawer").addEventListener("drawermode", (e) => { if (e.detail.mode === "study") { renderAll(); refreshResume(); loadIndex(); } });
   onStudioProgress((event, id) => {
     if (id !== S.jobId) return;
     S.events.push(event);

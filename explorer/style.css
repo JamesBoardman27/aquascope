@@ -841,6 +841,9 @@ body.workbench-mode .drawer { right: auto; left: 50%; transform: translateX(-50%
 .study-by { font-size: .72rem; line-height: 1.5; margin: .35rem 0 0; }
 /* A saved study at this place, offered once on the intake board. */
 .study-resume { margin: .45rem 0 0; }
+/* The recorded studies: one line of label, then the chips. */
+.study-recorded { margin-top: .5rem; }
+.study-recorded .study-chips { margin-top: .25rem; }
 
 /* ── narrow screens ──────────────────────────────────────────────────────── */
 

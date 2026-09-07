@@ -648,7 +648,8 @@ def test_the_study_drawer_is_wired_end_to_end() -> None:
     shell = (EXPLORER / "src" / "shell.js").read_text(encoding="utf-8")
     assert 'const MODES = ["ask", "study"]' in shell
     url = (EXPLORER / "src" / "url.js").read_text(encoding="utf-8")
-    assert 'q.set("study", "1")' in url and 'q.has("study") || q.has("solve")' in url, "old Solve links open Study"
+    assert 'q.set("study", state.study.recorded || "1")' in url and 'q.has("study") || q.has("solve")' in url, (
+        "old Solve links open Study; a recording on the board is in the link")
 
 
 def test_the_worker_studio_message_keeps_the_contract() -> None:
