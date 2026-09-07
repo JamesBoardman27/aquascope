@@ -1,0 +1,394 @@
+"""The Coordinator: the state machine over the workspace, and the API every face is thin over.
+
+    intake -> scouting -> planning -> review -> running -> critique -> authoring -> done
+                                        |                                          |
+                                     declined                                  follow-up
+
+:class:`Studio` drives it: :meth:`Studio.say` takes the client's messages
+until the brief is ready, then runs the Scout and the Methodologist and
+returns the plan; :meth:`Studio.approve` runs the Analysts, the Critic and
+the Author to the bundle; :meth:`Studio.follow_up` answers a question from
+the workspace or plans, runs and re-authors a change; :meth:`Studio.export`
+writes the files. Every method returns a :class:`Reply` and leaves the
+workspace consistent, so a face can stop anywhere and resume with
+:meth:`Studio.from_dict`. A role's exception never kills the study: it is an
+event, and a decline (intake, planning) or a report of what happened (the
+run).
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from aquascope.studio.model import Model
+from aquascope.studio.workspace import Artifact, Workspace, now
+
+__all__ = ["Reply", "Studio"]
+
+_APPROVE = re.compile(r"^\s*(approve|approved|run( it| this| the plan)?|go|yes|y|ok(ay)?|looks good|lgtm)\s*[.!]?\s*$",
+                      re.I)
+
+
+@dataclass
+class Reply:
+    """What a face gets back: ``kind`` is questions, plan, report, answer or declined."""
+
+    kind: str
+    text: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def questions(self) -> list[dict[str, Any]]:
+        return list(self.payload.get("questions") or [])
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"kind": self.kind, "text": self.text, "payload": self.payload}
+
+
+class Studio:
+    """A study at a place. See the module docstring and ``docs/studio-design.md``."""
+
+    def __init__(
+        self,
+        lat: float | None = None,
+        lon: float | None = None,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        client: Any | None = None,
+        data: dict[str, Any] | None = None,
+        on_event: Any = None,
+        on_artifact: Any = None,
+        max_replans: int = 1,
+        workspace: dict[str, Any] | Workspace | None = None,
+        tools: dict[str, Any] | None = None,
+        intake: dict[str, Any] | None = None,
+    ):
+        if isinstance(workspace, Workspace):
+            self.ws = workspace
+        elif workspace:
+            self.ws = Workspace.from_dict(workspace)
+        else:
+            self.ws = Workspace()
+        if lat is not None and lon is not None:
+            self.ws.site = {"lat": float(lat), "lon": float(lon)}
+        if self.ws.site is None:
+            raise ValueError("a study needs a site: pass lat and lon")
+        self.on_event = on_event
+        self.on_artifact = on_artifact
+        self.max_replans = int(max_replans)
+        self._tools = dict(tools or {})
+        self._frames: dict[str, Any] = {}
+        self.ws.listener = self._relay
+        for key, value in (data or {}).items():
+            dataset_id = key if str(key).startswith("upload:") else f"upload:{key}"
+            self.ws.add_table(dataset_id, value)
+            if not isinstance(value, str):
+                self._frames[dataset_id] = value
+        if intake:
+            self.ws.brief.intake.update({k: v for k, v in intake.items() if v is not None})
+        self.model = Model.resolve(self.ws, provider=provider, model=model, api_key=api_key, base_url=base_url,
+                                   client=client)
+        if self.model:
+            self.ws.event("coordinator", "model", f"{self.ws.model} via {self.ws.provider}")
+
+    # ── plumbing ──
+
+    @property
+    def workspace(self) -> Workspace:
+        return self.ws
+
+    def _relay(self, event: dict[str, Any]) -> None:
+        if self.on_event is not None:
+            self.on_event(event)
+
+    def _decline(self, reason: str, *, role: str = "coordinator") -> Reply:
+        self.ws.declined_reason = reason
+        if self.ws.status != "declined":
+            self.ws.set_status("declined")
+        self.ws.event(role, "declined", reason)
+        if not self.ws.messages or self.ws.messages[-1].kind != "declined":
+            self.ws.say(role, f"Declined: {reason}", kind="declined", payload={"reason": reason})
+        return Reply("declined", f"Declined: {reason}", {"reason": reason})
+
+    def _plan_reply(self) -> Reply:
+        from aquascope.studio.roles.methodologist import plan_text
+
+        text = plan_text(self.ws.study)
+        return Reply("plan", text, {"study": self.ws.study, "plan": (self.ws.study or {}).get("plan") or {},
+                                    "brief": self.ws.brief.to_dict()})
+
+    def _questions_reply(self, text: str) -> Reply:
+        return Reply("questions", text, {"questions": [q.to_dict() for q in self.ws.brief.open_questions],
+                                         "brief": self.ws.brief.to_dict()})
+
+    def _report_reply(self) -> Reply:
+        report = self.ws.report or {}
+        return Reply("report", str(report.get("answer") or ""), {
+            "report": report, "artifacts": [a.to_dict(with_data=False) for a in self.ws.artifacts],
+            "not_established": report.get("not_established") or [], "status": self.ws.status,
+        })
+
+    # ── the conversation ──
+
+    def say(self, text: str) -> Reply:
+        """The client's message. Intake until the brief is ready, then scouting and planning; at review, an
+        approval word runs the plan and anything else changes the brief and plans again; after the report,
+        a follow-up."""
+        from aquascope.studio.roles.consultant import consult
+
+        ws = self.ws
+        if ws.status == "declined":
+            return Reply("declined", f"Declined: {ws.declined_reason}", {"reason": ws.declined_reason})
+        if ws.status == "done":
+            return self.follow_up(text)
+        if ws.status in ("running", "critique", "authoring"):
+            return Reply("answer", "The crew is running; the report comes next.", {"status": ws.status})
+        if ws.status == "review":
+            if _APPROVE.match(text or ""):
+                return self.approve()
+            try:
+                consult(ws, self.model, text, tables=self._frames)
+            except Exception as exc:  # noqa: BLE001
+                ws.event("consultant", "error", f"{type(exc).__name__}: {exc}")
+                return self._plan_reply()
+            ws.event("coordinator", "replan", "the brief changed at review")
+            return self._plan()
+        try:
+            msg = consult(ws, self.model, text, tables=self._frames)
+        except Exception as exc:  # noqa: BLE001 - an intake failure is a decline, not a crash
+            ws.event("consultant", "error", f"{type(exc).__name__}: {exc}")
+            return self._decline(f"the Consultant could not take the brief: {exc}", role="consultant")
+        if not ws.brief.ready:
+            return self._questions_reply(msg.text)
+        return self._scout_and_plan()
+
+    def _scout_and_plan(self) -> Reply:
+        from aquascope.studio.roles.scout import scout
+
+        ws = self.ws
+        ws.set_status("scouting")
+        try:
+            scout(ws)
+        except Exception as exc:  # noqa: BLE001
+            ws.event("scout", "error", f"{type(exc).__name__}: {exc}")
+            return self._decline(f"the Scout could not build the inventory: {exc}", role="scout")
+        return self._plan()
+
+    def _plan(self) -> Reply:
+        from aquascope.studio.roles.methodologist import plan
+
+        ws = self.ws
+        ws.set_status("planning")
+        try:
+            study = plan(ws, self.model)
+        except Exception as exc:  # noqa: BLE001
+            ws.event("methodologist", "error", f"{type(exc).__name__}: {exc}")
+            return self._decline(f"the Methodologist failed: {exc}", role="methodologist")
+        if study is None:
+            if ws.status != "declined":
+                return self._decline(ws.declined_reason or "no plan", role="methodologist")
+            return Reply("declined", f"Declined: {ws.declined_reason}", {"reason": ws.declined_reason})
+        ws.set_status("review")
+        return self._plan_reply()
+
+    # ── the run ──
+
+    def approve(self, edits: dict[str, Any] | list[dict[str, Any]] | None = None) -> Reply:
+        """Approve the plan (with the user's edits, revalidated) and run the crew to the report."""
+        from aquascope.studio.roles.methodologist import revise
+
+        ws = self.ws
+        if ws.status == "declined":
+            return Reply("declined", f"Declined: {ws.declined_reason}", {"reason": ws.declined_reason})
+        if ws.status != "review" or not ws.study:
+            return Reply("answer", f"There is no plan to approve (status {ws.status}).", {"status": ws.status})
+        if edits:
+            try:
+                revise(ws, self.model, edits)
+            except ValueError as exc:
+                reply = self._plan_reply()
+                reply.text = f"The edit was not accepted: {exc}\n\n" + reply.text
+                reply.payload["errors"] = str(exc).split("; ")
+                return reply
+        ws.event("coordinator", "review", "the plan was approved" + (" with edits" if edits else ""))
+        return self._run_to_report()
+
+    def _run_to_report(self, *, prior: Any = None) -> Reply:
+        from aquascope.studio.roles.analysts import run
+        from aquascope.studio.roles.author import author_report
+        from aquascope.studio.roles.critic import critique
+
+        ws = self.ws
+        ws.set_status("running")
+        try:
+            run(ws, self.model, tools=self._tools, on_artifact=self.on_artifact, max_replans=self.max_replans,
+                prior=prior)
+        except Exception as exc:  # noqa: BLE001 - the report says what happened
+            reason = f"the run failed: {type(exc).__name__}: {exc}"
+            ws.event("analyst", "error", reason)
+            ws.run = {"ok": False, "results": [], "gates": [], "failed_gates": [], "stopped_at": None,
+                      "stop_reason": reason, "started": now(), "finished": now(), "replans": 0}
+        ws.set_status("critique")
+        try:
+            author_report(ws, self.model)
+        except Exception as exc:  # noqa: BLE001
+            ws.event("author", "error", f"{type(exc).__name__}: {exc}")
+            ws.report = {"title": ws.brief.problem, "answer": f"The report could not be written: {exc}",
+                         "key_numbers": [], "sections": [], "not_established": [str(exc)], "references": [],
+                         "footer": {"model": ws.model, "provider": ws.provider}}
+        try:
+            critique(ws, self.model)
+        except Exception as exc:  # noqa: BLE001
+            ws.event("critic", "error", f"{type(exc).__name__}: {exc}")
+            ws.critique = {"ok": False, "checks": [], "issues": [], "not_established": [f"the Critic failed: {exc}"]}
+        ws.set_status("authoring")
+        fixes = [i for i in (ws.critique or {}).get("issues") or [] if i.get("severity") == "fix"]
+        if fixes:
+            try:
+                author_report(ws, self.model, issues=fixes)
+                critique(ws, None)
+            except Exception as exc:  # noqa: BLE001
+                ws.event("author", "error", f"{type(exc).__name__}: {exc}")
+        if ws.report is not None and ws.critique is not None:
+            ws.report["not_established"] = list(ws.critique.get("not_established") or [])
+            ws.report["critique"] = {"issues": ws.critique.get("issues") or [],
+                                     "checks_passed": sum(1 for c in ws.critique.get("checks") or []
+                                                          if c.get("passed")),
+                                     "checks": len(ws.critique.get("checks") or [])}
+        self._build_deliverables()
+        ws.set_status("done")
+        report = ws.report or {}
+        ws.say("author", str(report.get("answer") or ""), kind="report",
+               payload={"title": report.get("title"), "key_numbers": report.get("key_numbers"),
+                        "not_established": report.get("not_established"),
+                        "artifacts": [a.to_dict(with_data=False) for a in ws.artifacts]})
+        return self._report_reply()
+
+    def _build_deliverables(self) -> None:
+        ws = self.ws
+        try:
+            from aquascope.studio.deliverables import build
+        except ImportError as exc:
+            ws.event("author", "deliverables_unavailable", f"{exc}")
+            return
+        try:
+            made = build(ws)
+            n = len(made) if isinstance(made, (list, dict)) else len(ws.artifacts)
+            ws.event("author", "deliverables", f"{n} artifact(s)")
+        except Exception as exc:  # noqa: BLE001
+            ws.event("author", "error", f"deliverables: {type(exc).__name__}: {exc}")
+
+    # ── after the report ──
+
+    def follow_up(self, text: str) -> Reply:
+        """A question is answered from the workspace; a change is planned, run and re-authored."""
+        from aquascope.studio.roles.analysts import prior_run
+        from aquascope.studio.roles.consultant import classify_follow_up
+        from aquascope.studio.roles.methodologist import change
+
+        ws = self.ws
+        if ws.status != "done":
+            return Reply("answer", f"The study is not finished (status {ws.status}); a follow-up comes after the "
+                         "report.", {"status": ws.status})
+        ws.say("user", text)
+        try:
+            verdict = classify_follow_up(ws, self.model, text)
+        except Exception as exc:  # noqa: BLE001
+            ws.event("consultant", "error", f"{type(exc).__name__}: {exc}")
+            verdict = {"kind": "question", "answer": str((ws.report or {}).get("answer") or "")}
+        entry: dict[str, Any] = {"text": text, "at": now(), "kind": verdict["kind"]}
+        if verdict["kind"] == "question":
+            answer = str(verdict.get("answer") or "")
+            entry["answer"] = answer
+            ws.follow_ups.append(entry)
+            ws.event("consultant", "follow_up", "question answered from the workspace")
+            ws.say("consultant", answer, kind="text")
+            return Reply("answer", answer, {"kind": "question"})
+        ws.event("consultant", "follow_up", f"change: {verdict.get('request') or text}")
+        prior = prior_run(ws)
+        ws.set_status("planning")
+        try:
+            study = change(ws, self.model, str(verdict.get("request") or text), intake=verdict.get("intake"))
+        except Exception as exc:  # noqa: BLE001
+            ws.event("methodologist", "error", f"{type(exc).__name__}: {exc}")
+            study = None
+        if study is None:
+            ws.set_status("done")
+            last = next((e["detail"] for e in reversed(ws.events)
+                         if e["role"] == "methodologist" and e["event"] in ("declined", "error")), "no plan")
+            answer = f"The change could not be planned: {last}"
+            entry["answer"] = answer
+            ws.follow_ups.append(entry)
+            ws.say("methodologist", answer, kind="text")
+            return Reply("answer", answer, {"kind": "change", "planned": False})
+        entry["steps"] = [s.get("id") for s in (ws.study or {}).get("steps") or []]
+        entry["intake"] = dict(verdict.get("intake") or {})
+        ws.follow_ups.append(entry)
+        ws.set_status("review")
+        ws.event("coordinator", "review", "a follow-up change runs without a second approval")
+        return self._run_to_report(prior=prior)
+
+    # ── files and checkpoints ──
+
+    def export(self, out_dir: str | Path) -> dict[str, str]:
+        """Write the bundle's files into ``out_dir`` and return their paths by name."""
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        try:
+            from aquascope.studio.deliverables import export as export_bundle
+        except ImportError:
+            export_bundle = None
+        if export_bundle is not None:
+            try:
+                paths = export_bundle(self.ws, out)
+                if isinstance(paths, dict):
+                    return {str(k): str(v) for k, v in paths.items()}
+            except Exception as exc:  # noqa: BLE001
+                self.ws.event("author", "error", f"export: {type(exc).__name__}: {exc}")
+        return self._export_plain(out)
+
+    def _export_plain(self, out: Path) -> dict[str, str]:
+        from aquascope.studio.roles.author import to_markdown
+
+        ws = self.ws
+        paths: dict[str, str] = {}
+        (out / "report.md").write_text(to_markdown(ws), encoding="utf-8")
+        paths["report.md"] = str(out / "report.md")
+        study = ws.study_obj()
+        if study is not None:
+            (out / "study.yaml").write_text(study.to_yaml(), encoding="utf-8")
+            paths["study.yaml"] = str(out / "study.yaml")
+        if ws.report:
+            (out / "report.json").write_text(json.dumps(ws.report, ensure_ascii=False, indent=2, default=str),
+                                             encoding="utf-8")
+            paths["report.json"] = str(out / "report.json")
+        for a in ws.artifacts:
+            if not a.data:
+                continue
+            target = out / a.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(a.data)
+            paths[a.name] = str(target)
+        (out / "workspace.json").write_text(ws.to_json(indent=None), encoding="utf-8")
+        paths["workspace.json"] = str(out / "workspace.json")
+        ws.event("coordinator", "export", f"{len(paths)} file(s) in {out}")
+        return paths
+
+    def to_dict(self, *, with_artifacts: bool = True) -> dict[str, Any]:
+        return self.ws.to_dict(with_artifacts=with_artifacts)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any] | Workspace, **kwargs: Any) -> Studio:
+        """Resume from a workspace dict; the model kwargs (provider, model, api_key, base_url, client),
+        ``on_event``, ``on_artifact``, ``tools`` and ``data`` are the constructor's."""
+        return cls(workspace=d, **kwargs)
+
+    def add_artifact(self, artifact: Artifact) -> Artifact:
+        return self.ws.add_artifact(artifact)

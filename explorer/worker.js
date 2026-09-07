@@ -190,6 +190,8 @@ json.dumps({
 // server run. The page has already run the reconnaissance (with the catchment
 // area and donor count only it can read), so it travels in as `recon` and the
 // Scout is not asked again. A model is used only when the page passes one.
+// The Explorer's drawer moved from Solve to Study (below); these messages stay
+// for the other faces that mirror them, and cost nothing while unused.
 
 function solveArgs() {
   return `provider=_a.get("provider") or None, model=_a.get("model") or None,
@@ -286,6 +288,275 @@ json.dumps(_res.to_dict(), default=str)
   }
 }
 
+
+
+// ── Studio: a complete study at a place, by a crew of roles ─────────────────
+// aquascope.studio.Studio, the same Coordinator the CLI and the MCP tools run.
+// The page holds the workspace dict between calls; the worker keeps its own
+// copy WITH the artifact bytes (_STUDIO, by workspace id) so a figure or a
+// document never crosses to the page except on request: `file` returns one
+// artifact by id, `export` the bundle zip. Events and PNG figures are posted
+// as they happen. matplotlib is loaded before the first run, openpyxl and
+// python-docx before the first bundle, never on a visit that runs no study.
+//
+// The Python between the markers is plain functions over dicts, so the test
+// suite can run it in CPython against the studio fixtures.
+
+const STUDIO_PY = `
+# --- studio face (explorer) ---
+import base64 as _b64
+import io as _io
+import json as _json
+
+from aquascope.studio import Studio as _Studio
+
+_STUDIO = {}      # workspace id -> Studio, with the artifact bytes
+
+
+def _studio_tools(catchment, donors=None):
+    """describe_catchment from the sub-basin row the page found (BasinATLAS is read by DuckDB-WASM on the
+    main thread; pyogrio does not run here), and the donor tools (similar_basins, regionalize_signatures)
+    over the station catchments and signatures tables the page read the same way: nothing here opens a
+    parquet file."""
+    tools = {}
+    c = catchment or {}
+    if (c.get("sub_basin") or {}).get("hybas_id") is None:
+        return tools
+    from aquascope.archive import basins as _basins
+
+    def describe(lat=None, lon=None, **_kw):
+        return _basins.describe_catchment_from_row(lat, lon, c["sub_basin"], c.get("row"),
+                                                   n_upstream=c.get("n_upstream"))
+
+    tools["describe_catchment"] = describe
+    d = donors or {}
+    if not d.get("catchments"):
+        return tools
+    import pandas as _pd
+    from aquascope.archive import regionalize as _rg
+    from aquascope.archive import similar as _similar
+
+    table = _pd.DataFrame(d["catchments"])
+    sig = _pd.DataFrame(d["signatures"]) if d.get("signatures") else None
+    skill = d.get("skill")
+
+    def similar_basins(lat=None, lon=None, source=None, station_id=None, k=10, method="combined", **_kw):
+        kk = max(1, min(int(k or 10), 50))
+        if source and station_id:
+            return _similar.similar_for_station(source, station_id, k=kk, method=method, table=table)
+        return _similar.similar_for_point(float(lat), float(lon), k=kk, method=method, desc=describe(lat, lon),
+                                          table=table)
+
+    tools["similar_basins"] = similar_basins
+    if sig is not None:
+        def regionalize_signatures(lat=None, lon=None, k=10, method="similarity", **_kw):
+            kk = max(1, min(int(k or 10), 50))
+            return _rg.regionalize_point(float(lat), float(lon), k=kk, method=method, desc=describe(lat, lon),
+                                         table=table, signatures=sig, skill=skill)
+
+        tools["regionalize_signatures"] = regionalize_signatures
+    return tools
+
+
+def _with_recon_context(a, fn):
+    """Run fn with the Scout's assess_site carrying the catchment area and donor count only the page can
+    read (BasinATLAS and the donor table are DuckDB-WASM reads on the main thread); restored afterwards."""
+    import aquascope.explore as _ex
+
+    base = _ex.assess_site
+    ctx = {"area_km2": a.get("area_km2"), "donors": a.get("donors")}
+
+    def assess_site(lat, lon, **kw):
+        for key, value in ctx.items():
+            if kw.get(key) is None and value is not None:
+                kw[key] = value
+        return base(lat, lon, **kw)
+
+    _ex.assess_site = assess_site
+    try:
+        return fn()
+    finally:
+        _ex.assess_site = base
+
+
+def _studio_model(a):
+    return {"provider": a.get("provider") or None, "model": a.get("model") or None,
+            "api_key": a.get("api_key") or None, "base_url": a.get("base_url") or None}
+
+
+def _studio_open(a, on_event, on_artifact):
+    """The Studio for this call: from the worker's own copy (with the bytes) when it has one, else from the
+    page's workspace dict. Rebuilt every call so the model and the callbacks are this call's."""
+    ws = a.get("workspace") or {}
+    kept = _STUDIO.get(ws.get("id"))
+    d = kept.to_dict() if kept is not None else ws
+    s = _Studio.from_dict(d, tools=_studio_tools(a.get("catchment"), a.get("donors_tables")), on_event=on_event, on_artifact=on_artifact,
+                          **_studio_model(a))
+    _STUDIO[s.ws.id] = s
+    return s
+
+
+def _studio_reply(s, r):
+    return {"reply": r.to_dict(), "workspace": s.to_dict(with_artifacts=False), "status": s.ws.status}
+
+
+def _studio_file(art):
+    return {"id": art.id, "name": art.name, "media_type": art.media_type, "size": art.size,
+            "data": _b64.b64encode(art.data).decode("ascii")}
+
+
+def studio_call(a, on_event=None, on_artifact=None, store=None):
+    """One message from the page. op is start, say, approve, follow_up, file or export."""
+    return _with_recon_context(a, lambda: _studio_dispatch(a, on_event, on_artifact, store))
+
+
+def _studio_dispatch(a, on_event, on_artifact, store):
+    op = a.get("op")
+    if op == "start":
+        tables = dict(a.get("tables") or {})
+        frame = (store or {}).get("frame") if store is not None else None
+        if a.get("use_frame") and frame is not None:
+            tables[str(a.get("frame_label") or "my-data")] = frame.to_csv(index=False)
+        s = _Studio(float(a["lat"]), float(a["lon"]), data=tables or None, intake=a.get("intake") or None,
+                    tools=_studio_tools(a.get("catchment"), a.get("donors_tables")), on_event=on_event, on_artifact=on_artifact,
+                    **_studio_model(a))
+        brief = a.get("brief") or {}
+        if isinstance(brief.get("decision"), str) and brief["decision"].strip():
+            s.ws.brief.decision = brief["decision"].strip()
+        if isinstance(brief.get("quantities"), list):
+            s.ws.brief.quantities = [str(q) for q in brief["quantities"] if str(q).strip()]
+        _STUDIO[s.ws.id] = s
+        r = s.say(str(a.get("text") or ""))
+        if brief and s.ws.brief.source == "rules":
+            s.ws.brief.source = "device"
+        return _studio_reply(s, r)
+    s = _studio_open(a, on_event, on_artifact)
+    if op == "say":
+        return _studio_reply(s, s.say(str(a.get("text") or "")))
+    if op == "approve":
+        return _studio_reply(s, s.approve(a.get("edits") or None))
+    if op == "follow_up":
+        return _studio_reply(s, s.follow_up(str(a.get("text") or "")))
+    if op == "file":
+        art = s.ws.artifact(str(a.get("artifact_id") or ""))
+        if art is None:
+            return {"error": f"no artifact {a.get('artifact_id')!r} in this study"}
+        return _studio_file(art)
+    if op == "export":
+        from aquascope.studio.deliverables.bundle import bundle_bytes
+
+        data = bundle_bytes(s.ws)
+        return {"id": "bundle", "name": "bundle.zip", "media_type": "application/zip", "size": len(data),
+                "data": _b64.b64encode(data).decode("ascii")}
+    return {"error": f"unknown op {op!r}"}
+
+
+def studio_table(name, data_b64):
+    """An Excel upload as CSV text, so it travels in the workspace like any other table."""
+    import pandas as pd
+
+    df = pd.read_excel(_io.BytesIO(_b64.b64decode(data_b64)))
+    return {"name": name, "csv": df.to_csv(index=False), "n": int(len(df)), "columns": [str(c) for c in df.columns]}
+# --- end studio face ---
+`;
+
+let studioDefined = false;
+let plottingLoaded = false;
+let docsLoaded = false;
+
+async function ensureStudioPython() {
+  if (studioDefined) return;
+  await pyodide.runPythonAsync(STUDIO_PY);
+  studioDefined = true;
+}
+
+const studioNote = (id, detail) => post("studio_progress", { id, event: { role: "coordinator", step: null, event: "loading", detail } });
+
+// The figures need matplotlib (in the Pyodide distribution), the workbook and
+// the Word report need openpyxl and python-docx (from PyPI through micropip).
+// Loaded once, before the first run; a failed document install is a note, and
+// the bundle says the Word file was skipped.
+async function ensurePlotting(id) {
+  if (plottingLoaded) return;
+  studioNote(id, "Loading the plotting library (once)");
+  await pyodide.loadPackage("matplotlib");
+  plottingLoaded = true;
+}
+
+async function ensureDocs(id) {
+  if (docsLoaded) return;
+  studioNote(id, "Loading the document libraries (once)");
+  try {
+    await pyodide.pyimport("micropip").install(["openpyxl", "python-docx"]);
+  } catch (err) {
+    console.warn("the document libraries did not install; the Word file will be skipped:", err);
+    studioNote(id, "The document libraries did not load; the bundle will carry no Word file");
+  }
+  docsLoaded = true;
+}
+
+// One studio call at a time. The arguments travel through a global the Python
+// reads at its start, and runPythonAsync yields before it runs (it scans the
+// code for imports), so two calls in flight read each other's: seen when a
+// follow-up was stopped on the page (abandoned here, still running) and the
+// next message arrived behind it with JsNull for its arguments.
+let studioChain = Promise.resolve();
+function studioSerial(m) {
+  const run = studioChain.then(() => studio(m));
+  studioChain = run.catch(() => {});
+  return run;
+}
+
+async function studio(m) {
+  const { id, type: _type, ...args } = m;
+  await ensureStudioPython();
+  if (args.op === "table") {
+    await ensureDocs(id);
+    self.__aqStudio = JSON.stringify({ name: args.name || "table.xlsx", data: args.data || "" });
+    const code = `
+import json
+from js import __aqStudio
+_a = json.loads(__aqStudio)
+json.dumps(studio_table(_a["name"], _a["data"]), default=str)
+`;
+    try {
+      const out = await pyodide.runPythonAsync(code);
+      post("result", { id, result: JSON.parse(out) });
+    } finally {
+      self.__aqStudio = null;
+    }
+    return;
+  }
+  if (args.op === "approve" || args.op === "follow_up") {
+    await ensurePlotting(id);
+    await ensureDocs(id);
+  }
+  self.__aqStudio = JSON.stringify(args);
+  self.__aqStudioEvent = (text) => post("studio_progress", { id, event: JSON.parse(text) });
+  self.__aqStudioArtifact = (text) => post("studio_artifact", { id, artifact: JSON.parse(text) });
+  const code = `
+import json
+from js import __aqStudio, __aqStudioEvent, __aqStudioArtifact
+_a = json.loads(__aqStudio)
+_out = studio_call(
+    _a,
+    on_event=lambda e: __aqStudioEvent(json.dumps(e, default=str)),
+    # PNG figures travel with their bytes so the page can show them as they land; SVG and CSV without.
+    on_artifact=lambda art: __aqStudioArtifact(
+        json.dumps(art.to_dict(with_data=art.media_type == "image/png"), default=str)),
+    store=_STORE,
+)
+json.dumps(_out, default=str)
+`;
+  try {
+    const out = await pyodide.runPythonAsync(code);
+    post("result", { id, result: JSON.parse(out) });
+  } finally {
+    self.__aqStudio = null;
+    self.__aqStudioEvent = null;
+    self.__aqStudioArtifact = null;
+  }
+}
 
 // ── the workbench: analyses of the user's own table ─────────────────────────
 // aquascope.workbench holds what the dashboard pages used to hold, as plain
@@ -406,6 +677,7 @@ self.onmessage = async (e) => {
     if (m.type === "solve_plan") return await solvePlan(m);
     if (m.type === "coerce_intake") return await coerceIntake(m);
     if (m.type === "solve_run") return await solveRun(m);
+    if (m.type === "studio") return await studioSerial(m);
     if (m.type === "ingest") return await ingestText(m);
     if (m.type === "load_table") return await loadTable(m);
     if (m.type === "workbench") return await workbench(m);

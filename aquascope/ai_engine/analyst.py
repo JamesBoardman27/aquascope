@@ -154,6 +154,8 @@ def _tool_specs() -> list[ToolSpec]:
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
                                               "years": {"type": "integer", "description": years_cap},
                                               "bootstrap_ci": {"type": "boolean"},
+                                              "return_periods": {"type": "array", "items": num, "description":
+                                                                 "the T in years to report (default 2 to 100)"},
                                               "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.analyze_station,
@@ -163,7 +165,9 @@ def _tool_specs() -> list[ToolSpec]:
             "Return levels for T = 2..100 years at a station (subset of analyze_station).",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
                                               "years": {"type": "integer", "description": years_cap},
-                                              "bootstrap_ci": {"type": "boolean"}},
+                                              "bootstrap_ci": {"type": "boolean"},
+                                              "return_periods": {"type": "array", "items": num, "description":
+                                                                 "the T in years to report (default 2 to 100)"}},
              "required": ["source", "station_id"]},
             t.flood_frequency,
         ),

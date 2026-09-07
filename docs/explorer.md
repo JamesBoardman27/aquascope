@@ -192,6 +192,30 @@ set" rather than presented as the full Analyst.
 
 **Your own key**, as described above, for the full tool loop.
 
+## Study: a complete study at a place
+
+The drawer's second mode. **Study this place** on a gauge or on a point (or
+the Study button at the top right) opens it with the site set, and the
+[Studio](studio.md) crew runs in the same Pyodide worker as everything else:
+you say the problem, the Consultant asks at most three questions (chips
+answer them, **Just go** takes the defaults), the Scout lists what is in
+reach, the Methodologist shows the plan as a card you **Approve**, **Edit**
+(the arguments inline, revalidated) or **Decline**, the Analysts run it with
+a gate on every step while the timeline and the figures appear, and the
+Author's report lands with the key numbers, the figures, what is not
+established, **Download bundle** and links for the Word, Excel, Markdown,
+notebook and `study.yaml` files. The input stays open for a follow-up: a
+question is answered from the workspace, a change is planned, run and
+re-authored.
+
+Keyless by default, which is a complete study; the key Ask holds is offered
+on one line for the prose; an on-device model that is already there reads
+the first sentence into a brief. Drop a CSV or an XLSX, or attach the table
+open in My data, and the Scout lists it with its QA next to the gauges. The
+figures and the documents are made in the worker and stay there until you
+ask for one; the plotting and document libraries load once, before the first
+run, never on a visit that runs no study. See [studio.md](studio.md#in-the-explorer).
+
 ### For an assistant already in your browser
 
 Where the browser supports [WebMCP](https://github.com/webmachinelearning/webmcp)
@@ -246,10 +270,12 @@ loop is nine times faster, same numbers to 1e-14), which is what makes
   registry), `catalog.js` (DuckDB-WASM over the archive's GeoParquet, GeoJSON
   fallback), `search.js`, `shell.js` and `url.js` (the map-first shell and
   URL-as-state), the `panel-*.js` inspectors, `charts.js` (Plotly), `ask.js`
-  with `showcase.js` and `local-model.js`, and `webmcp.js`. `app.js` wires them
-  together.
+  with `showcase.js` and `local-model.js`, `studio.js` with `intake.js` (Study),
+  and `webmcp.js`. `app.js` wires them together.
 - `worker.js`: a Web Worker that loads Pyodide, numpy / scipy / pandas, and the
-  aquascope wheel, then calls `aquascope.explore`.
+  aquascope wheel, then calls `aquascope.explore`; the `studio` message drives
+  `aquascope.studio.Studio` for Study, loading matplotlib and the document
+  libraries only when a study runs.
 - `aquascope.explore` (in the package): the Python half, the same
   `(source, station) -> answer` entry point the CLI and the MCP server use.
   It runs unchanged in CPython, which is how it is tested (`tests/test_explore.py`).

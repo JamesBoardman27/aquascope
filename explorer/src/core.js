@@ -61,9 +61,9 @@ export const state = {
   overlays: new Set(), opacity: {}, date: null,
   ...LAYER_DEFAULTS,
   ask: { running: false, catalogSent: false, markdown: null, run: 0 },
-  // One drawer, two modes (Ask, Solve); the Solve chip is part of the URL.
+  // One drawer, two modes (Ask, Study); an open Study drawer is part of the URL.
   drawerOpen: false, drawerMode: "ask",
-  solve: { playbook: null, running: false },
+  study: { running: false },
 };
 dbg.state = state;
 
@@ -72,7 +72,7 @@ export const actions = {
   selectStation: () => {},
   selectPoint: () => {},
   openAsk: () => {},
-  openSolve: () => {},
+  openStudy: () => {},
   applyUrl: () => {},
   refreshMapData: () => {},
 };
