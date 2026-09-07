@@ -23,12 +23,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "explorer"
-# Every text asset of the app: the page, the ES modules in explorer/src/, and
-# the recorded Analyst traces in explorer/showcase/ that the page replays (#233).
-TEXT_GLOBS = ("*.html", "*.js", "*.css", "*.json", "src/*.js", "showcase/*.json")
+# Every text asset of the app: the page, the ES modules in explorer/src/, the
+# recorded Analyst traces in explorer/showcase/ that the page replays (#233),
+# and the recorded studies under explorer/showcase/studies/ (#366).
+TEXT_GLOBS = ("*.html", "*.js", "*.css", "*.json", "src/*.js", "showcase/*.json", "showcase/studies/*.json",
+              "showcase/studies/*/*.json", "showcase/studies/*/*.md", "showcase/studies/*/*.yaml")
 # Assets copied byte for byte: the social preview card (og.png, drawn by
-# make_og_image.py) is referenced by the page's og:image.
-BINARY_GLOBS = ("*.png", "*.ico")
+# make_og_image.py) is referenced by the page's og:image, and the recorded
+# studies' figures.
+BINARY_GLOBS = ("*.png", "*.ico", "showcase/studies/*/figures/*.png")
 SKIP = {"build.py", "make_og_image.py"}
 
 
