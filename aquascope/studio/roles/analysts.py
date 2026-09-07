@@ -49,7 +49,7 @@ _BULK_KEYS = ("series",)
 
 
 def analyze_station_full(source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False,
-                         variable: str | None = None) -> dict[str, Any]:
+                         variable: str | None = None, return_periods: list[float] | None = None) -> dict[str, Any]:
     """``aquascope.explore.analyze_station`` with the daily series and the full flow-duration curve kept in the
     payload (the runner's own ``analyze_station`` drops them, so the hydrograph, trend and FDC figures never
     drew); the bootstrap band as the runner adds it. The Analysts strip the series before the payload is stored."""
@@ -64,10 +64,11 @@ def analyze_station_full(source: str, station_id: str, years: int | None = None,
     if variable and variables is not None and variable not in variables:
         return {"error": f"unknown variable {variable!r}; allowed: {list(variables)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable)
+    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable,
+                   return_periods=return_periods)
     if bootstrap_ci and res.get("ffa") and store.get("series") is not None:
         try:
-            ci = flood_ci(store["series"])
+            ci = flood_ci(store["series"], return_periods=return_periods)
             res["ffa"]["fits"]["gev_bootstrap"] = {
                 k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded") if k in ci
             }
@@ -121,6 +122,11 @@ def _ask_for_the_return_period(ws: Workspace, study: Study) -> None:
             continue
         periods.append(rp_f)
         step.arguments["return_periods"] = [int(v) if float(v).is_integer() else v for v in sorted(set(periods))]
+    for step in study.steps:
+        for gate in step.expects or []:
+            if isinstance(gate, dict) and gate.get("check") == "max_return_period_factor" \
+                    and gate.get("return_period") is None:
+                gate["return_period"] = int(rp_f) if rp_f.is_integer() else rp_f
 
 
 def _inherit_units(ws: Workspace, run: StudyRun, study: Study) -> None:

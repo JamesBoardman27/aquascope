@@ -405,6 +405,17 @@ def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
     for k in entry.required:
         if k not in args and not (k == "from_step" and "from_step" in args):
             errors.append(f"step {sid}: {tool} needs argument {k!r}")
+    for k, v in list(args.items()):
+        schema = entry.arguments.get(k)
+        allowed_values = schema.get("enum") if isinstance(schema, dict) else None
+        if allowed_values and isinstance(v, str) and v not in allowed_values:
+            if repair:
+                # A model often invents a label for a choice ("regionalization", "physio_climatic"); the tool
+                # would reject it at run time, so the first allowed value stands in and the step records it.
+                step.setdefault("notes", []).append(f"{k}={v!r} is not a choice of {tool}; used {allowed_values[0]!r}")
+                args[k] = allowed_values[0]
+            else:
+                errors.append(f"step {sid}: {tool} argument {k}={v!r} is not one of {allowed_values}")
     ids = known_ids or set()
     ref = re.compile(r"\{\{\s*result\.([A-Za-z0-9_]+)\.")
     for k, v in args.items():
