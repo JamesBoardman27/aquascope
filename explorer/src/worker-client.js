@@ -10,10 +10,17 @@ import { bootDone, bootProgress } from "./shell.js?v=__BUILD__";
 let worker = null;
 const askListeners = new Set();
 const solveListeners = new Set();
+const studioListeners = new Set();
+const artifactListeners = new Set();
 
 export function onAskProgress(fn) { askListeners.add(fn); return () => askListeners.delete(fn); }
 // Solve's timeline events ({role, step, event, detail}) with the id of the call they belong to.
 export function onSolveProgress(fn) { solveListeners.add(fn); return () => solveListeners.delete(fn); }
+// The Study crew's events ({role, step, event, detail, at}) and its figures as they are drawn
+// ({id, kind, name, media_type, caption, step, data} with the PNG bytes as base64), each with
+// the id of the call they belong to.
+export function onStudioProgress(fn) { studioListeners.add(fn); return () => studioListeners.delete(fn); }
+export function onStudioArtifact(fn) { artifactListeners.add(fn); return () => artifactListeners.delete(fn); }
 
 export function ensureWorker() {
   if (worker) return worker;
@@ -23,6 +30,8 @@ export function ensureWorker() {
     if (m.type === "progress") { if (!state.workerReady) bootProgress(m.text); return; }
     if (m.type === "ask_progress") { for (const fn of askListeners) fn(m.text); return; }
     if (m.type === "solve_progress") { for (const fn of solveListeners) fn(m.event, m.id); return; }
+    if (m.type === "studio_progress") { for (const fn of studioListeners) fn(m.event, m.id); return; }
+    if (m.type === "studio_artifact") { for (const fn of artifactListeners) fn(m.artifact, m.id); return; }
     if (m.type === "ready") { state.workerReady = true; bootDone(); return; }
     const pending = state.pending.get(m.id);
     if (!pending) return;                       // cancelled: drop it

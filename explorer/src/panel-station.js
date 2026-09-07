@@ -448,6 +448,7 @@ export function initStationPanel() {
 
   $("btn-share").addEventListener("click", (e) => copyText(canonicalUrl(), e.currentTarget, "Link copied"));
   $("btn-cite").addEventListener("click", () => openCite(methodsOnPage("methods")));
+  $("btn-study-st").addEventListener("click", () => actions.openStudy({ fresh: true }));
   $("btn-to-workbench").addEventListener("click", () => actions.openStationInWorkbench());
 
   $("btn-csv").addEventListener("click", async () => {

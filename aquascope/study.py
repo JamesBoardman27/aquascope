@@ -64,10 +64,13 @@ class Step:
     fallback: dict[str, Any] | str | None = None
     depends_on: list[str] = field(default_factory=list)
     method: str | None = None
+    #: Version 3: what the step should yield for the report, ``[{"kind": "figure" | "table", "id", "caption"}]``.
+    outputs: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def is_v2(self) -> bool:
-        return bool(self.id or self.rationale or self.expects or self.fallback or self.depends_on or self.method)
+        return bool(self.id or self.rationale or self.expects or self.fallback or self.depends_on or self.method
+                    or self.outputs)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"tool": self.tool, "arguments": self.arguments}
@@ -85,6 +88,8 @@ class Step:
             out["fallback"] = self.fallback
         if self.depends_on:
             out["depends_on"] = list(self.depends_on)
+        if self.outputs:
+            out["outputs"] = [dict(o) for o in self.outputs]
         return out
 
     @classmethod
@@ -99,12 +104,15 @@ class Step:
             fallback=d.get("fallback"),
             depends_on=[str(x) for x in (d.get("depends_on") or [])],
             method=d.get("method"),
+            outputs=[dict(o) for o in (d.get("outputs") or []) if isinstance(o, dict)],
         )
 
 
 @dataclass
 class Study:
-    """A question and the steps that answer it (version 2: and the plan and the results)."""
+    """A question and the steps that answer it (version 2: and the plan and the results; version 3, the
+    Studio's: the plan also carries the objective, the methodology, assumptions, alternatives and expected
+    limitations, and each step its expected outputs). A version-3 study runs exactly as a version-2 one."""
 
     question: str
     steps: list[Step] = field(default_factory=list)
@@ -140,7 +148,7 @@ class Study:
             "steps": [s.to_dict() for s in self.steps],
         }
         if self.is_v2:
-            out = {"version": 2, **out}
+            out = {"version": max(2, int(self.version or 2)), **out}
             if self.problem:
                 out["problem"] = self.problem
             if self.plan:
@@ -181,10 +189,11 @@ class Study:
         d = self.to_dict()
         if not self.is_v2:
             return self._v1_yaml(d)
+        version = max(2, int(self.version or 2))
         lines = [
-            "# An AquaScope study (version 2): the plan behind an answer, its gates, and what happened.",
+            f"# An AquaScope study (version {version}): the plan behind an answer, its gates, and what happened.",
             "#   aquascope run study.yaml",
-            "version: 2",
+            f"version: {version}",
             f"title: {_scalar(d['title'])}",
             f"question: {_scalar(d['question'])}",
             f"created: {_scalar(d['created'])}",
@@ -219,6 +228,8 @@ class Study:
                 lines.append(f"    fallback: {_scalar(step['fallback'])}")
             if step.get("depends_on"):
                 lines.append(f"    depends_on: {_scalar(step['depends_on'])}")
+            if step.get("outputs"):
+                lines.append(f"    outputs: {_scalar(step['outputs'])}")
         if d.get("results"):
             lines.append("results:")
             for k, v in d["results"].items():

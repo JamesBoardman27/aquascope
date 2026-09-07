@@ -157,11 +157,11 @@ export function localReaderLabel() {
 }
 
 // ── one small structured call ───────────────────────────────────────────────
-// Solve reads a sentence into a playbook and its intake fields with a single
-// call: its own system prompt, a schema, a low temperature, a timeout. It must
-// never start a download on its own (a sentence typed into Solve is not a
-// choice to fetch gigabytes): it runs when Chrome's model is already on the
-// machine, or when a WebLLM engine is already loaded in this tab.
+// Study reads the first sentence into a brief with a single call: its own
+// system prompt, a schema, a low temperature, a timeout. It must never start a
+// download on its own (a sentence typed into Study is not a choice to fetch
+// gigabytes): it runs when Chrome's model is already on the machine, or when a
+// WebLLM engine is already loaded in this tab.
 
 const READY = { ok: false };  // cached: Chrome's model, already on this machine
 

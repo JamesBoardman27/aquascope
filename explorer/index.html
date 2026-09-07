@@ -47,8 +47,8 @@
       <button id="btn-cite-top" class="btn" title="How to cite AquaScope and the data">Cite</button>
       <button id="btn-ask" class="btn ask-toggle" aria-expanded="false" aria-controls="drawer"
               title="Ask a question in plain language; answered from real gauges by aquascope's tools, in your browser">Ask ✨</button>
-      <button id="btn-solve" class="btn ask-toggle" aria-expanded="false" aria-controls="drawer"
-              title="State a water problem at the selected place: a plan you review, then run with a check after every step">Solve</button>
+      <button id="btn-study" class="btn ask-toggle" aria-expanded="false" aria-controls="drawer"
+              title="A complete study at the selected place: the brief agreed with you, the plan approved by you, a report with figures and a bundle">Study</button>
     </div>
   </header>
 
@@ -175,6 +175,7 @@
             <span id="st-id"></span> · <span id="st-vars"></span><span id="st-period"></span>
           </div>
           <div class="st-actions">
+            <button id="btn-study-st" class="btn" title="A complete study at this gauge, planned and checked, with a report">Study this place</button>
             <button id="btn-csv" class="btn" disabled title="Download the observed record as CSV">Download CSV</button>
             <button id="btn-unit" class="btn" hidden title="Switch the displayed discharge unit. Analyses and CSV downloads stay in m³/s.">Show ft³/s</button>
             <details class="more">
@@ -309,6 +310,7 @@
           <h2 id="pt-title">Point</h2>
           <div class="st-meta"><span id="pt-coords"></span> · ERA5 climate + GloFAS modelled discharge, last 10 years</div>
           <div class="st-actions">
+            <button id="btn-study-pt" class="btn" title="A complete study at this point, planned and checked, with a report">Study this place</button>
             <button id="btn-share-pt" class="btn" title="Copy a link to exactly this view">Copy link</button>
             <button id="btn-cite-pt" class="btn" title="How to cite this">Cite</button>
           </div>
@@ -463,15 +465,15 @@
       </div>
     </aside>
 
-    <!-- the Analyst, in the inspector's place: Ask (a question) or Solve (a problem at a place) -->
+    <!-- the Analyst, in the inspector's place: Ask (a question) or Study (a complete study at a place) -->
     <aside id="drawer" class="drawer" aria-label="Ask AquaScope" hidden>
       <div class="drawer-head">
         <button id="drawer-close" class="icon-btn back" title="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </button>
-        <div id="drawer-mode" class="drawer-mode" role="radiogroup" aria-label="Ask or Solve">
+        <div id="drawer-mode" class="drawer-mode" role="radiogroup" aria-label="Ask or Study">
           <label class="seg"><input type="radio" name="drawer-mode" value="ask" checked><span>Ask</span></label>
-          <label class="seg"><input type="radio" name="drawer-mode" value="solve"><span>Solve</span></label>
+          <label class="seg"><input type="radio" name="drawer-mode" value="study"><span>Study</span></label>
         </div>
         <span id="ask-context-chip" class="context-chip" hidden></span>
       </div>
@@ -533,77 +535,20 @@
         <article id="ask-result" class="ask-result" tabindex="-1" hidden></article>
       </div>
 
-      <div id="solve-pane" hidden>
-        <section class="stage" id="stage-where" data-state="open">
-          <button type="button" class="stage-head"><span class="stage-num" aria-hidden="true">1</span><span class="stage-name">Where</span><span class="stage-sum"></span></button>
-          <div class="stage-body">
-            <p id="solve-where-text" class="solve-where"></p>
+      <!-- Study: the conversation with the crew, and one board above the input
+           that shows what is current: where and what to bring, the plan to
+           approve, the run as it happens, the answer and the bundle. -->
+      <div id="study-pane" hidden>
+        <ol id="study-thread" class="study-thread" aria-label="The conversation" hidden></ol>
+        <div id="study-board" class="study-board" data-status="intake"></div>
+        <div id="study-status" class="status" hidden></div>
+        <div id="study-compose" class="study-compose">
+          <textarea id="study-text" rows="2" data-autofocus placeholder="What do you need to know here?"></textarea>
+          <div class="row-actions">
+            <button id="study-send" class="btn primary">Send</button>
+            <button id="study-go" class="btn" hidden title="Proceed on the defaults">Just go</button>
           </div>
-        </section>
-        <section class="stage" id="stage-what" data-state="open">
-          <button type="button" class="stage-head"><span class="stage-num" aria-hidden="true">2</span><span class="stage-name">What</span><span class="stage-sum"></span></button>
-          <div class="stage-body">
-            <div id="solve-chips" class="solve-chips"></div>
-            <div id="solve-intake" class="ask-grid solve-intake" hidden></div>
-            <input id="solve-text" class="solve-text" type="text" autocomplete="off" placeholder="In your words (optional)" />
-            <label id="solve-model-row" class="ask-context-toggle solve-model" hidden><input type="checkbox" id="solve-use-key" checked /> <span id="solve-model-label"></span></label>
-            <div class="row-actions"><button id="solve-plan-btn" class="btn primary">Plan</button></div>
-            <div id="solve-what-status" class="status" hidden></div>
-          </div>
-        </section>
-        <section class="stage" id="stage-recon" data-state="pending">
-          <button type="button" class="stage-head"><span class="stage-num" aria-hidden="true">3</span><span class="stage-name">Can it be answered here</span><span class="stage-sum"></span></button>
-          <div class="stage-body">
-            <div id="solve-assess-card" class="card assess solve-assess" hidden>
-              <div class="card-body">
-                <details>
-                  <summary><span class="assess-counts"></span></summary>
-                  <p class="assess-foot muted"></p>
-                  <ul class="assess-rows"></ul>
-                  <ul class="assess-notes muted"></ul>
-                </details>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section class="stage" id="stage-plan" data-state="pending">
-          <button type="button" class="stage-head"><span class="stage-num" aria-hidden="true">4</span><span class="stage-name">Plan</span><span class="stage-sum"></span></button>
-          <div class="stage-body">
-            <div id="solve-plan-status" class="status" hidden></div>
-            <p id="solve-declined" class="solve-declined" hidden></p>
-            <div id="solve-plan-head" class="solve-plan-head"></div>
-            <ol id="solve-steps" class="solve-steps"></ol>
-            <div class="row-actions">
-              <button id="solve-run" class="btn primary" hidden>Run</button>
-              <button id="solve-edit" class="btn" hidden>Edit</button>
-            </div>
-          </div>
-        </section>
-        <section class="stage" id="stage-run" data-state="pending">
-          <button type="button" class="stage-head"><span class="stage-num" aria-hidden="true">5</span><span class="stage-name">Run</span><span class="stage-sum"></span></button>
-          <div class="stage-body">
-            <ol id="solve-timeline" class="solve-timeline"></ol>
-            <div class="row-actions"><button id="solve-stop" class="btn" hidden>Stop</button></div>
-            <div id="solve-run-status" class="status" hidden></div>
-          </div>
-        </section>
-        <section class="stage" id="stage-result" data-state="pending">
-          <button type="button" class="stage-head"><span class="stage-num" aria-hidden="true">6</span><span class="stage-name">Result</span><span class="stage-sum"></span></button>
-          <div class="stage-body">
-            <article id="solve-answer" class="ask-result solve-answer" tabindex="-1"></article>
-            <div id="solve-not" class="ask-checks"></div>
-            <div id="solve-caveats" class="solve-caveats"></div>
-            <div class="solve-h">Plan and gates</div>
-            <ol id="solve-outcomes" class="solve-steps"></ol>
-            <details id="solve-data" class="ask-settings solve-data"><summary>Data and Methods</summary><div id="solve-data-body" class="solve-data-body"></div></details>
-            <p id="solve-foot" class="solve-foot muted"></p>
-            <div class="row-actions">
-              <button id="solve-study" class="btn" title="The executed plan, to run again with `aquascope run study.yaml`">Download study.yaml</button>
-              <button id="solve-copy" class="btn">Copy report</button>
-              <button id="solve-rerun" class="btn">Re-run</button>
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
     </aside>
   </main>
