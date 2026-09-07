@@ -69,6 +69,8 @@ KEYWORDS: dict[str, list[str]] = {
         r"\breliab", r"\bsupply\b|\bsupplies\b|\bsupplying\b", r"\bdemand\b",
         r"\d\s*(m3|m³|cumec|cubic met|ML|megalit)", r"\btown\b|municipal|drinking water|water works",
         r"withdraw|divert|take (out|from) the river",
+        r"\bbe met\b|\bmet on\b|percent of (the )?(days|time)|% of (the )?(days|time)",
+        r"(keep|leave|reserve|hands?-off)[^.]{0,20}\b(q95|flow)\b|hands?-off flow|reserve flow",
     ],
     "irrigation_feasibility": [
         r"irrigat", r"\bcrops?\b|\bfield\b|\bfarm", r"\bhectares?\b|\bha\b",
