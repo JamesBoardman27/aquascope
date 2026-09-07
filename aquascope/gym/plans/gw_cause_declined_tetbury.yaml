@@ -1,0 +1,27 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# Attributing a decline to pumping needs abstraction records the playbook does not have: it declines and offers
+# the trend instead.
+id: gw_cause_declined_tetbury
+playbook: groundwater_decline
+title: The cause of a groundwater decline asked without abstraction data (declined)
+brief: >-
+  The water table under our farm near Tetbury seems to be falling. Is it the new abstraction licence upstream
+  that is pulling it down? Tell me why it is falling.
+intake:
+  horizon: 10
+  concern: supply
+  attribute_cause: true
+site:
+  name: Tetbury, Gloucestershire (rain gauge; Tetbury Slads Farm gauge 0.7 km; Brokenborough borehole 3.9 km)
+  lat: 51.633147
+  lon: -2.153993
+  source: uk_ea
+  station_id: 02bd4687-2b55-4f42-b1cf-77066f01cc70
+  years: 34.9
+  recon: tetbury
+decline: true
+decline_kind: declined
+rationale: >-
+  A trend says whether the level is changing and how fast, never why. Attributing the change to the upstream
+  abstraction needs the pumping records and a water balance that nobody has supplied; the right plan is to decline
+  the cause and offer the rate of change with its confidence (see gw_well_tetbury).

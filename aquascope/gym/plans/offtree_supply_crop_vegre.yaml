@@ -1,0 +1,62 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# Off-tree: a supply question whose demand is a crop's. The demand must be computed before it can be screened, and
+# the record the abstraction leans on is summarised in its own right.
+id: offtree_supply_crop_vegre
+playbook: irrigation_feasibility
+title: Supply reliability for a maize scheme whose demand is not yet known
+brief: >-
+  A grower wants to irrigate 25 hectares of maize planted in May by sprinkler from the Vègre at Asnières. What
+  would the scheme need over the season and at the peak, what does the river's record look like in dry years,
+  and how reliable would a run-of-river abstraction of the peak demand be?
+intake:
+  crop: maize
+  area_ha: 25
+  planting_month: 5
+  efficiency: 0.7
+site:
+  name: La Vègre à Asnières-sur-Vègre, Sarthe
+  lat: 47.88843
+  lon: -0.23269
+  source: hubeau_hydrometrie
+  station_id: M058302010
+  years: 45.8
+  recon: vegre
+expected_branch: with_gauge
+tags: [off_tree]
+steps:
+  - tool: anywhere
+    method: fao56_et0
+    gates:
+      - {check: not_empty, path: climate}
+  - tool: crop_water_demand
+    method: crop_water_requirement
+    gates:
+      - {check: not_empty, path: demand.gross_irrigation_mm}
+      - {check: not_empty, path: demand.peak_month_m3s}
+      - {check: not_empty, path: season.months}
+  - tool: analyze_station
+    method: flow_duration
+    gates:
+      - {check: min_years, path: years}
+      - {check: unit_present, path: unit}
+    note: "Required: the brief asks what the record looks like in dry years."
+  - tool: supply_reliability
+    method: supply_reliability
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: reliability}
+      - {check: unit_present, path: unit}
+  - tool: low_flow_context
+    method: low_flow_frequency
+    optional: true
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [irrigation, reference_et, load_table, flow_duration]
+  methods: [spi, spei, groundwater_trend, sgi, regionalize_signatures]
+rationale: >-
+  The demand is not in the brief, it is the crop's: FAO-56 ET0 from ERA5 and the maize coefficient curve from a May
+  planting give the seasonal depth and the peak-month rate. The grower also asks about the record in dry years, so
+  the gauge's flow-duration curve and summary are a required step in their own right, and the screening of the
+  peak demand against the 46-year record with Q95 kept in the river gives the reliability. A regional transfer
+  answers nothing here: the gauge is at the point.

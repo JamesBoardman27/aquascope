@@ -1,0 +1,44 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# The USGS catalog lists no rain gauge, so the indices come from the ERA5 cell; the century-long discharge gauge
+# at the point gives the low-flow context; no well, so no groundwater index.
+id: drought_reanalysis_snake_plain
+playbook: drought_status
+title: Drought status for irrigators on the Snake River plain from the ERA5 cell
+brief: >-
+  Are the farms around Gooding, Idaho, in drought this season? Give me the drought status by SPI and SPEI, and
+  where the Malad River sits in its record.
+intake:
+  timescales: [1, 3, 12]
+  drought_concern: agriculture
+site:
+  name: Malad River near Gooding, Idaho
+  lat: 42.88639
+  lon: -114.80306
+  source: usgs
+  station_id: USGS-13152500
+  years: 110.4
+  recon: snake_plain_gauge
+expected_branch: reanalysis
+steps:
+  - tool: drought_indices
+    method: spei_reanalysis
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: indices}
+      - {check: not_empty, path: current.spei}
+  - tool: low_flow_context
+    method: flow_duration
+    gates:
+      - {check: min_years, path: years}
+    note: "Required: the brief asks where the river sits in its record."
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [drought_propagation, sgi_drought, load_table, spei]
+  methods: [spi, spei, sgi, groundwater_trend]
+rationale: >-
+  No rain gauge with a record is catalogued within 50 km, so SPI and SPEI on a gauge are not defensible; the
+  indices come from the ERA5 cell over the last 40 years and describe the area's climate, which the report says.
+  The Malad River gauge at the point has 110 years of daily discharge, so the low-flow context (Q95, the baseflow
+  index, where the last months sit) is defensible and the brief asks for it. No well is within reach, so the
+  groundwater drought index and its lag are not.

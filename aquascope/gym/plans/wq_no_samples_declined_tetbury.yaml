@@ -1,0 +1,25 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# The Environment Agency catalog carries no sampled water quality here and the archive none until Phase 3: the
+# playbook declines; nothing can be indexed.
+id: wq_no_samples_declined_tetbury
+playbook: water_quality
+title: Water quality asked where no samples are within reach (declined)
+brief: >-
+  Is the water in the Avon at Tetbury fit to drink? Index it against the drinking-water guidelines.
+intake:
+  use: drinking
+  years: 5
+site:
+  name: Tetbury, Gloucestershire (rain gauge; Tetbury Slads Farm gauge 0.7 km; Brokenborough borehole 3.9 km)
+  lat: 51.633147
+  lon: -2.153993
+  source: uk_ea
+  station_id: 02bd4687-2b55-4f42-b1cf-77066f01cc70
+  years: 34.9
+  recon: tetbury
+decline: true
+decline_kind: declined
+rationale: >-
+  No station with sampled water-quality parameters is catalogued within 50 km (the Environment Agency rows carry
+  none and the archive has no water-quality variables until Phase 3), so there is nothing to index. A plan that
+  fetches samples from a station that has none, or indexes the flow record, is wrong; the right plan declines.
