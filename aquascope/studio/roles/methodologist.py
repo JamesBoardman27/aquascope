@@ -322,6 +322,34 @@ def _fix_methods(steps: list[dict[str, Any]], kind: str | None) -> list[str]:
     return notes
 
 
+def _fix_arguments(steps: list[dict[str, Any]]) -> list[str]:
+    """A ``return_period`` (singular) argument on a tool that takes ``return_periods`` (or ``periods``) is the
+    return period asked, not a mistake worth the step: it lands in the list, with a note. Other arguments the
+    tool does not take are left for the validator."""
+    notes: list[str] = []
+    for step in steps:
+        args = step.get("arguments")
+        entry = catalogue.get(str(step.get("tool") or ""))
+        if not isinstance(args, dict) or entry is None or "return_period" not in args:
+            continue
+        if "return_period" in entry.arguments:
+            continue
+        target = next((k for k in ("return_periods", "periods") if k in entry.arguments), None)
+        if target is None:
+            continue
+        value = args.pop("return_period")
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            notes.append(f"step {step.get('id')}: return_period {value!r} is not a number; dropped")
+            continue
+        current = args.get(target) if isinstance(args.get(target), list) else []
+        merged = sorted({float(x) for x in current if isinstance(x, (int, float))} | {number})
+        args[target] = [int(x) if x.is_integer() else x for x in merged]
+        notes.append(f"step {step.get('id')}: return_period {value!r} became {target}={args[target]}")
+    return notes
+
+
 def _errors_of(steps: list[dict[str, Any]], ws: Workspace) -> list[str]:
     errors = catalogue.validate_plan(steps, sufficiency=sufficiency_for_validation(ws))
     for st in steps:
@@ -339,7 +367,7 @@ def _check(obj: dict[str, Any] | None, ws: Workspace) -> tuple[list[dict[str, An
         return [], ["the plan has no steps"], []
     if len(steps) > MAX_STEPS:
         return steps, [f"the plan has {len(steps)} steps; at most {MAX_STEPS}"], []
-    notes = _fix_methods(steps, ws.brief.kind)
+    notes = [*_fix_arguments(steps), *_fix_methods(steps, ws.brief.kind)]
     return steps, _errors_of(steps, ws), notes
 
 

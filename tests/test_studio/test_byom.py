@@ -93,6 +93,23 @@ def test_a_proposed_plan_is_repaired_and_pruned(studio_factory):
                                                                                      "flood_frequency"]
 
 
+def test_a_singular_return_period_argument_is_repaired_onto_the_list(studio_factory):
+    s, calls = studio_factory()
+    s.say(PROBLEM)
+    plan = {"objective": "the design flow", "source": "device", "steps": [
+        {"id": "s1", "tool": "analyze_station", "arguments": {"source": "uk_ea", "station_id": "3400TH"}},
+        {"id": "s2", "tool": "flood_frequency", "arguments": {"source": "uk_ea", "station_id": "3400TH",
+                                                              "return_period": 200, "return_periods": [2, 100]}}]}
+    r = s.approve(plan=plan)
+    ws = s.workspace
+    assert r.kind == "report" and r.payload["plan_used"] == "proposed" and r.payload["plan_errors"] == []
+    assert [st["tool"] for st in ws.study["steps"]] == ["analyze_station", "flood_frequency"]
+    assert ws.study["steps"][1]["arguments"] == {"source": "uk_ea", "station_id": "3400TH",
+                                                 "return_periods": [2, 100, 200]}
+    assert any("return_period 200 became return_periods" in n for n in ws.study["plan"]["notes"])
+    assert calls[1][1]["return_periods"] == [2, 100, 200]
+
+
 def test_a_proposed_plan_with_nothing_valid_falls_back_to_the_tree(studio_factory):
     s, calls = studio_factory()
     s.say(PROBLEM)
