@@ -188,7 +188,9 @@ def load_table(ws: Workspace, table: str, value_column: str | None = None,
         if value_column:
             if value_column not in df.columns:
                 return {"error": f"no column {value_column!r} in {table}; the columns are {columns}", **out}
-            mapping.value_column = value_column
+            from aquascope.studio.roles.scout import choose_column
+
+            mapping = choose_column(df, mapping, value_column)
         if datetime_column:
             if datetime_column not in df.columns:
                 return {"error": f"no column {datetime_column!r} in {table}; the columns are {columns}", **out}

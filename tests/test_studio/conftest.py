@@ -196,5 +196,5 @@ def studio_factory(no_deliverables):
         return s, calls
 
     yield make
-    for patcher in patchers:
+    for patcher in reversed(patchers):      # last started, first stopped: each restores what it found
         patcher.stop()

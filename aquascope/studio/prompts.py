@@ -116,3 +116,127 @@ trend. Under 200 words per section.
 AUTHOR_FIX = f"""You are the Author of AquaScope Studio. The Critic found issues in your draft. Apply each fix listed
 and reply with the whole object again (title, answer, sections), changing nothing the Critic did not ask for.
 {RULES}"""
+
+
+# ── the export for the Explorer (and any face that runs the prompts on a model of its own) ──
+
+#: Bumped when a prompt or a schema changes in a way a page should know about.
+VERSION = 1
+
+_STRING = {"type": "string"}
+_STRINGS = {"type": "array", "items": _STRING}
+_KINDS = ["flood_risk", "ungauged_flow", "drought", "groundwater_decline", "supply_reliability", "irrigation",
+          "water_quality"]
+
+#: The JSON schemas of the three replies a page hands back to the crew: the brief (``say(proposed=...)``), the
+#: plan (``approve(plan=...)``) and the sections (``narrate(...)``). As small as the roles need.
+SCHEMAS: dict[str, dict] = {
+    "brief": {
+        "type": "object",
+        "properties": {
+            "decision": {"type": ["string", "null"]},
+            "quantities": _STRINGS,
+            "period": {"type": ["string", "null"]},
+            "horizon": {"type": ["string", "null"]},
+            "constraints": _STRINGS,
+            "deliverables": _STRINGS,
+            "kind": {"type": ["string", "null"], "enum": [*_KINDS, None]},
+            "playbook": {"type": ["string", "null"]},
+            "intake": {"type": "object", "additionalProperties": True},
+            "assumptions": _STRINGS,
+            "questions": {"type": "array", "maxItems": 3, "items": {
+                "type": "object",
+                "properties": {"id": _STRING, "text": _STRING, "options": {"type": ["array", "null"], "items": _STRING},
+                               "default": {}},
+                "required": ["id", "text"]}},
+            "ready": {"type": "boolean"},
+        },
+        "required": ["decision", "quantities", "kind", "intake", "questions", "ready"],
+    },
+    "plan": {
+        "type": "object",
+        "properties": {
+            "objective": _STRING,
+            "decision": _STRING,
+            "methodology": _STRINGS,
+            "steps": {"type": "array", "minItems": 1, "maxItems": 12, "items": {
+                "type": "object",
+                "properties": {
+                    "id": _STRING, "tool": _STRING,
+                    "arguments": {"type": "object", "additionalProperties": True},
+                    "rationale": _STRING, "method": _STRING,
+                    "expects": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {"check": _STRING, "path": _STRING, "value": {}},
+                        "required": ["check"]}},
+                    "fallback": {"type": ["object", "null"], "properties": {"step": {"type": "object"}}},
+                    "depends_on": _STRINGS,
+                    "outputs": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {"kind": {"type": "string", "enum": ["figure", "table"]}, "id": _STRING,
+                                       "caption": _STRING},
+                        "required": ["kind", "id"]}},
+                },
+                "required": ["id", "tool", "arguments", "rationale"]}},
+            "assumptions": _STRINGS,
+            "alternatives": {"type": "array", "items": {
+                "type": "object", "properties": {"method": _STRING, "why_not": _STRING}}},
+            "limitations_expected": _STRINGS,
+            "citations": _STRINGS,
+        },
+        "required": ["objective", "methodology", "steps"],
+    },
+    "sections": {
+        "type": "object",
+        "properties": {
+            "title": _STRING,
+            "answer": _STRING,
+            "sections": {"type": "object", "additionalProperties": _STRING,
+                         "description": "section id (summary, problem, site_data, methodology, results-<step id>, "
+                                        "limitations, recommendations) to Markdown paragraphs"},
+        },
+        "required": ["answer", "sections"],
+    },
+}
+
+
+def as_dict() -> dict:
+    """Every prompt by role, the reply schemas and the version."""
+    return {
+        "generated_by": "python -m aquascope.studio.prompts",
+        "version": VERSION,
+        "consultant": CONSULTANT,
+        "consultant_answers": CONSULTANT_ANSWERS,
+        "consultant_follow_up": CONSULTANT_FOLLOW_UP,
+        "methodologist": METHODOLOGIST,
+        "methodologist_repair": METHODOLOGIST_REPAIR,
+        "methodologist_change": METHODOLOGIST_CHANGE,
+        "author": AUTHOR,
+        "author_fix": AUTHOR_FIX,
+        "critic": CRITIC,
+        "specialist": SPECIALIST,
+        "schemas": SCHEMAS,
+    }
+
+
+def as_json() -> str:
+    """The prompts as the JSON the Explorer ships (``explorer/prompts.json``), so a page runs the crew's own
+    prompts on a device model; ``python -m aquascope.studio.prompts [path]`` writes it and a test keeps the
+    file in step with this module."""
+    import json
+
+    return json.dumps(as_dict(), indent=2, ensure_ascii=False) + "\n"
+
+
+def main(argv: list[str] | None = None) -> None:
+    import sys
+    from pathlib import Path
+
+    args = list(sys.argv[1:] if argv is None else argv)
+    out = Path(args[0]) if args else Path(__file__).resolve().parents[2] / "explorer" / "prompts.json"
+    out.write_text(as_json(), encoding="utf-8")
+    print(f"wrote {out}")
+
+
+if __name__ == "__main__":
+    main()

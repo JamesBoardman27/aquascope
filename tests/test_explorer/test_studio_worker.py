@@ -135,7 +135,8 @@ def test_questions_say_and_the_device_brief(face) -> None:
                       "text": "Can the river supply the town with 3 ML/day reliably?",
                       "brief": {"decision": "renew the abstraction licence", "quantities": ["the reliability"]}},
                tools=tools)
-    assert out["reply"]["kind"] == "questions" and out["status"] == "intake"
+    # the device brief names the decision and the text the demand: the keyless Consultant has nothing to ask
+    assert out["reply"]["kind"] == "plan" and out["status"] == "review"
     ws = out["workspace"]
     assert ws["brief"]["decision"] == "renew the abstraction licence"
     assert ws["brief"]["quantities"] == ["the reliability"]

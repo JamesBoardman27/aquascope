@@ -690,32 +690,78 @@ def studio_start(
 
 
 def studio_say(
-    workspace: dict[str, Any], text: str, provider: str | None = None, model: str | None = None,
-    api_key: str | None = None, base_url: str | None = None,
+    workspace: dict[str, Any], text: str, proposed: dict[str, Any] | None = None, provider: str | None = None,
+    model: str | None = None, api_key: str | None = None, base_url: str | None = None,
 ) -> dict[str, Any]:
     """Continue the conversation with the Studio crew: answer the Consultant's questions (in order, or "just go"
     for the defaults), change the brief at review, or ask a follow-up after the report. Returns the next reply
     (questions, plan, report, answer or declined) and the updated workspace to pass on.
+    proposed: a brief a model of your own wrote from the text, {"brief": {decision, quantities, period, horizon,
+    constraints, kind, playbook, intake, assumptions, questions}, "source": "device"}; it is merged with the
+    coercion a model reply gets (studio_context with role "consultant" gives the prompt and the context).
     """
     try:
         studio = _studio(workspace, provider=provider, model=model, api_key=api_key, base_url=base_url)
-        return _studio_reply(studio, studio.say(text))
+        return _studio_reply(studio, studio.say(text, proposed=proposed))
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
 def studio_approve(
-    workspace: dict[str, Any], edits: dict[str, Any] | None = None, provider: str | None = None,
-    model: str | None = None, api_key: str | None = None, base_url: str | None = None,
+    workspace: dict[str, Any], edits: dict[str, Any] | None = None, plan: dict[str, Any] | None = None,
+    provider: str | None = None, model: str | None = None, api_key: str | None = None,
+    base_url: str | None = None,
 ) -> dict[str, Any]:
     """Approve the plan in the workspace (optionally with edits: {"s3": {"arguments": {"k": 8}}} or a
     replacement {"steps": [...]}, revalidated) and run the crew to the report: the Analysts with their gates,
     the Critic, the Author. The reply is `report` (answer, key numbers, sections, what is not established)
     with the artifacts listed; the workspace carries their bytes.
+    plan: a plan a model of your own wrote in the Methodologist's reply shape ({objective, decision, methodology,
+    steps: [{id, tool, arguments, rationale, method, expects, fallback, depends_on, outputs}], assumptions,
+    alternatives, limitations_expected, citations, source}); it goes through the validator like a model plan
+    (repair, pruning, the playbook tree when nothing valid remains) and the reply's payload says `plan_used`
+    (proposed or tree) and `plan_errors`.
     """
     try:
         studio = _studio(workspace, provider=provider, model=model, api_key=api_key, base_url=base_url)
-        return _studio_reply(studio, studio.approve(edits=edits))
+        return _studio_reply(studio, studio.approve(edits=edits, plan=plan))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def studio_narrate(workspace: dict[str, Any], sections: dict[str, str] | list[dict[str, Any]],
+                   source: str = "device") -> dict[str, Any]:
+    """After the report: replace the prose of the named sections with text a model of your own wrote
+    (sections: {section id: text} or [{id, text}]; ids as in the report's sections plus "answer" and
+    "recommendations"). Every sentence passes the Critic's check first: one whose numbers are in no tool
+    result is dropped and counted (`dropped` in the payload). The report says who wrote which section
+    (`written_by`), the deliverables are rebuilt, the reply is the report.
+    """
+    try:
+        studio = _studio(workspace)
+        return _studio_reply(studio, studio.narrate(sections, source=source))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def studio_context(workspace: dict[str, Any], role: str, text: str | None = None) -> dict[str, Any]:
+    """The prompt and the compact context one role of the crew would send a model at this point, so any model
+    can run it and hand the reply back: role "consultant" (text: the client's message; reply -> studio_say
+    proposed), "methodologist" (text: a change request after the report, else the plan; reply -> studio_approve
+    plan), "author" (reply's sections -> studio_narrate). The context carries the system prompt under
+    `system`. Nothing runs and the workspace is not changed.
+    """
+    try:
+        studio = _studio(workspace)
+        if role == "consultant":
+            context = studio.consultant_context(text or "")
+        elif role == "methodologist":
+            context = studio.methodologist_context(text)
+        elif role == "author":
+            context = studio.author_context()
+        else:
+            return {"error": f"unknown role {role!r}; one of consultant, methodologist, author"}
+        return {"role": role, "context": context, "status": studio.workspace.status}
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
 
@@ -840,6 +886,8 @@ def build_server():
     server.tool()(studio_say)
     server.tool()(studio_approve)
     server.tool()(studio_follow_up)
+    server.tool()(studio_narrate)
+    server.tool()(studio_context)
     server.tool()(studio_export)
 
     @server.resource("aquascope://sources")
