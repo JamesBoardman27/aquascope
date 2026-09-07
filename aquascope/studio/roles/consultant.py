@@ -165,6 +165,21 @@ def _apply_brief(ws: Workspace, obj: dict[str, Any], known: dict[str, Any]) -> N
     b.ready = not b.questions and bool(obj.get("ready", True))
 
 
+_TABLE_WORDS = re.compile(r"\b(my|own|this|these|attached|uploaded|upload|csv|table|file|record|data)\b", re.I)
+
+
+def _note_uploads(ws: Workspace, text: str) -> None:
+    """An attached table is a constraint of the brief; when the text does not mention it, an assumption too."""
+    for key in ws.tables:
+        constraint = f"use the attached table {key}"
+        if constraint not in ws.brief.constraints:
+            ws.brief.constraints.append(constraint)
+        if not _TABLE_WORDS.search(text or ""):
+            note = f"The attached table {key} is used where the analysis can take it; the text did not say."
+            if note not in ws.brief.assumptions:
+                ws.brief.assumptions.append(note)
+
+
 def _open(ws: Workspace, model: Model | None, text: str, tables: dict[str, Any] | None) -> Message:
     from aquascope.ai_engine.team import choose_playbook, intake_hints
 
@@ -207,6 +222,7 @@ def _open(ws: Workspace, model: Model | None, text: str, tables: dict[str, Any] 
                     b.assumptions.append(f"{f.label or f.name}: {f.default} (the playbook's default)")
         b.ready = not b.questions
         ws.event("consultant", "brief", f"rules: playbook {playbook or 'none'}, {len(b.questions)} question(s)")
+    _note_uploads(ws, text)
     return _message(ws)
 
 

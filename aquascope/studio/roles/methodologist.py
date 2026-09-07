@@ -24,10 +24,30 @@ from aquascope.studio.prompts import METHODOLOGIST, METHODOLOGIST_CHANGE, METHOD
 from aquascope.studio.workspace import Workspace
 from aquascope.study import Step, Study
 
-__all__ = ["change", "plan", "plan_text", "revise"]
+__all__ = ["change", "plan", "plan_text", "revise", "sufficiency_for_validation", "wants_upload"]
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_]+)\.")
+_STEP_IN_ERROR = re.compile(r"^(?:fallback of )?step ([^:]+):")
+_UPLOAD_WORDS = re.compile(
+    r"\b(my|own|this|these|attached|uploaded)\s+(?:\w+\s+){0,2}(record|data|file|table|upload|series|csv)\b|"
+    r"\b(upload|csv)\b", re.I,
+)
 MIN_STEPS, MAX_STEPS = 1, 12
+#: Steps that frame a study but are not an analysis on their own.
+_FRAMING_TOOLS = frozenset({"describe_catchment", "find_stations", "assess_site", "load_table", "eda", "quality"})
+#: The workbench step per problem kind over an attached table (F): tool, method, the key its gate checks.
+_UPLOAD_STEPS: dict[str, list[tuple[str, str | None, str]]] = {
+    "flood_risk": [("return_periods", "at_site_flood_frequency", "return_levels"),
+                   ("flow_duration", "flow_duration", "percentiles")],
+    "supply_reliability": [("flow_duration", "flow_duration", "percentiles"), ("signatures", None, "signatures"),
+                           ("baseflow", "baseflow_separation", "bfi")],
+    "ungauged_flow": [("flow_duration", "flow_duration", "percentiles"), ("signatures", None, "signatures"),
+                      ("baseflow", "baseflow_separation", "bfi")],
+    "groundwater_decline": [("sgi_drought", "sgi", "current"), ("recharge", "recharge_wtf", "value_mm_per_year")],
+    "water_quality": [("who_screen", None, "rows"), ("wqi", "water_quality_index", "ccme")],
+}
+_GENERIC_UPLOAD_STEPS: list[tuple[str, str | None, str]] = [("eda", None, "n_records"), ("quality", None, "n_records"),
+                                                          ("signatures", None, "signatures")]
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -116,6 +136,39 @@ def _caveats_and_citations(ws: Workspace) -> tuple[list[str], list[str]]:
         return pbk.caveats_for(pb, ctx), list(pb.citations)
     except (pbk.Declined, pbk.PlaybookError):
         return [], list(pb.citations)
+
+
+def _uploads(ws: Workspace) -> list[Any]:
+    inv = ws.inventory
+    return [d for d in (inv.uploads() if inv else []) if (d.quality or {}).get("verdict") != "unreadable"]
+
+
+def sufficiency_for_validation(ws: Workspace) -> list[dict[str, Any]] | None:
+    """The registry's verdicts the validator judges a ``method`` against: the site's table, and for a method whose
+    variable an attached table carries, the better of the site's verdict and the table's own record."""
+    from aquascope.methods import METHODS, SiteContext, assess_method
+
+    inv = ws.inventory
+    if inv is None:
+        return None
+    rows = {r.get("method"): dict(r) for r in inv.sufficiency if isinstance(r, dict)}
+    order = {"defensible": 0, "marginal": 1, "not_defensible": 2, "not defensible": 2}
+    rp = ws.brief.intake.get("return_period")
+    for d in _uploads(ws):
+        if not d.variable or not d.years:
+            continue
+        ctx = SiteContext(years_by_variable={d.variable: float(d.years)},
+                          resolution_by_variable={d.variable: "monthly" if d.resolution == "monthly" else "daily"},
+                          return_period=float(rp) if isinstance(rp, (int, float)) else None)
+        for m in METHODS.values():
+            if m.variable != d.variable:
+                continue
+            verdict = assess_method(m, ctx)
+            verdict["station"] = {"source": "upload", "station_id": d.id}
+            old = rows.get(m.id)
+            if old is None or order.get(str(verdict["status"]), 2) < order.get(str(old.get("status")), 2):
+                rows[m.id] = verdict
+    return list(rows.values())
 
 
 def _catalogue_for(problem: str | None, *, uploads: bool) -> list[dict[str, Any]]:
@@ -227,23 +280,89 @@ def _normalise(steps: Any) -> list[dict[str, Any]]:
     return out
 
 
-def _check(obj: dict[str, Any] | None, ws: Workspace) -> tuple[list[dict[str, Any]], list[str]]:
+def _unwrap(obj: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A repair reply that echoes the context's shape (``{"plan": {...}}``) is the plan inside it."""
+    if isinstance(obj, dict) and "steps" not in obj and isinstance(obj.get("plan"), dict):
+        return obj["plan"]
+    return obj
+
+
+def _fix_methods(steps: list[dict[str, Any]], kind: str | None) -> list[str]:
+    """A ``method`` the tool does not apply is not fatal: it becomes the entry's first method that serves the
+    problem, or goes; one note per change (A)."""
+    from aquascope.methods import METHODS
+
+    notes: list[str] = []
+    for step in steps:
+        method = step.get("method")
+        if not method:
+            continue
+        entry = catalogue.get(str(step.get("tool") or ""))
+        if entry is None:
+            continue
+        fits = method in METHODS and (not entry.methods or method in entry.methods)
+        if fits:
+            continue
+        replacement = next((m for m in entry.methods if m in METHODS and (not kind or kind in METHODS[m].problems)),
+                           None)
+        if replacement:
+            step["method"] = replacement
+            notes.append(f"step {step.get('id')}: method {method!r} is not one {entry.id} applies; "
+                         f"{replacement!r} stands in")
+        else:
+            step.pop("method", None)
+            notes.append(f"step {step.get('id')}: method {method!r} is not one {entry.id} applies; dropped")
+    return notes
+
+
+def _errors_of(steps: list[dict[str, Any]], ws: Workspace) -> list[str]:
+    errors = catalogue.validate_plan(steps, sufficiency=sufficiency_for_validation(ws))
+    for st in steps:
+        errors += _placeholder_errors(st)
+    return errors
+
+
+def _check(obj: dict[str, Any] | None, ws: Workspace) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    """The steps, the validator's errors and the notes (methods repaired) for a model's plan object."""
+    obj = _unwrap(obj)
     if not obj:
-        return [], ["the model returned no plan"]
+        return [], ["the model returned no plan"], []
     steps = _normalise(obj.get("steps"))
     if not steps:
-        return [], ["the plan has no steps"]
+        return [], ["the plan has no steps"], []
     if len(steps) > MAX_STEPS:
-        return steps, [f"the plan has {len(steps)} steps; at most {MAX_STEPS}"]
-    sufficiency = ws.inventory.sufficiency if ws.inventory else None
-    errors = catalogue.validate_plan(steps, sufficiency=sufficiency)
-    for s in steps:
-        errors += _placeholder_errors(s)
-    return steps, errors
+        return steps, [f"the plan has {len(steps)} steps; at most {MAX_STEPS}"], []
+    notes = _fix_methods(steps, ws.brief.kind)
+    return steps, _errors_of(steps, ws), notes
+
+
+def _has_analysis(steps: list[dict[str, Any]]) -> bool:
+    return any(str(st.get("tool")) not in _FRAMING_TOOLS for st in steps)
+
+
+def _prune(steps: list[dict[str, Any]], ws: Workspace) -> tuple[list[dict[str, Any]], list[str]]:
+    """The plan minus the steps the validator names (and the steps that then lose what they depend on),
+    until what remains validates. Returns the kept steps and one note per removed step."""
+    kept = [dict(st) for st in steps]
+    notes: list[str] = []
+    for _ in range(len(steps) + 1):
+        errors = _errors_of(kept, ws)
+        if not errors:
+            break
+        bad: dict[str, str] = {}
+        for e in errors:
+            m = _STEP_IN_ERROR.match(e)
+            if m:
+                bad.setdefault(m.group(1), e)
+        if not bad:
+            return [], notes + errors
+        notes += [f"step {sid} removed: {reason}" for sid, reason in bad.items()]
+        kept = [st for st in kept if str(st.get("id")) not in bad]
+    return kept, notes
 
 
 def _study_from(ws: Workspace, obj: dict[str, Any], steps: list[dict[str, Any]], *,
-                base: Study | None = None) -> Study:
+                base: Study | None = None, notes: list[str] | None = None) -> Study:
     """A version-3 study from the model's plan object (``base`` keeps an earlier plan's block on a change)."""
     b = ws.brief
     site = dict(ws.site or {})
@@ -267,6 +386,8 @@ def _study_from(ws: Workspace, obj: dict[str, Any], steps: list[dict[str, Any]],
         "caveats": caveats,
     })
     plan_block["rationale"] = plan_block["objective"]
+    if notes:
+        plan_block["notes"] = list(dict.fromkeys([*(plan_block.get("notes") or []), *notes]))
     if ws.inventory and ws.inventory.notes:
         plan_block["recon_notes"] = list(ws.inventory.notes[:8])
     where = f"{site.get('lat')}, {site.get('lon')}" if site else "the site"
@@ -283,45 +404,61 @@ def _study_from(ws: Workspace, obj: dict[str, Any], steps: list[dict[str, Any]],
     return study
 
 
+def _uploads_compact(ws: Workspace) -> list[dict[str, Any]]:
+    out = []
+    for d in _uploads(ws):
+        q = d.quality or {}
+        out.append({"id": d.id, "variable": d.variable, "unit": q.get("unit"), "years": d.years, "n": d.n,
+                    "resolution": d.resolution, "columns": (q.get("columns") or [])[:12], "quality": q.get("verdict")})
+    return out
+
+
 def _model_plan(ws: Workspace, model: Model) -> tuple[Study | None, list[str]]:
     from aquascope import playbooks as pbk
     from aquascope.gates import CHECKS
 
     exemplar: dict[str, Any] | None = None
     try:
-        tree = _tree(ws)
+        tree = _upload_tree(ws) if wants_upload(ws) else _tree(ws)
         exemplar = {"playbook": tree.plan.get("playbook"), "branch": tree.plan.get("branch"),
                     "rationale": tree.plan.get("rationale"),
-                    "steps": [s.to_dict() for s in tree.steps], "caveats": tree.plan.get("caveats")}
+                    "steps": [st.to_dict() for st in tree.steps], "caveats": tree.plan.get("caveats")}
     except pbk.Declined as exc:
         exemplar = {"playbook": ws.brief.playbook, "declined": exc.reason}
     except pbk.PlaybookError:
         exemplar = None
-    uploads = bool(ws.inventory and ws.inventory.uploads())
+    uploads = _uploads_compact(ws)
     context = {
+        "uploads": uploads or None,
         "brief": _brief_compact(ws),
         "inventory": _inventory_compact(ws),
-        "catalogue": _catalogue_for(ws.brief.kind, uploads=uploads),
+        "catalogue": _catalogue_for(ws.brief.kind, uploads=bool(uploads)),
         "gates": CHECKS,
         "exemplar": exemplar,
     }
     obj = model.call_json("methodologist", METHODOLOGIST, context)
-    steps, errors = _check(obj, ws)
+    steps, errors, notes = _check(obj, ws)
     if errors and obj is not None:
         ws.event("methodologist", "invalid", "; ".join(errors[:6]))
-        repaired = model.call_json("methodologist", METHODOLOGIST_REPAIR, {
+        repaired = _unwrap(model.call_json("methodologist", METHODOLOGIST_REPAIR, {
             "plan": obj, "errors": errors, "catalogue": context["catalogue"], "gates": list(CHECKS),
-            "inventory": context["inventory"],
-        })
-        steps2, errors2 = _check(repaired, ws)
-        if repaired is not None and not errors2:
-            obj, steps, errors = repaired, steps2, []
+            "inventory": context["inventory"], "uploads": uploads or None,
+        }))
+        steps2, errors2, notes2 = _check(repaired, ws)
+        if repaired is not None and steps2 and not errors2:
+            obj, steps, errors, notes = repaired, steps2, [], notes + notes2
             ws.event("methodologist", "repaired", f"{len(steps)} steps pass the validator")
         else:
-            errors = errors2 if repaired is not None else errors
+            kept, pruned = _prune(steps, ws)
+            if kept and _has_analysis(kept):
+                ws.event("methodologist", "pruned", f"{len(steps) - len(kept)} invalid step(s) removed, "
+                         f"{len(kept)} kept: " + "; ".join(pruned[:4]))
+                steps, errors, notes = kept, [], notes + pruned
+            else:
+                errors = errors2 if repaired is not None and errors2 else errors
     if errors:
         return None, errors
-    return _study_from(ws, obj or {}, steps), []
+    return _study_from(ws, obj or {}, steps, notes=notes), []
 
 
 def _decline(ws: Workspace, reason: str) -> None:
@@ -368,7 +505,7 @@ def plan(ws: Workspace, model: Model | None) -> Study | None:
                 return None
     elif ws.brief.playbook:
         try:
-            study = _tree(ws)
+            study = _upload_tree(ws) if wants_upload(ws) else _tree(ws)
         except pbk.Declined as exc:
             _decline(ws, exc.reason)
             return None
@@ -377,6 +514,113 @@ def plan(ws: Workspace, model: Model | None) -> Study | None:
         return None
     _announce(ws, study)
     return study
+
+
+def wants_upload(ws: Workspace) -> bool:
+    """Plan on an attached table when the text points at it (my/own/this record, data, file, table, upload, csv)
+    or when no gauge within reach carries the variable the playbook needs."""
+    uploads = _uploads(ws)
+    if not uploads:
+        return False
+    if _UPLOAD_WORDS.search(ws.brief.problem or ""):
+        return True
+    pb = _playbook(ws)
+    if pb is None or not pb.variable:
+        return False
+    return pb.variable not in (ws.inventory.years_by_variable if ws.inventory else {})
+
+
+def _upload_tree(ws: Workspace) -> Study:
+    """The keyless plan over an attached table: load_table, then the workbench steps for the problem kind, each
+    with a gate on its result key, the registry consulted on every method. Raises ``Declined`` when nothing
+    defensible remains."""
+    from aquascope import playbooks as pbk
+    from aquascope.methods import METHODS, SiteContext, assess_method
+
+    pb = _playbook(ws)
+    if pb is None:
+        raise pbk.Declined("no playbook applies", kind="no_playbook")
+    uploads = _uploads(ws)
+    upload = next((d for d in uploads if d.variable == pb.variable), None) or \
+        next((d for d in uploads if d.variable), None) or uploads[0]
+    intake = pbk.fill_intake(pb, dict(ws.brief.intake))
+    ws.brief.intake = dict(intake)
+    site = dict(ws.site or {})
+    rp = intake.get("return_period")
+    years = float(upload.years or 0.0)
+    ctx = SiteContext(years_by_variable={upload.variable: years} if upload.variable else {},
+                      resolution_by_variable={upload.variable: "monthly" if upload.resolution == "monthly"
+                                              else "daily"} if upload.variable else {},
+                      return_period=float(rp) if isinstance(rp, (int, float)) else None)
+    steps: list[Step] = [Step(
+        tool=catalogue.LOAD_TABLE, id="s1", arguments={"table": upload.id},
+        rationale=f"The attached table {upload.id} ({upload.variable or 'rows'}"
+                  + (f", {years:g} years" if years else "") + ") is the record this study is about.",
+        expects=[{"check": "not_empty", "path": "n"}]
+                + ([{"check": "min_years", "value": 1, "path": "years"}] if upload.variable else []),
+    )]
+    notes: list[str] = []
+    recipe = list(_UPLOAD_STEPS.get(pb.id) or [])
+    if pb.id == "drought_status":
+        # workbench.spei needs a temperature or PET column and a from_step frame carries the value column only:
+        # the table is profiled and the indices come from the ERA5 cell.
+        recipe = [("eda", None, "n_records"), ("quality", None, "n_records")]
+        notes.append("SPI and SPEI over an attached table need a temperature series the table loader does not "
+                     "carry; the indices are computed for the ERA5 cell instead.")
+    if not upload.variable and pb.id != "water_quality":
+        recipe = [("eda", None, "n_records"), ("quality", None, "n_records")]
+    if not recipe:
+        recipe = _GENERIC_UPLOAD_STEPS
+    n = 1
+    for tool, method, key in recipe:
+        if method and method in METHODS and upload.variable:
+            verdict = assess_method(METHODS[method], ctx)
+            if verdict.get("status") == "not_defensible":
+                notes.append(f"step {tool} dropped: {method} is not defensible on the table: {verdict.get('reason')}")
+                continue
+            if verdict.get("status") == "marginal":
+                notes.append(f"{METHODS[method].label} is marginal on the table: {verdict.get('reason')}")
+        n += 1
+        args: dict[str, Any] = {"from_step": "s1"}
+        if tool == "return_periods":
+            periods = sorted({2, 5, 10, 25, 50, 100, *([int(rp)] if isinstance(rp, (int, float)) else [])})
+            args.update({"distribution": "gev", "periods": periods})
+        if tool == "wqi":
+            args["use"] = str(intake.get("use") or "drinking")
+        steps.append(Step(tool=tool, id=f"s{n}", arguments=args, method=method, depends_on=["s1"],
+                          rationale=f"{catalogue.get(tool).about if catalogue.get(tool) else tool} on the table.",
+                          expects=[{"check": "not_empty", "path": key}]))
+        if tool == "return_periods":
+            n += 1
+            steps.append(Step(tool=tool, id=f"s{n}", arguments={**args, "distribution": "lp3"}, method=method,
+                              depends_on=["s1"], rationale="A second distribution (Log-Pearson III) on the same "
+                              "maxima, so the spread between fits can be quoted.",
+                              expects=[{"check": "not_empty", "path": key}]))
+    if pb.id == "drought_status" and site.get("lat") is not None:
+        n += 1
+        args = {"lat": site["lat"], "lon": site["lon"], "years": 40}
+        if intake.get("timescales"):
+            args["timescales"] = list(intake["timescales"])
+        steps.append(Step(tool="drought_indices", id=f"s{n}", arguments=args, method="spei_reanalysis",
+                          rationale="SPI and SPEI for the ERA5 cell, the indices the table cannot yield alone.",
+                          expects=[{"check": "not_empty", "path": "indices"}]))
+    if not any(st.tool not in _FRAMING_TOOLS for st in steps):
+        raise pbk.Declined("The attached table supports no defensible analysis for this problem: "
+                           + "; ".join(notes), kind="refused", playbook=pb.id)
+    caveats, citations = _caveats_and_citations(ws)
+    where = f"{site.get('lat')}, {site.get('lon')}" if site else "the site"
+    study = Study(
+        question=ws.brief.problem, title=f"{pb.title} on {upload.id}: {where}", steps=steps, author="playbook",
+        version=3,
+        problem={"kind": pb.problem, "site": site, "params": dict(intake), "text": ws.brief.problem},
+        plan={"playbook": pb.id, "branch": "upload", "upload": upload.id,
+              "rationale": f"The brief points at the attached table {upload.id}"
+                           + (f" ({years:g} years of {upload.variable})" if upload.variable else "")
+                           + "; the study runs on it rather than on a gauge within reach.",
+              "caveats": caveats, "citations": citations, "notes": notes},
+        created=_now(),
+    )
+    return _promote(ws, study, author="playbook")
 
 
 def revise(ws: Workspace, model: Model | None, edits: dict[str, Any] | list[dict[str, Any]]) -> Study:
@@ -419,10 +663,7 @@ def revise(ws: Workspace, model: Model | None, edits: dict[str, Any] | list[dict
                 s["fallback"] = override["fallback"]
             kept.append(s)
         steps = _normalise(kept)
-    sufficiency = ws.inventory.sufficiency if ws.inventory else None
-    errors = catalogue.validate_plan(steps, sufficiency=sufficiency)
-    for s in steps:
-        errors += _placeholder_errors(s)
+    errors = _errors_of(steps, ws)
     if not steps:
         errors.append("the edited plan has no steps")
     if errors:
@@ -481,16 +722,20 @@ def change(ws: Workspace, model: Model | None, request: str, *, intake: dict[str
             "inventory": _inventory_compact(ws),
             "catalogue": _catalogue_for(ws.brief.kind, uploads=uploads), "gates": CHECKS,
         })
-        steps, errors = _check(obj, ws)
+        steps, errors, notes = _check(obj, ws)
         if errors and obj is not None:
             ws.event("methodologist", "invalid", "; ".join(errors[:6]))
-            repaired = model.call_json("methodologist", METHODOLOGIST_REPAIR, {
-                "plan": obj, "errors": errors, "gates": list(CHECKS)})
-            steps2, errors2 = _check(repaired, ws)
-            if repaired is not None and not errors2:
-                obj, steps, errors = repaired, steps2, []
+            repaired = _unwrap(model.call_json("methodologist", METHODOLOGIST_REPAIR, {
+                "plan": obj, "errors": errors, "gates": list(CHECKS)}))
+            steps2, errors2, notes2 = _check(repaired, ws)
+            if repaired is not None and steps2 and not errors2:
+                obj, steps, errors, notes = repaired, steps2, [], notes + notes2
+            else:
+                kept, pruned = _prune(steps, ws)
+                if kept and _has_analysis(kept):
+                    steps, errors, notes = kept, [], notes + pruned
         if not errors:
-            study = _study_from(ws, obj or {}, steps, base=base)
+            study = _study_from(ws, obj or {}, steps, base=base, notes=notes)
             study.plan["changed_for"] = request
             if isinstance((obj or {}).get("methodology"), list):
                 study.plan["methodology"] = [str(m) for m in obj["methodology"]]
@@ -501,7 +746,7 @@ def change(ws: Workspace, model: Model | None, request: str, *, intake: dict[str
             ws.event("methodologist", "declined", "no playbook to plan the change from and no valid model plan")
             return None
         try:
-            study = _tree(ws)
+            study = _upload_tree(ws) if wants_upload(ws) else _tree(ws)
             study.plan["changed_for"] = request
         except pbk.Declined as exc:
             ws.event("methodologist", "declined", exc.reason)

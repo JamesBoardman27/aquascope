@@ -103,6 +103,11 @@ def record_name(payload: dict[str, Any], site: dict[str, Any] | None = None) -> 
     """How the caption names the record: ``uk_ea 3400TH``, ``the ERA5 cell at 51.42 N, 0.31 W``, ``the table``."""
     src, sid = payload.get("source"), payload.get("station_id")
     if src and sid:
+        # The Analysts add the catalog name of the station the step ran on, so a caption says
+        # "Kingston (uk_ea 3400TH)" rather than an id alone.
+        name = payload.get("station_name")
+        if isinstance(name, str) and name.strip() and name.strip() != str(sid):
+            return f"{name.strip()} ({src} {sid})"
         return f"{src} {sid}"
     if payload.get("station") and isinstance(payload["station"], dict):
         st = payload["station"]

@@ -121,6 +121,15 @@ def test_an_invalid_plan_gets_one_repair_call():
     assert any("frobnicate" in e for e in repair["errors"]) and any("min_yearz" in e for e in repair["errors"])
 
 
+def test_a_repair_reply_wrapped_as_plan_is_unwrapped():
+    ws = _ws()
+    broken = dict(VALID_PLAN, steps=[dict(VALID_PLAN["steps"][0], tool="frobnicate")])
+    client = FakeModel({"methodologist": [broken, {"plan": VALID_PLAN}]})
+    model = Model.resolve(ws, client=client, model="fake", provider="custom")
+    study = methodologist.plan(ws, model)
+    assert study is not None and study.author == "methodologist" and len(study.steps) == 4
+
+
 def test_an_unrepairable_plan_falls_back_to_the_tree_or_declines():
     ws = _ws()
     broken = dict(VALID_PLAN, steps=[dict(VALID_PLAN["steps"][0], tool="frobnicate")])
@@ -145,8 +154,9 @@ def test_a_method_the_registry_calls_not_defensible_is_refused():
     client = FakeModel({"methodologist": [VALID_PLAN, VALID_PLAN]})
     model = Model.resolve(ws, client=client, model="fake", provider="custom")
     study = methodologist.plan(ws, model)
-    assert study is not None and study.author == "playbook", "the tree stands in"
-    assert any("not defensible" in e and "at_site_flood_frequency" in e for e in study.plan["model_plan_rejected"])
+    assert study is not None and study.author == "methodologist", "the rest of the plan stands"
+    assert study.step_by_id("s3") is None and [s.id for s in study.steps] == ["s1", "s2", "s4"]
+    assert any("not defensible" in n and "at_site_flood_frequency" in n for n in study.plan["notes"])
     assert any("not defensible" in e for e in client.requests[1]["context"]["errors"])
 
 
@@ -156,8 +166,8 @@ def test_placeholders_other_than_results_are_rejected():
         dict(VALID_PLAN["steps"][1], id="s1", arguments={"source": "{{ station.source }}", "station_id": "3400TH"}),
         {"id": "s2", "tool": "anywhere", "arguments": {"lat": 51.415, "lon": -0.308, "years": "{{ result.s1.years }}"},
          "depends_on": ["s1"], "rationale": "ok"}])
-    steps, errors = methodologist._check(plan, ws)
-    assert len(errors) == 1 and "station" in errors[0] and "concrete value" in errors[0]
+    steps, errors, notes = methodologist._check(plan, ws)
+    assert len(errors) == 1 and "station" in errors[0] and "concrete value" in errors[0] and notes == []
 
 
 def test_revise_applies_overrides_moves_gate_keys_and_refuses_bad_edits():

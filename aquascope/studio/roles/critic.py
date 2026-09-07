@@ -34,10 +34,21 @@ def tool_results(ws: Workspace) -> list[dict[str, Any]]:
         if isinstance(fb, dict) and fb.get("tool"):
             seen.append({"name": fb["tool"], "arguments": fb.get("arguments") or {}, "payload": fb.get("result"),
                          "ok": bool(fb.get("ok"))})
-    pool = {"gates": [g for r in (run.get("results") or []) for g in (r.get("gates") or [])],
-            "plan": (ws.study or {}).get("plan") or {},
-            "inventory": [d.to_dict() for d in ws.inventory.datasets] if ws.inventory else []}
+    gates = [g for r in (run.get("results") or []) for g in (r.get("gates") or [])]
+    all_gates = run.get("gates") or gates
+    pool = {"gates": gates, "plan": (ws.study or {}).get("plan") or {},
+            # the counts the Author writes ("3 steps ran, 7 of 7 gates passed") are results too
+            "n_steps": len(run.get("results") or []), "n_gates": len(all_gates),
+            "n_passed": sum(1 for g in all_gates if g.get("passed")),
+            "n_failed": sum(1 for g in all_gates if not g.get("passed")),
+            "n_not_established": len(not_established(ws)), "n_replans": run.get("replans") or 0}
     seen.append({"name": "gates", "arguments": {}, "payload": pool, "ok": True})
+    datasets = [d.to_dict() for d in ws.inventory.datasets] if ws.inventory else []
+    stations = [d for d in datasets if d.get("kind") == "station"]
+    short = [d for d in stations if (d.get("years") or 0) < 1]
+    seen.append({"name": "inventory", "arguments": {}, "ok": True, "payload": {
+        "datasets": datasets, "n_datasets": len(datasets), "n_stations": len(stations),
+        "n_short": len(short), "n_listed": len(datasets) - len(short)}})
     return seen
 
 

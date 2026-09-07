@@ -146,10 +146,20 @@ class FakeModel:
         return [r for r in self.requests if r["role"] == role]
 
 
+def workbench_tools() -> dict[str, Any]:
+    """The workbench analyses as the runner wraps them: pure functions over a frame, no network."""
+    from aquascope import workbench
+    from aquascope.study import _workbench_tool
+
+    return {name: _workbench_tool(name) for name in workbench.TOOLS}
+
+
 @contextmanager
 def patched(recon_value: dict[str, Any] = RECON, tools: dict[str, Any] | None = None, calls: list | None = None):
-    """assess_site and the runner's tools replaced for the block."""
+    """assess_site and the runner's tools replaced for the block: the fakes over the workbench's pure tools,
+    so a plan over an attached table runs while every network tool stays faked (or unknown)."""
     tools = tools if tools is not None else fake_tools(calls if calls is not None else [])
+    tools = {**workbench_tools(), **tools}
     with patch.object(aquascope.explore, "assess_site", create=True, return_value=recon_value), \
          patch("aquascope.study._tools", return_value=tools):
         yield tools

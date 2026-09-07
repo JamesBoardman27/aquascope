@@ -74,7 +74,7 @@ def test_figures_and_tables_are_made_per_step_when_the_makers_exist(monkeypatch)
         if tool == "flood_frequency":
             raise RuntimeError("no matplotlib here")
         return [Artifact(id=f"{step_id}_series", kind="figure", name=f"figures/{step_id}_series.png", data=b"png",
-                         media_type="image/png", caption="the series")]
+                         media_type="image/png", caption="the series", meta={"kind": "series"})]
 
     def tables_for(step_id, tool, payload):
         made.append(("tab", step_id, tool))
