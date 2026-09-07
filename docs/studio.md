@@ -158,6 +158,50 @@ once per visit, and never on a visit that runs no study. Nothing is uploaded
 anywhere: the tables you attach are read in your tab and travel inside the
 workspace as CSV text.
 
+## Recorded studies
+
+The keyless tier plans from the playbook tree and writes template prose.
+What the crew does with a model (a methodology composed from the
+catalogue, a Critic with findings, an Author who writes) needs a model
+once, not at every visit. So the maintainer records a dozen studies with a
+model and commits the bundles under `explorer/showcase/studies/`: flood,
+drought, supply, groundwater, ungauged flow, water quality, irrigation and
+a table you bring; gauged sites and bare points; five continents. The Study
+intake offers them as chips.
+
+Opening one shows the recorded study as it was: the brief, the plan, the
+run with its gates, the figures, the report. Two things are true of every
+recording and the page says both:
+
+- **The numbers re-run live.** The plan (`study.yaml`, the version-3 study
+  in `workspace.json`) is handed back to the worker and every step runs
+  again in your browser, keyless, at the same place with the same arguments
+  and gates. Records grow, so a number can differ from the recording; a
+  difference is new observations, not an error.
+- **The prose is a recording.** The Author's text and the Critic's findings
+  were written once by the model named in the label ("recorded on
+  2026-09-07 with claude-sonnet-5, 0.42 USD") and are shown as recorded,
+  never regenerated.
+
+A recording is a directory: `workspace.json` (without the artifact bytes;
+`aquascope studio --resume` picks it up), `report.md`, `study.yaml`
+(`aquascope run study.yaml` replays it with no model), `figures/*.png` and
+`meta.json` (the model, the date, the tokens and the estimated cost, the
+seconds, the gates passed, the headline). `index.json` at the root lists
+them. A declined study is kept as recorded: a decline with its reason is a
+valid worked example.
+
+Recording is a maintainer's command and needs a key:
+
+```bash
+aquascope studio-showcase record --out explorer/showcase/studies [--only kingston-flood] [--max-usd 15]
+aquascope studio-showcase list --out explorer/showcase/studies
+```
+
+Cases fresher than 30 days are skipped (`--refresh-after`), so a run that
+stops halfway tops up rather than starting again, and the run stops at
+`--max-usd`. The cases are `aquascope.studio.showcase.CASES`.
+
 ## The honesty rules
 
 - Every number in the report comes from a tool result and passes the gates
