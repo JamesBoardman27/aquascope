@@ -390,16 +390,19 @@ function renderCompose(status) {
 }
 
 // A figure the page has not seen (the worker was restarted, or the study came
-// from elsewhere) is fetched by id when the report shows it.
+// from elsewhere) is fetched by id when the report shows it; one the worker
+// cannot serve either (its bytes were never in this session) leaves the board
+// rather than standing as a broken image. The next run draws it again.
 function loadMissingFigures() {
   for (const img of board().querySelectorAll("img[data-art]")) {
     const id = img.dataset.art;
+    const drop = () => { const fig = img.closest("figure"); if (fig) fig.remove(); };
     call("studio", { op: "file", workspace: S.ws, artifact_id: id }).then((res) => {
-      if (!res || res.error || !res.data) return;
+      if (!res || res.error || !res.data) { drop(); return; }
       const f = { id, src: `data:${res.media_type};base64,${res.data}`, caption: img.alt, job: null };
       S.figures.set(id, f);
       if (img.isConnected) img.src = f.src;
-    }).catch((err) => console.info("figure unavailable:", err && err.message));
+    }).catch((err) => { console.info("figure unavailable:", err && err.message); drop(); });
   }
 }
 
