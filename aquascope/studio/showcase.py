@@ -169,11 +169,11 @@ CASES: list[Case] = [
         upload=TABLE_NAME,
     ),
     Case(
-        id="toulouse-irrigation", title="Irrigating maize from the Garonne at Toulouse", lat=43.60, lon=1.44,
-        problem="Irrigating 40 ha of maize from the Garonne at Toulouse, planted in April: what is the seasonal "
-                "water demand and can the river meet it run of river?",
-        kind="irrigation_feasibility", site="Garonne at Toulouse, France",
-        shows="FAO-56 crop demand from the ERA5 climate, then a supply screening on an 80-year Hub'Eau gauge.",
+        id="toulouse-irrigation", title="Irrigating maize from the Garonne at Toulouse", lat=43.53, lon=1.40,
+        problem="Irrigating 40 ha of maize from the Garonne at Portet-sur-Garonne, south of Toulouse, planted in "
+                "April: what is the seasonal water demand and can the river meet it run of river?",
+        kind="irrigation_feasibility", site="Garonne at Portet-sur-Garonne, Toulouse, France",
+        shows="FAO-56 crop demand from the ERA5 climate, then a supply screening on a 116-year Hub'Eau gauge.",
         intake={"crop": "maize", "area_ha": 40, "planting_month": 4},
     ),
     Case(

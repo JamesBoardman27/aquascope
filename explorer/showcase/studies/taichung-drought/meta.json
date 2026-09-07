@@ -77,7 +77,7 @@
  },
  "replans": 1,
  "stop_reason": "gate failed: min_years (10 years of record, 30 needed: too short); the fallback drought_indices did not pass its own gates",
- "headline": "Using taiwancwa station 467490 (Taichung), the nearest available station in this catalog, current SPI-3 is 0.87 and SPEI-3 is 0.77 as of 2026-06-01, both classed normal; Taichung is not in drought by this reading.",
+ "headline": "Using taiwan_cwa station 467490 (Taichung), the nearest available station in this catalog, current SPI-3 is 0.87 and SPEI-3 is 0.77 as of 2026-06-01, both classed normal; Taichung is not in drought by this reading.",
  "not_established": [
   "Step s1, gate min_years: 9 years of record, 30 needed: too short",
   "Step s2, gate min_years: 10 years of record, 30 needed: too short",

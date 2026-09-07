@@ -73,7 +73,7 @@
  },
  "replans": 1,
  "stop_reason": "gate failed: not_empty (nothing at 'climate'); the fallback regionalize_signatures failed too: regionalisation failed: ValueError: method must be similarity, regression or both",
- "headline": "At the Environment Agency Kingston gauge (ukea, station 8496ce69-482c-406a-a2f0-ac418ef8f099, 142.9 years of daily discharge, 1883-2026), the 100-year flood discharge (Q100) is estimated at 652.5 m3/s by GEV (L-moments) and 624.0 m3/s by...",
+ "headline": "At the Environment Agency Kingston gauge (uk_ea, station 8496ce69-482c-406a-a2f0-ac418ef8f099, 142.9 years of daily discharge, 1883-2026), the 100-year flood discharge (Q100) is estimated at 652.5 m3/s by GEV (L-moments) and 624.0 m3/s b...",
  "not_established": [
   "Step s4, gate not_empty: nothing at 'climate'",
   "Step s4.fallback, gate not_empty: the step returned an error: regionalisation failed: ValueError: method must be similarity, regression or both",

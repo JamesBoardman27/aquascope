@@ -71,7 +71,7 @@
  },
  "replans": 0,
  "stop_reason": null,
- "headline": "Regionalised low-flow transfer from 10 donor gauges to the 478.7 km2 catchment (BasinATLAS/HydroATLAS, hybasid 2120018870) gives a mean flow of about 0.60 m3/s (52 ML/day), a median of about 0.38 m3/s (33 ML/day) and a Q95 low flow of ab...",
+ "headline": "Regionalised low-flow transfer from 10 donor gauges to the 478.7 km2 catchment (BasinATLAS/HydroATLAS, hybas_id 2120018870) gives a mean flow of about 0.60 m3/s (52 ML/day), a median of about 0.38 m3/s (33 ML/day) and a Q95 low flow of a...",
  "not_established": [
   "step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in",
   "These numbers are not in any tool result: 0.38, 0.046, 0.38, 0.046, 0.38, 0.046."

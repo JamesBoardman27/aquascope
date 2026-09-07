@@ -74,7 +74,7 @@
  },
  "replans": 1,
  "stop_reason": "gate failed: min_years (9.7 years of record, 10 needed: too short); not_empty (nothing at 'trend'); the fallback analyze_station did not pass its own gates",
- "headline": "The full 48.7-year record at Haggis Farm (ukea, station b3272d5b-f4fd-48eb-8bc7-67c102d65943, 1977-09-29 to 2026-06-08) shows a statistically significant increasing trend by Mann-Kendall test (tau = 0.86, p = 0.0) with a Sen's slope of +...",
+ "headline": "The full 48.7-year record at Haggis Farm (uk_ea, station b3272d5b-f4fd-48eb-8bc7-67c102d65943, 1977-09-29 to 2026-06-08) shows a statistically significant increasing trend by Mann-Kendall test (tau = 0.86, p = 0.0) with a Sen's slope of...",
  "not_established": [
   "Step s2, gate min_years: 9.7 years of record, 10 needed: too short",
   "Step s2, gate not_empty: nothing at 'trend'",
