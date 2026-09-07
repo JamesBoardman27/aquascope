@@ -22,8 +22,10 @@ import argparse
 import json
 import logging
 import sys
+from dataclasses import asdict, is_dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import argcomplete
 
@@ -34,6 +36,55 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
 )
 logger = logging.getLogger("aquascope")
+
+
+def _serializable(value: Any) -> Any:
+    """Convert CLI result objects into JSON-compatible values."""
+    import numpy as np
+    import pandas as pd
+
+    if is_dataclass(value) and not isinstance(value, type):
+        return _serializable(asdict(value))
+    if isinstance(value, pd.DataFrame):
+        return _serializable(value.rename_axis(value.index.name or "index").reset_index().to_dict("records"))
+    if isinstance(value, pd.Series):
+        name = value.name or "value"
+        return _serializable(
+            value.rename(name).rename_axis(value.index.name or "index").reset_index().to_dict("records")
+        )
+    if isinstance(value, dict):
+        return {str(key): _serializable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_serializable(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, (date, Path)):
+        return value.isoformat() if isinstance(value, date) else str(value)
+    return value
+
+
+def _write_output(data: Any, path: str, fmt: str | None = None) -> Path:
+    """Write structured CLI output as JSON or CSV, inferring the format from the suffix."""
+    import pandas as pd
+
+    output_path = Path(path)
+    output_format = fmt or ("csv" if output_path.suffix.lower() == ".csv" else "json")
+    serializable = _serializable(data)
+
+    if output_format == "json":
+        output_path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
+    else:
+        records = serializable if isinstance(serializable, list) else [serializable]
+        frame = pd.json_normalize(records)
+        for column in frame.columns:
+            frame[column] = frame[column].map(
+                lambda value: json.dumps(value) if isinstance(value, (dict, list)) else value
+            )
+        frame.to_csv(output_path, index=False)
+
+    return output_path
 
 
 def _load_dataframe(path: str):
@@ -286,6 +337,8 @@ def cmd_recommend(args: argparse.Namespace) -> None:
         recs = recommend(profile, top_k=args.top_k)
 
     if not recs:
+        if args.output:
+            _write_output([], args.output, args.format)
         print("No matching methodologies found. Try broader parameters or keywords.")
         return
 
@@ -304,6 +357,10 @@ def cmd_recommend(args: argparse.Namespace) -> None:
         if m.references:
             print(f"     Reference  : {m.references[0]}")
         print()
+
+    if args.output:
+        output_path = _write_output(recs, args.output, args.format)
+        print(f"  ✓ Recommendations saved → {output_path}\n")
 
 
 def cmd_eda(args: argparse.Namespace) -> None:
@@ -1616,11 +1673,13 @@ def cmd_hydro(args: argparse.Namespace) -> None:
 
     df = pd.read_csv(args.file, index_col=0, parse_dates=True)
     q = df.iloc[:, 0]  # first column as discharge
+    output_data: Any = None
 
     if args.analysis == "fdc":
         from aquascope.hydrology import flow_duration_curve
 
         result = flow_duration_curve(q)
+        output_data = pd.DataFrame({"exceedance": result.exceedance, "discharge": result.discharge})
         print("\n  Flow Duration Curve Percentiles:")
         for pct, val in sorted(result.percentiles.items()):
             print(f"    Q{pct:g} = {val:.3f}")
@@ -1633,16 +1692,15 @@ def cmd_hydro(args: argparse.Namespace) -> None:
             result = eckhardt(q)
         else:
             result = lyne_hollick(q)
+        output_data = result.df.assign(method=result.method, bfi=result.bfi)
         print(f"\n  Baseflow Separation ({result.method}):")
         print(f"    BFI = {result.bfi:.3f}")
-        if args.output:
-            result.df.to_csv(args.output)
-            print(f"    Saved to {args.output}")
 
     elif args.analysis == "recession":
         from aquascope.hydrology import recession_analysis
 
         result = recession_analysis(q)
+        output_data = result
         print("\n  Recession Analysis:")
         print(f"    Segments found: {len(result.segments)}")
         print(f"    Recession constant: {result.recession_constant:.2f} days")
@@ -1653,6 +1711,15 @@ def cmd_hydro(args: argparse.Namespace) -> None:
         from aquascope.hydrology import fit_gev
 
         result = fit_gev(q)
+        output_data = [
+            {
+                "return_period": return_period,
+                "discharge": discharge,
+                "ci_lower": result.confidence_intervals.get(return_period, (None, None))[0],
+                "ci_upper": result.confidence_intervals.get(return_period, (None, None))[1],
+            }
+            for return_period, discharge in sorted(result.return_periods.items())
+        ]
         print("\n  Flood Frequency Analysis (GEV):")
         for rp, val in sorted(result.return_periods.items()):
             ci = result.confidence_intervals.get(rp)
@@ -1665,8 +1732,12 @@ def cmd_hydro(args: argparse.Namespace) -> None:
         n_day = args.n_day or 7
         return_period = args.return_period or 10
         val = low_flow_stat(q, n_day=n_day, return_period=return_period)
+        output_data = {"n_day": n_day, "return_period": return_period, "discharge": val}
         print(f"\n  {n_day}Q{return_period} = {val:.3f}")
 
+    if args.output:
+        output_path = _write_output(output_data, args.output, args.format)
+        print(f"  ✓ Results saved → {output_path}")
     print()
 
 
@@ -1895,9 +1966,8 @@ def cmd_agri_plan(args: argparse.Namespace) -> None:
     print(f"  Irrigation trigger days  : {plan.irrigation_trigger_days}")
 
     if args.output:
-        out_path = Path(args.output)
-        out_path.write_text(json.dumps(plan.to_dict(), indent=2, default=str))
-        print(f"\n  ✓ Full irrigation plan saved → {out_path}")
+        output_path = _write_output(plan.to_dict(), args.output, args.format)
+        print(f"\n  ✓ Full irrigation plan saved → {output_path}")
 
 
 def cmd_agri_benchmark(args: argparse.Namespace) -> None:
@@ -2075,6 +2145,8 @@ def main() -> None:
     p_rec.add_argument("--model", default=None, help="LLM model name (default: gpt-4o-mini)")
     p_rec.add_argument("--llm-api-key", default=None, help="OpenAI-compatible API key")
     p_rec.add_argument("--llm-base-url", default=None, help="Custom LLM base URL (e.g. Ollama)")
+    p_rec.add_argument("-o", "--output", default=None, help="Write recommendations to a JSON or CSV file")
+    p_rec.add_argument("--format", choices=["json", "csv"], default=None, help="Output format (inferred from suffix)")
 
     # ── eda ──────────────────────────────────────────────────────────
     p_eda = sub.add_parser("eda", help="Run exploratory data analysis on a data file")
@@ -2490,7 +2562,10 @@ def main() -> None:
     p_agri_plan.add_argument("--efficiency", type=float, default=0.7, help="Irrigation efficiency (0-1)")
     p_agri_plan.add_argument("--depletion-fraction", type=float, default=0.5, help="RAW depletion fraction")
     p_agri_plan.add_argument("--initial-depletion", type=float, default=0.0, help="Initial root-zone depletion in mm")
-    p_agri_plan.add_argument("--output", default=None, help="Path to save the irrigation plan as JSON")
+    p_agri_plan.add_argument("-o", "--output", default=None, help="Write the irrigation plan to a JSON or CSV file")
+    p_agri_plan.add_argument(
+        "--format", choices=["json", "csv"], default=None, help="Output format (inferred from suffix)"
+    )
 
     p_agri_benchmark = agri_sub.add_parser("benchmark", help="Benchmark AQUASTAT country-scale water metrics")
     p_agri_benchmark.add_argument("--aquastat-file", required=True, help="Path to AQUASTAT CSV or JSON data")
@@ -2600,7 +2675,8 @@ def main() -> None:
     )
     p_hydro.add_argument("--file", required=True, help="Path to discharge data (CSV with DatetimeIndex)")
     p_hydro.add_argument("--method", default=None, help="Sub-method (e.g. lyne_hollick, eckhardt for baseflow)")
-    p_hydro.add_argument("--output", default=None, help="Save results to CSV")
+    p_hydro.add_argument("-o", "--output", default=None, help="Write results to a JSON or CSV file")
+    p_hydro.add_argument("--format", choices=["json", "csv"], default=None, help="Output format (inferred from suffix)")
     p_hydro.add_argument("--n-day", type=int, default=None, help="N-day window for low-flow (default: 7)")
     p_hydro.add_argument("--return-period", type=int, default=None, help="Return period for low-flow (default: 10)")
 

@@ -289,13 +289,13 @@ aquascope collect --source wapor --bbox 30.5,29.8,31.1,30.2 --variable RET --sta
 
 # Hydrological analysis
 aquascope hydro --analysis flood-freq --file discharge.csv
-aquascope hydro --analysis baseflow --file discharge.csv --method eckhardt
+aquascope hydro --analysis baseflow --file discharge.csv --method eckhardt -o baseflow.json
 
 # Agriculture planning
-aquascope agri plan --crop maize --planting-date 2026-04-01 --lat 30.0 --lon 31.25
+aquascope agri plan --crop maize --planting-date 2026-04-01 --lat 30.0 --lon 31.25 -o plan.csv
 
 # AI recommendation + natural-language problem solving
-aquascope recommend --parameters DO,BOD5,COD --goal "pollution trend detection"
+aquascope recommend --parameters DO,BOD5,COD --goal "pollution trend detection" -o recommendations.json
 aquascope solve "Design flow for a road crossing, 100-year return period" --lat 51.415 --lon -0.308
 aquascope studio "Design flow for a road crossing, 100-year, and how sure can we be" --lat 51.415 --lon -0.308 --out kingston/   # the crew: brief, plan, run, bundle
 
@@ -371,7 +371,7 @@ New contributor? These [`good first issue`](https://github.com/Rekin226/aquascop
 | 🌾 **Agriculture** | [Kc for millet/cassava/chickpea](https://github.com/Rekin226/aquascope/issues/21) · [Kc for sorghum/groundnut/sugar beet](https://github.com/Rekin226/aquascope/issues/5) |
 | 📈 **Methodologies** | [SPEI drought index](https://github.com/Rekin226/aquascope/issues/23) · [Budyko framework](https://github.com/Rekin226/aquascope/issues/24) |
 | 📊 **Visualization** | [interactive Plotly hydrograph](https://github.com/Rekin226/aquascope/issues/25) · [double-mass curve](https://github.com/Rekin226/aquascope/issues/26) |
-| 💻 **CLI** | [`--output` to JSON/CSV](https://github.com/Rekin226/aquascope/issues/27) · [shell completion](https://github.com/Rekin226/aquascope/issues/28) |
+| 💻 **CLI** | `--output` to JSON/CSV · [shell completion](https://github.com/Rekin226/aquascope/issues/28) |
 | 📚 **Docs & tutorials** | [Colab/Binder badges](https://github.com/Rekin226/aquascope/issues/29) · [groundwater notebook](https://github.com/Rekin226/aquascope/issues/30) · [agri irrigation notebook](https://github.com/Rekin226/aquascope/issues/6) · [translate the docs (zh/fr/ja)](https://github.com/Rekin226/aquascope/issues/31) |
 | 🧪 **Code quality & tests** | [type annotations](https://github.com/Rekin226/aquascope/issues/32) |
 
