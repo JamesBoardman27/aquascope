@@ -283,7 +283,8 @@ function doneHtml() {
     (not.length
       ? `<div class="ask-checks warn"><strong>Not established</strong><ul>${not.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul></div>`
       : "") +
-    `<div class="row-actions"><button type="button" class="btn primary" data-act="bundle">Download bundle</button></div>` +
+    `<div class="row-actions"><button type="button" class="btn primary" data-act="bundle">Download bundle</button>` +
+    `<button type="button" class="btn" data-act="again">New study</button></div>` +
     (docs.length ? `<p class="study-docs muted">${docs.map(([id, label]) => `<a href="#" data-file="${id}">${label}</a>`).join(" · ")}</p>` : "") +
     `<p class="study-foot muted">${escapeHtml(footLine())}</p>`;
 }

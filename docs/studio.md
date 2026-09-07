@@ -138,7 +138,8 @@ board above the input shows one thing at a time:
    zip) and links for the Word, Excel, Markdown, notebook and `study.yaml`
    files. The input stays open: a question is answered from the workspace, a
    change ("redo it with a 200-year return period") is planned, run and
-   re-authored, and the board refreshes.
+   re-authored, and the board refreshes. **New study** clears the board for
+   another study at the same place.
 
 The tiers are Ask's. Keyless by default, which is a complete study: the
 playbook tree plans, the gates check, templates write. When Ask holds a key,
