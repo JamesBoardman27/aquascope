@@ -100,6 +100,25 @@ def _name_stations(ws: Workspace, run: StudyRun) -> None:
                     p["name"] = name
 
 
+def _inherit_units(ws: Workspace, run: StudyRun, study: Study) -> None:
+    """A workbench step that took its table from an earlier step (``from_step``) inherits that payload's unit
+    and variable when it reports none, so "496.7" becomes "496.7 m3/s" in the prose, the tables and the figures."""
+    by_id: dict[str, dict[str, Any]] = {}
+    for r in run.results:
+        if isinstance(r.get("result"), dict) and r.get("id"):
+            by_id[str(r["id"])] = r["result"]
+    for step in study.steps:
+        src = (step.arguments or {}).get("from_step")
+        if not src or not step.id:
+            continue
+        source, target = by_id.get(str(src)), by_id.get(str(step.id))
+        if not isinstance(source, dict) or not isinstance(target, dict):
+            continue
+        for key in ("unit", "variable"):
+            if source.get(key) and not target.get(key):
+                target[key] = source[key]
+
+
 def _strip_bulk(run: StudyRun, study: Study) -> None:
     """Drop the daily series from the stored results (a workspace must not carry 50k points) and rehash."""
     for r in run.results:
@@ -344,6 +363,7 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
     ws.event("analyst", "start", f"{len(study.steps)} step(s)")
     run_ = run_study(study, on_event=say, prior=prior, tools=callables)
     _name_stations(ws, run_)
+    _inherit_units(ws, run_, study)
     _draw(ws, run_, drawn, on_artifact, study)
     replans = 0
     attempts = 0
@@ -367,6 +387,7 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
             replans += 1
             run_ = run_study(study, on_event=say, prior=run_, tools=callables)
             _name_stations(ws, run_)
+            _inherit_units(ws, run_, study)
             _draw(ws, run_, drawn, on_artifact, study)
             continue
         if not model:
@@ -412,6 +433,7 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
         replans += 1
         run_ = run_study(study, on_event=say, prior=run_, tools=callables)
         _name_stations(ws, run_)
+        _inherit_units(ws, run_, study)
         _draw(ws, run_, drawn, on_artifact, study)
 
     _strip_bulk(run_, study)

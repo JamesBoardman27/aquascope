@@ -575,7 +575,7 @@ def _sentences_for(tool: str, payload: dict[str, Any], study: Study) -> list[str
     out: list[str] = []
     params = (study.problem or {}).get("params") or {}
     unit = payload.get("unit") or ""
-    if tool in ("analyze_station", "flood_frequency", "get_timeseries"):
+    if tool in ("analyze_station", "flood_frequency", "get_timeseries", "load_table"):
         who = " ".join(str(x) for x in (payload.get("name"),) if x) or ""
         label = f"{payload.get('source')} {payload.get('station_id')}"
         where = f"{who} ({label})" if who else f"station {label}"
@@ -806,7 +806,64 @@ def _sentences_for(tool: str, payload: dict[str, Any], study: Study) -> list[str
             if missing:
                 names = ", ".join(str(m).replace("_", " ") for m in missing[:8])
                 out.append(f"Not sampled, so not judged: {names}.")
+    elif tool == "return_periods":
+        out += _return_periods_sentences(payload, params, unit)
+    elif tool == "flow_duration":
+        pct = payload.get("percentiles") or {}
+        if isinstance(pct, dict) and pct:
+            u = f" {unit}" if unit else ""
+            keys = [k for k in ("95", "50", "10", "5") if pct.get(k) is not None]
+            bits = ", ".join(f"Q{k} {_fmt(pct[k])}{u}" for k in keys)
+            out.append(f"Flow duration over {payload.get('n') or 'the'} daily values: {bits} "
+                       f"(Qx is the flow exceeded x % of days).")
+    elif tool == "signatures":
+        sig = payload.get("signatures") if isinstance(payload.get("signatures"), dict) else payload
+        bits = []
+        for key, label in (("mean_flow", "mean flow"), ("q95", "Q95"), ("q50", "Q50"), ("q05", "Q05"),
+                           ("baseflow_index", "baseflow index"), ("runoff_ratio", "runoff ratio"),
+                           ("slope_fdc", "FDC slope"), ("flashiness", "flashiness")):
+            v = sig.get(key) if isinstance(sig, dict) else None
+            if isinstance(v, (int, float)):
+                bits.append(f"{label} {_fmt(v)}")
+        if bits:
+            out.append("Flow signatures of the record: " + ", ".join(bits) + ".")
+    elif tool == "baseflow":
+        bfi = payload.get("bfi")
+        if isinstance(bfi, (int, float)):
+            out.append(f"Baseflow separation ({payload.get('method') or 'digital filter'}): the baseflow index is "
+                       f"{_fmt(bfi, 3)}, the fraction of total flow that is baseflow.")
     return out
+
+
+def _return_periods_sentences(payload: dict[str, Any], params: dict[str, Any], unit: str) -> list[str]:
+    """The workbench's return levels (one distribution per call) at the return period asked, with a band only
+    when it is credible: a bootstrap that exploded on a short record is not quoted as an interval."""
+    periods = [float(x) for x in payload.get("return_periods") or []]
+    levels = payload.get("return_levels") or []
+    if not periods or len(levels) != len(periods):
+        return []
+    rp = float(params.get("return_period") or 100)
+    if rp in periods:
+        i = periods.index(rp)
+    else:
+        i = min(range(len(periods)), key=lambda k: abs(periods[k] - rp))
+        rp = periods[i]
+    dist = {"gev": "GEV", "lp3": "Log-Pearson III", "gumbel": "Gumbel"}.get(str(payload.get("distribution") or ""),
+                                                                            str(payload.get("distribution") or ""))
+    u = f" {unit}" if unit else ""
+    q = levels[i]
+    n_years = payload.get('n_years') or 'the'
+    text = f"The {_fmt(rp)}-year return level by {dist} from {n_years} annual maxima: {_fmt(q)}{u}"
+    lo = (payload.get("lower_bound") or [None] * len(levels))[i]
+    hi = (payload.get("upper_bound") or [None] * len(levels))[i]
+    if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and isinstance(q, (int, float)) and q > 0 \
+            and 0 < lo <= q <= hi and hi / q < 10 and q / lo < 10:
+        cl = payload.get("confidence_level")
+        pct = f"{int(round(float(cl) * 100))} %" if isinstance(cl, (int, float)) else ""
+        text += f" ({pct + ' ' if pct else ''}confidence interval {_fmt(lo)} to {_fmt(hi)}{u})"
+    elif isinstance(hi, (int, float)) and isinstance(q, (int, float)) and q > 0 and hi / q >= 10:
+        text += " (the bootstrap band is too wide to quote: the fit is not stable on this record)"
+    return [text + "."]
 
 
 def _months(n: Any) -> str:
