@@ -12,6 +12,7 @@ All notable changes to AquaScope are documented here.
 - **Flood fits report the return period the study asks for.** `analyze_station`, `flood_frequency` and `flood_ci` take `return_periods` (the default list stays 2 to 100 years); the Analyst tools expose it; the Studio runner adds the brief's return period to every flood step, so a 200-year design no longer fails the gates for want of a 200 in the list.
 - **Explorer: discharge can be displayed in ft³/s (cfs)** (#316). A "Show ft³/s" button in the station header converts the KPIs, hydrograph, flood-frequency table and chart, flow-duration curve, trend slope and GR4J plot at render time. The choice persists in localStorage. Everything internal is untouched: the worker, the model and the CSV downloads stay in the agency's unit.
 - The showcase and repair workflows accept `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID`) as repository secrets, so both can run on Claude (#325).
+- Add FAO-56 crop coefficient and growth-stage data for millet, cassava, and chickpea (#21).
 
 ### Changed
 - `Study.to_dict()` keeps the study's version (2 or 3) instead of always writing 2.
