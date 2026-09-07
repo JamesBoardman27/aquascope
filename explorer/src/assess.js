@@ -3,8 +3,8 @@
 // and the MCP tool), as one quiet card: three counts on a line, the rows
 // behind a disclosure. The page passes the catchment area and donor count it
 // already holds, since the worker cannot read BasinATLAS or the donor table.
-// Solve reuses the card (target "solve", narrowed to its problem) and takes
-// the reconnaissance back, so the plan is filled from the same dict.
+// Study runs its own reconnaissance in the worker (the Scout) and only borrows
+// the catchment area and donor count this module looks up.
 
 import { $, VAR_LABEL, escapeHtml, fmt, state } from "./core.js?v=__BUILD__";
 import { catchmentAreaAt, donorPoolSize, stationArea } from "./basins.js?v=__BUILD__";
@@ -18,7 +18,7 @@ const STATUS = {
   marginal: ["warn", "marginal"],
   not_defensible: ["no", "not defensible"],
 };
-// One counter per card: Solve's request must not cancel the inspector's.
+// One counter per card, so a request for one surface never cancels another's.
 const runs = {};
 
 export async function requestAssess({ lat, lon, target, key = null, problem = null }) {

@@ -109,6 +109,55 @@ text)`, `studio_approve(workspace, edits=None)`, `studio_follow_up(workspace,
 text)`, `studio_export(workspace, out_dir)`. The tools are stateless: each
 returns the reply, a summary and the workspace dict to pass to the next.
 
+## In the Explorer
+
+**Study** is the second mode of the Explorer's drawer, next to Ask. Open it
+with **Study this place** on a gauge or on a point (a bare point works: the
+Scout finds what is in reach), or with the Study button at the top right.
+Everything runs in the page: the crew is `aquascope.studio` in the Pyodide
+worker, the same Coordinator the CLI and the MCP tools drive.
+
+The drawer is a conversation and a board. The conversation is the workspace's
+messages: what you said, what the Consultant asked, what the crew wrote. The
+board above the input shows one thing at a time:
+
+1. **Intake**: the place, the model line, and what to bring. Drop a CSV or an
+   XLSX, or attach the table already open in My data. Type the problem and
+   send. When the Consultant asks something, the options are chips (one click
+   answers) and **Just go** proceeds on the defaults.
+2. **Review**: the plan as a card: the objective, the numbered steps with
+   their arguments in words, the gates as chips, the rationale on expand.
+   **Approve** runs it; **Edit** opens the arguments inline and sends them as
+   the Methodologist's edits, revalidated in the worker (a refused edit says
+   why and keeps the plan); **Decline** keeps the input open for a change of
+   brief, or start again.
+3. **Running**: the timeline as it happens, one line per event, and the
+   figures as they are drawn. **Stop** abandons the run.
+4. **Done**: the answer, the key numbers, the figures, what the study does
+   not establish when the Critic listed anything, **Download bundle** (the
+   zip) and links for the Word, Excel, Markdown, notebook and `study.yaml`
+   files. The input stays open: a question is answered from the workspace, a
+   change ("redo it with a 200-year return period") is planned, run and
+   re-authored, and the board refreshes. **New study** clears the board for
+   another study at the same place.
+
+The tiers are Ask's. Keyless by default, which is a complete study: the
+playbook tree plans, the gates check, templates write. When Ask holds a key,
+one line offers it for the prose and the composed methodology. When Chrome's
+built-in model is already on the device, or Ask has loaded a small model in
+this tab, it reads the first sentence into a brief (the decision, the
+quantities, a return period or drought timescales when stated) before the
+Consultant sees it; nothing is downloaded for that, and a wrong reading costs
+one question, never a wrong number.
+
+The bytes stay in the worker. The page holds the workspace without the
+artifact data; a figure travels as a PNG when it is drawn, a document only
+when you ask for it, the bundle when you download it. matplotlib is loaded
+before the first run and the document libraries before the first bundle,
+once per visit, and never on a visit that runs no study. Nothing is uploaded
+anywhere: the tables you attach are read in your tab and travel inside the
+workspace as CSV text.
+
 ## The honesty rules
 
 - Every number in the report comes from a tool result and passes the gates

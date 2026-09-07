@@ -167,6 +167,7 @@ export function initPointPanel() {
     }
   });
   $("btn-share-pt").addEventListener("click", (e) => copyText(canonicalUrl(), e.currentTarget, "Link copied"));
+  $("btn-study-pt").addEventListener("click", () => actions.openStudy({ fresh: true }));
   $("btn-cite-pt").addEventListener("click", () => openCite(methodsOnPage("pt-methods")));
   actions.selectPoint = (lat, lon, opts) => selectPoint(lat, lon, opts);
 }
