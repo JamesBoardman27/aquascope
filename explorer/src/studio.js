@@ -525,7 +525,10 @@ async function callStudio(op, extra = {}) {
     // A run may reach for donors (similar_basins, regionalize_signatures); the worker cannot read the
     // parquet tables, so the page hands over the ones it holds, once.
     if ((op === "approve" || op === "follow_up") && S.catchment && !("donors_tables" in extra)) {
-      extra = { ...extra, donors_tables: await donorTablesForWorker().catch(() => null) };
+      extra = { ...extra, donors_tables: await donorTablesForWorker().catch((err) => {
+        console.warn("donor tables unavailable, the donor steps will say so:", err && err.message);
+        return null;
+      }) };
       if (my !== S.run) return;
     }
     const res = await job(op, extra);

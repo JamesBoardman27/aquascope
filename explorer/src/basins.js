@@ -314,7 +314,10 @@ export async function donorTablesForWorker() {
   if (donorTables) return donorTables;
   const { rows } = await ensureSimilarTable();
   const { sig, skill } = await ensureRegimeData();
-  donorTables = { catchments: rows.map(plain), signatures: [...sig.values()].map(plain), skill };
+  // Only a station with archived signatures can lend them, so the pool the worker
+  // ranks is those (about 800 rows, a few hundred KB), not every catalog station.
+  const usable = rows.filter((r) => sig.has(`${r.source}/${r.station_id}`));
+  donorTables = { catchments: usable.map(plain), signatures: [...sig.values()].map(plain), skill };
   return donorTables;
 }
 
