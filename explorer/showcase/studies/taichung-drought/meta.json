@@ -1,0 +1,129 @@
+{
+ "id": "taichung-drought",
+ "title": "Is Taichung in drought?",
+ "kind": "drought_status",
+ "shows": "SPI and SPEI on a 130-year CWA rain gauge with ERA5 temperature.",
+ "site": {
+  "lat": 24.15,
+  "lon": 120.68,
+  "name": "Taichung, Taiwan"
+ },
+ "problem": "Is Taichung in drought now, and how does this dry spell compare with the worst on record? It matters for the city's water supply.",
+ "intake": {
+  "timescales": [
+   3,
+   12
+  ],
+  "drought_concern": "water supply",
+  "flash_drought": false
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T13:43:31+00:00",
+ "seconds": 478.8,
+ "tokens": {
+  "prompt": 47680,
+  "completion": 33165,
+  "calls": 6,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3317,
+    "completion_tokens": 1047
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 10526,
+    "completion_tokens": 7627
+   },
+   "analyst": {
+    "calls": 1,
+    "prompt_tokens": 3759,
+    "completion_tokens": 1206
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 23464,
+    "completion_tokens": 13738
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 6614,
+    "completion_tokens": 9547
+   }
+  },
+  "total": 80845
+ },
+ "usd": 0.6405,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "drought_status",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 4,
+ "gates": {
+  "passed": 8,
+  "total": 11
+ },
+ "checks": {
+  "passed": 5,
+  "total": 6
+ },
+ "replans": 1,
+ "stop_reason": "gate failed: min_years (10 years of record, 30 needed: too short); the fallback drought_indices did not pass its own gates",
+ "headline": "Using taiwancwa station 467490 (Taichung), the nearest available station in this catalog, current SPI-3 is 0.87 and SPEI-3 is 0.77 as of 2026-06-01, both classed normal; Taichung is not in drought by this reading.",
+ "not_established": [
+  "Step s1, gate min_years: 9 years of record, 30 needed: too short",
+  "Step s2, gate min_years: 10 years of record, 30 needed: too short",
+  "Step s2.fallback, gate min_years: no record length at 'years'",
+  "The study stopped at s2: gate failed: min_years (10 years of record, 30 needed: too short); the fallback drought_indices did not pass its own gates",
+  "These numbers are not in any tool result: -12.0, -12.0, -12.0, -12.0, -12.0, -12.0."
+ ],
+ "figures": [
+  {
+   "name": "s1_drought_strip.png",
+   "id": "fig-s1-drought_strip",
+   "step": "s1",
+   "caption": "SPEI (bars) with SPI (grey line) at taiwan_cwa 467490 for the 3 month accumulations, 2016 to 2026: blue above zero is wetter than normal, red below is drier; the dashed lines mark the moderate (1), severe (1.5) and extreme (2) classes.",
+   "bytes": 56268
+  },
+  {
+   "name": "s2_series.png",
+   "id": "fig-s2-series",
+   "step": "s2",
+   "caption": "Daily precipitation at 臺中 (taiwan_cwa 467490), 2016 to 2026, with the annual maxima marked.",
+   "bytes": 65598
+  },
+  {
+   "name": "s2_trend.png",
+   "id": "fig-s2-trend",
+   "step": "s2",
+   "caption": "Annual mean precipitation at 臺中 (taiwan_cwa 467490) with the Sen slope line; the Mann-Kendall test finds no trend (p = 0.917, 9 years).",
+   "bytes": 77355
+  },
+  {
+   "name": "s2.fallback_drought_strip.png",
+   "id": "fig-s2.fallback-drought_strip",
+   "step": "s2.fallback",
+   "caption": "SPEI (bars) with SPI (grey line) at the site at 24.15 N, 120.68 E for the 1, 3, 6, 12 month accumulations, 1996 to 2026: blue above zero is wetter than normal, red below is drier; the dashed lines mark the moderate (1), severe (1.5) and extreme (2) classes.",
+   "bytes": 291552
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_drought_strip.png",
+  "figures/s2_series.png",
+  "figures/s2_trend.png",
+  "figures/s2.fallback_drought_strip.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}

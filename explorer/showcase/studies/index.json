@@ -1,0 +1,445 @@
+{
+ "generated": "2026-09-07T14:25:38+00:00",
+ "aquascope_version": "0.14.0",
+ "note": "Recorded studies: the prose was written once by the model named in each entry, on the date given. The plan re-runs live in the page with no key; the recorded numbers are the run's.",
+ "studies": [
+  {
+   "id": "bamako-ungauged",
+   "title": "Flow to expect in the Niger at Bamako",
+   "kind": "ungauged_flow",
+   "site": {
+    "lat": 12.6,
+    "lon": -8.0,
+    "name": "Niger at Bamako, Mali (no gauge in reach)"
+   },
+   "shows": "Prediction in an ungauged basin: donors by similarity, transferred signatures, the GloFAS check.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T13:55:59+00:00",
+   "usd": 0.7882,
+   "seconds": 469.0,
+   "steps": 4,
+   "gates": {
+    "passed": 8,
+    "total": 9
+   },
+   "checks": {
+    "passed": 3,
+    "total": 4
+   },
+   "headline": "No gauge is reachable at the Bamako offtake, so both numbers are transferred from 10 gauged donor basins (out of a 37,071-station pool) matched by catchment similarity, then converted to m3/s using the BasinATLAS upstream area of 115,012...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_site_map.png",
+    "figures/s2_donors_map.png",
+    "figures/s3_signatures_band.png",
+    "figures/s4_monthly_climate.png",
+    "figures/s4_glofas_series.png",
+    "figures/s4.fallback_signatures_band.png"
+   ],
+   "figures": [
+    "s1_site_map.png",
+    "s2_donors_map.png",
+    "s3_signatures_band.png",
+    "s4_monthly_climate.png",
+    "s4_glofas_series.png",
+    "s4.fallback_signatures_band.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "cambridge-groundwater",
+   "title": "Groundwater decline in the Chalk near Cambridge",
+   "kind": "groundwater_decline",
+   "site": {
+    "lat": 52.2,
+    "lon": 0.12,
+    "name": "Chalk boreholes near Cambridge, UK"
+   },
+   "shows": "A 48-year borehole record: trend, the SGI and a recharge estimate.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T13:48:10+00:00",
+   "usd": 0.4218,
+   "seconds": 279.9,
+   "steps": 4,
+   "gates": {
+    "passed": 5,
+    "total": 8
+   },
+   "checks": {
+    "passed": 6,
+    "total": 6
+   },
+   "headline": "The full 48.7-year record at Haggis Farm (ukea, station b3272d5b-f4fd-48eb-8bc7-67c102d65943, 1977-09-29 to 2026-06-08) shows a statistically significant increasing trend by Mann-Kendall test (tau = 0.86, p = 0.0) with a Sen's slope of +...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_series.png",
+    "figures/s1_trend.png",
+    "figures/s2_series.png",
+    "figures/s2.fallback_series.png",
+    "figures/s2.fallback_trend.png"
+   ],
+   "figures": [
+    "s1_series.png",
+    "s1_trend.png",
+    "s2_series.png",
+    "s2.fallback_series.png",
+    "s2.fallback_trend.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "kingston-flood",
+   "title": "Design flood of the Thames at Kingston",
+   "kind": "flood_risk",
+   "site": {
+    "lat": 51.415,
+    "lon": -0.308,
+    "name": "Thames at Kingston, London, UK"
+   },
+   "shows": "A gauge with 140 years of daily discharge: two frequency fits, the spread between them, the band.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T13:29:15+00:00",
+   "usd": 0.4468,
+   "seconds": 342.6,
+   "steps": 4,
+   "gates": {
+    "passed": 6,
+    "total": 9
+   },
+   "checks": {
+    "passed": 7,
+    "total": 7
+   },
+   "headline": "At the Environment Agency Kingston gauge (ukea, station 8496ce69-482c-406a-a2f0-ac418ef8f099, 142.9 years of daily discharge, 1883-2026), the 100-year flood discharge (Q100) is estimated at 652.5 m3/s by GEV (L-moments) and 624.0 m3/s by...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_site_map.png",
+    "figures/s2_series.png",
+    "figures/s2_trend.png",
+    "figures/s3_frequency_curve.png"
+   ],
+   "figures": [
+    "s1_site_map.png",
+    "s2_series.png",
+    "s2_trend.png",
+    "s3_frequency_curve.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "little-falls-water-quality",
+   "title": "Water quality of the Potomac at Little Falls",
+   "kind": "water_quality",
+   "site": {
+    "lat": 38.95,
+    "lon": -77.13,
+    "name": "Potomac at Little Falls, Washington DC, USA"
+   },
+   "shows": "WQP samples at a USGS station: the WHO screen and the water-quality index over what was sampled.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T14:21:50+00:00",
+   "usd": 0.4347,
+   "seconds": 251.3,
+   "steps": 4,
+   "gates": {
+    "passed": 6,
+    "total": 6
+   },
+   "checks": {
+    "passed": 4,
+    "total": 5
+   },
+   "headline": "Over 2021-09-07 to 2026-09-06, USGS-01646500 (Potomac River near Wash DC, Little Falls Pump Sta) yielded 5,366 water-quality samples across three parameters.",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_samples_by_parameter.png",
+    "figures/s2_who_exceedances.png",
+    "figures/s3_wqi_bars.png",
+    "figures/s4_wqi_bars.png"
+   ],
+   "figures": [
+    "s1_samples_by_parameter.png",
+    "s2_who_exceedances.png",
+    "s3_wqi_bars.png",
+    "s4_wqi_bars.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "nairobi-drought",
+   "title": "Meteorological drought at Nairobi",
+   "kind": "drought_status",
+   "site": {
+    "lat": -1.29,
+    "lon": 36.82,
+    "name": "Nairobi, Kenya (bare point)"
+   },
+   "shows": "A bare point: SPI and SPEI on the ERA5 cell, and what that does and does not say.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T14:02:08+00:00",
+   "usd": 0.57,
+   "seconds": 368.5,
+   "steps": 3,
+   "gates": {
+    "passed": 8,
+    "total": 8
+   },
+   "checks": {
+    "passed": 4,
+    "total": 4
+   },
+   "headline": "For the ERA5 reanalysis cell at -1.29, 36.82 (Open-Meteo/ERA5, 1986-09-01 to 2026-08-01, 40-year record, month ending 2026-08-01), SPEI-3 is -1.08 (moderately dry) while SPI-3 is -0.39 (normal); SPEI-6, SPEI-12, SPI-6 and SPI-12 are all...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_drought_strip.png",
+    "figures/s2_monthly_climate.png",
+    "figures/s2_glofas_series.png",
+    "figures/s3_site_map.png"
+   ],
+   "figures": [
+    "s1_drought_strip.png",
+    "s2_monthly_climate.png",
+    "s2_glofas_series.png",
+    "s3_site_map.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "own-table-flood",
+   "title": "The 50-year flood from your own table",
+   "kind": "flood_risk",
+   "site": {
+    "lat": 40.2,
+    "lon": -8.0,
+    "name": "An ungauged stream in central Portugal (your own table)"
+   },
+   "shows": "A table you bring: the ingest mapping and QA, then the frequency fits on your annual maxima.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T14:25:38+00:00",
+   "usd": 0.3719,
+   "seconds": 228.2,
+   "steps": 5,
+   "gates": {
+    "passed": 5,
+    "total": 5
+   },
+   "checks": {
+    "passed": 6,
+    "total": 6
+   },
+   "headline": "Using the client's own daily discharge record (upload:myflows.csv, station upload:myflows.csv, 1994-01-01 to 2023-12-31, 30 years, n=10957), the 50-year flood discharge is 166.7 m3/s (95% band 112.9-297.8 m3/s) from a GEV fit and 164.7 m...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_series.png",
+    "figures/s3_frequency_curve.png",
+    "figures/s4_frequency_curve.png",
+    "figures/s5_fdc.png"
+   ],
+   "figures": [
+    "s1_series.png",
+    "s3_frequency_curve.png",
+    "s4_frequency_curve.png",
+    "s5_fdc.png"
+   ],
+   "upload": "my_flows.csv"
+  },
+  {
+   "id": "potomac-supply",
+   "title": "Can the Potomac supply the city in a dry year?",
+   "kind": "supply_reliability",
+   "site": {
+    "lat": 38.95,
+    "lon": -77.13,
+    "name": "Potomac at Little Falls, Washington DC, USA"
+   },
+   "shows": "Supply screening against the flow-duration curve of a 95-year USGS record.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T13:35:32+00:00",
+   "usd": 0.5691,
+   "seconds": 359.6,
+   "steps": 6,
+   "gates": {
+    "passed": 4,
+    "total": 6
+   },
+   "checks": {
+    "passed": 5,
+    "total": 5
+   },
+   "headline": "At USGS-01646500 (Potomac River near Washington, DC, Little Falls Pump Station, 1930-03-01 to 2026-09-06, 96.5 years of daily discharge), the flow-duration screening finds Q95 = 35.7 m3/s and a 7-day 10-year low flow (7Q10) of 18.79 m3/s...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_site_map.png",
+    "figures/s1.fallback_reliability_curve.png"
+   ],
+   "figures": [
+    "s1_site_map.png",
+    "s1.fallback_reliability_curve.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "sintra-supply",
+   "title": "A village supply from an ungauged stream near Lisbon",
+   "kind": "supply_reliability",
+   "site": {
+    "lat": 38.8,
+    "lon": -9.38,
+    "name": "Sintra hills near Lisbon, Portugal (no gauge in reach)"
+   },
+   "shows": "Ungauged supply: the flow-duration curve transferred from donors, with its band and skill.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T14:08:38+00:00",
+   "usd": 0.7564,
+   "seconds": 389.9,
+   "steps": 3,
+   "gates": {
+    "passed": 6,
+    "total": 6
+   },
+   "checks": {
+    "passed": 3,
+    "total": 4
+   },
+   "headline": "Regionalised low-flow transfer from 10 donor gauges to the 478.7 km2 catchment (BasinATLAS/HydroATLAS, hybasid 2120018870) gives a mean flow of about 0.60 m3/s (52 ML/day), a median of about 0.38 m3/s (33 ML/day) and a Q95 low flow of ab...",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_site_map.png",
+    "figures/s2_donors_map.png",
+    "figures/s3_signatures_band.png"
+   ],
+   "figures": [
+    "s1_site_map.png",
+    "s2_donors_map.png",
+    "s3_signatures_band.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "taichung-drought",
+   "title": "Is Taichung in drought?",
+   "kind": "drought_status",
+   "site": {
+    "lat": 24.15,
+    "lon": 120.68,
+    "name": "Taichung, Taiwan"
+   },
+   "shows": "SPI and SPEI on a 130-year CWA rain gauge with ERA5 temperature.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T13:43:31+00:00",
+   "usd": 0.6405,
+   "seconds": 478.8,
+   "steps": 4,
+   "gates": {
+    "passed": 8,
+    "total": 11
+   },
+   "checks": {
+    "passed": 5,
+    "total": 6
+   },
+   "headline": "Using taiwancwa station 467490 (Taichung), the nearest available station in this catalog, current SPI-3 is 0.87 and SPEI-3 is 0.77 as of 2026-06-01, both classed normal; Taichung is not in drought by this reading.",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_drought_strip.png",
+    "figures/s2_series.png",
+    "figures/s2_trend.png",
+    "figures/s2.fallback_drought_strip.png"
+   ],
+   "figures": [
+    "s1_drought_strip.png",
+    "s2_series.png",
+    "s2_trend.png",
+    "s2.fallback_drought_strip.png"
+   ],
+   "upload": null
+  },
+  {
+   "id": "wagga-flood",
+   "title": "Design flood of the Murrumbidgee at Wagga Wagga",
+   "kind": "flood_risk",
+   "site": {
+    "lat": -35.1,
+    "lon": 147.37,
+    "name": "Murrumbidgee at Wagga Wagga, NSW, Australia"
+   },
+   "shows": "A BoM gauge the catalog lists but cannot read yet: the regional path and its honest caveats.",
+   "status": "done",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "date": "2026-09-07",
+   "recorded": "2026-09-07T14:17:39+00:00",
+   "usd": 0.8441,
+   "seconds": 540.9,
+   "steps": 4,
+   "gates": {
+    "passed": 5,
+    "total": 9
+   },
+   "checks": {
+    "passed": 4,
+    "total": 4
+   },
+   "headline": "No Q100 discharge in cubic metres per second can be defended from this study.",
+   "files": [
+    "workspace.json",
+    "report.md",
+    "study.yaml",
+    "figures/s1_site_map.png",
+    "figures/s2_donors_map.png",
+    "figures/s3_signatures_band.png"
+   ],
+   "figures": [
+    "s1_site_map.png",
+    "s2_donors_map.png",
+    "s3_signatures_band.png"
+   ],
+   "upload": null
+  }
+ ]
+}

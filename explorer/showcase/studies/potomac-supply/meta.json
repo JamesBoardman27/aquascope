@@ -1,0 +1,110 @@
+{
+ "id": "potomac-supply",
+ "title": "Can the Potomac supply the city in a dry year?",
+ "kind": "supply_reliability",
+ "shows": "Supply screening against the flow-duration curve of a 95-year USGS record.",
+ "site": {
+  "lat": 38.95,
+  "lon": -77.13,
+  "name": "Potomac at Little Falls, Washington DC, USA"
+ },
+ "problem": "Can the Potomac at Little Falls reliably supply 8 m3/s to the city's water works, run of river, in a dry year?",
+ "intake": {
+  "demand_m3s": 8.0,
+  "use": "municipal",
+  "share": 0.1,
+  "storage": false,
+  "demand_ml_day": null
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T13:35:32+00:00",
+ "seconds": 359.6,
+ "tokens": {
+  "prompt": 44741,
+  "completion": 28991,
+  "calls": 6,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3440,
+    "completion_tokens": 1009
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 10068,
+    "completion_tokens": 4657
+   },
+   "analyst": {
+    "calls": 1,
+    "prompt_tokens": 5746,
+    "completion_tokens": 314
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 19517,
+    "completion_tokens": 17179
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 5970,
+    "completion_tokens": 5832
+   }
+  },
+  "total": 73732
+ },
+ "usd": 0.5691,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "supply_reliability",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 6,
+ "gates": {
+  "passed": 4,
+  "total": 6
+ },
+ "checks": {
+  "passed": 5,
+  "total": 5
+ },
+ "replans": 1,
+ "stop_reason": "gate failed: max_area_km2 (no area at 'sub_basin.up_area'); the fallback supply_reliability did not pass its own gates",
+ "headline": "At USGS-01646500 (Potomac River near Washington, DC, Little Falls Pump Station, 1930-03-01 to 2026-09-06, 96.5 years of daily discharge), the flow-duration screening finds Q95 = 35.7 m3/s and a 7-day 10-year low flow (7Q10) of 18.79 m3/s...",
+ "not_established": [
+  "Step s1, gate max_area_km2: no area at 'sub_basin.up_area'",
+  "Step s1.fallback, gate min_years: no record length at 'years'",
+  "The study stopped at s1: gate failed: max_area_km2 (no area at 'sub_basin.up_area'); the fallback supply_reliability did not pass its own gates"
+ ],
+ "figures": [
+  {
+   "name": "s1_site_map.png",
+   "id": "fig-s1-site_map",
+   "step": "s1",
+   "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+   "bytes": 32778
+  },
+  {
+   "name": "s1.fallback_reliability_curve.png",
+   "id": "fig-s1.fallback-reliability_curve",
+   "step": "s1.fallback",
+   "caption": "The flow-duration curve at POTOMAC RIVER NEAR WASH, DC LITTLE FALLS PUMP STA (usgs USGS-01646500) with the flow the demand needs (red), the reserve left in the river (orange) and Q95 (dashed); the demand is met on 77% of days.",
+   "bytes": 73601
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_site_map.png",
+  "figures/s1.fallback_reliability_curve.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}

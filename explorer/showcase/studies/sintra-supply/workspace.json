@@ -1,0 +1,4302 @@
+{
+ "version": 1,
+ "id": "bd7c70760837",
+ "created": "2026-09-07T14:02:08+00:00",
+ "status": "done",
+ "site": {
+  "lat": 38.8,
+  "lon": -9.38
+ },
+ "brief": {
+  "problem": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?",
+  "decision": "whether the Sintra hills stream can sustain a 4 ML/day run-of-river abstraction for village supply and how reliable that abstraction would be",
+  "quantities": [
+   "estimated mean and low-flow statistics (Q95, Q05) for the ungauged catchment",
+   "the abstraction as a fraction of daily flow (share)",
+   "reliability (probability of meeting the 4 ML/day demand without violating the share rule)"
+  ],
+  "period": null,
+  "horizon": null,
+  "constraints": [
+   "no gauge within 50 km of the site (nearest is hubeau_hydrometrie/S516001001 at 823 km), so at-site methods (flow_duration, baseflow_separation, gr4j_calibration, low_flow_frequency) are not defensible",
+   "flow must be estimated by regionalize_signatures and similar_basins using the 10 donor gauges from BasinATLAS catchment hybas_id 2120018870",
+   "run-of-river abstraction assumed, no storage available"
+  ],
+  "deliverables": [
+   "report"
+  ],
+  "kind": "supply_reliability",
+  "playbook": "supply_reliability",
+  "intake": {
+   "demand_ml_day": 4.0,
+   "use": "municipal",
+   "share": 0.1,
+   "storage": false,
+   "demand_m3s": null
+  },
+  "assumptions": [
+   "flow statistics for the ungauged site will be derived via regionalized signatures and transfer from the 10 nearest donor basins (from a pool of 37,071 gauged catchments), not from an at-site record",
+   "no storage is available, consistent with the stated run-of-river intent",
+   "the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction",
+   "GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate",
+   "BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists"
+  ],
+  "questions": [],
+  "ready": true,
+  "source": "model"
+ },
+ "inventory": {
+  "site": {
+   "lat": 38.8,
+   "lon": -9.38
+  },
+  "datasets": [
+   {
+    "id": "catchment",
+    "kind": "catchment",
+    "source": "BasinATLAS (HydroATLAS v1.0)",
+    "name": "the catchment of the point",
+    "note": "upstream area 479 km2"
+   },
+   {
+    "id": "donors",
+    "kind": "donors",
+    "source": "similar_basins",
+    "name": "10 donor gauges by catchment similarity",
+    "n": 10
+   },
+   {
+    "id": "era5",
+    "kind": "reanalysis",
+    "variable": "climate",
+    "source": "ERA5 via Open-Meteo",
+    "name": "ERA5 cell",
+    "lat": 38.8,
+    "lon": -9.38,
+    "start": "1940-01-01",
+    "end": "2026-09-07",
+    "years": 86.7,
+    "resolution": "daily",
+    "note": "precipitation, temperature and FAO-56 ET0 for a 9 km cell, any point on land; GloFAS modelled discharge for the same point, indicative"
+   }
+  ],
+  "recon": {
+   "point": {
+    "lat": 38.8,
+    "lon": -9.38
+   },
+   "stations": [],
+   "catchment": {
+    "hybas_id": 2120018870,
+    "area_km2": 478.5,
+    "upstream_area_km2": 478.7,
+    "n_sub_basins": 1,
+    "elevation_m": 44.0,
+    "precipitation_mm_yr": 751.0,
+    "aridity": 0.8,
+    "dams": 0.0,
+    "source": "BasinATLAS (HydroATLAS v1.0)"
+   },
+   "context": {
+    "years_by_variable": {},
+    "resolution_by_variable": {},
+    "area_km2": 478.7,
+    "return_period": null,
+    "donors": 10,
+    "available": [
+     "forcing",
+     "glofas",
+     "temperature"
+    ],
+    "ungauged": true
+   },
+   "sufficiency": [
+    {
+     "method": "regionalize_signatures",
+     "status": "defensible",
+     "reason": "the record supports it",
+     "label": "Flow signatures transferred from donors",
+     "tool": "regionalize_signatures",
+     "station": null
+    },
+    {
+     "method": "similar_basins",
+     "status": "defensible",
+     "reason": "the record supports it",
+     "label": "Donor gauges by catchment similarity",
+     "tool": "similar_basins",
+     "station": null
+    },
+    {
+     "method": "baseflow_separation",
+     "status": "not_defensible",
+     "reason": "no discharge record at this site",
+     "label": "Baseflow separation and baseflow index",
+     "tool": "baseflow",
+     "station": null
+    },
+    {
+     "method": "flow_duration",
+     "status": "not_defensible",
+     "reason": "no discharge record at this site",
+     "label": "Flow duration curve and Q95",
+     "tool": "analyze_station",
+     "station": null
+    },
+    {
+     "method": "gr4j_calibration",
+     "status": "not_defensible",
+     "reason": "no discharge record at this site",
+     "label": "GR4J rainfall-runoff calibration",
+     "tool": "gr4j",
+     "station": null
+    },
+    {
+     "method": "low_flow_frequency",
+     "status": "not_defensible",
+     "reason": "no discharge record at this site",
+     "label": "Low-flow frequency (annual minima)",
+     "tool": "analyze_station",
+     "station": null
+    },
+    {
+     "method": "recharge_wtf",
+     "status": "not_defensible",
+     "reason": "no groundwater level record at this site",
+     "label": "Recharge by water-table fluctuation",
+     "tool": "recharge",
+     "station": null
+    },
+    {
+     "method": "supply_reliability",
+     "status": "not_defensible",
+     "reason": "no discharge record at this site",
+     "label": "Run-of-river supply reliability against a demand (flow-duration screening)",
+     "tool": "supply_reliability",
+     "station": null
+    }
+   ],
+   "notes": [
+    "No catalog gauge within 50 km; the nearest is La Nivelle à Ciboure (hubeau_hydrometrie/S516001001) at 823 km.",
+    "10 donor gauges from a pool of 37,071 gauged catchments.",
+    "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+    "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.",
+    "No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check."
+   ]
+  },
+  "catchment": {
+   "hybas_id": 2120018870,
+   "area_km2": 478.5,
+   "upstream_area_km2": 478.7,
+   "n_sub_basins": 1,
+   "elevation_m": 44.0,
+   "precipitation_mm_yr": 751.0,
+   "aridity": 0.8,
+   "dams": 0.0,
+   "source": "BasinATLAS (HydroATLAS v1.0)"
+  },
+  "donors": 10,
+  "notes": [
+   "No catalog gauge within 50 km; the nearest is La Nivelle à Ciboure (hubeau_hydrometrie/S516001001) at 823 km.",
+   "10 donor gauges from a pool of 37,071 gauged catchments.",
+   "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+   "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.",
+   "No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check."
+  ]
+ },
+ "study": {
+  "version": 3,
+  "title": "Determine whether a stream in the Sintra hills (38.80N, -9.3: 38.8, -9.38",
+  "question": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?",
+  "created": "2026-09-07T14:04:13+00:00",
+  "aquascope_version": "0.14.0",
+  "author": "methodologist",
+  "model": "claude-sonnet-5",
+  "steps": [
+   {
+    "tool": "describe_catchment",
+    "arguments": {
+     "lat": 38.8,
+     "lon": -9.38,
+     "upstream": true
+    },
+    "id": "s1",
+    "rationale": "The catchment and upstream area are needed to convert donor-transferred mm/d signatures into m3/s at this point.",
+    "expects": [
+     {
+      "check": "not_empty",
+      "path": "sub_basin"
+     },
+     {
+      "check": "max_area_km2",
+      "path": "sub_basin.up_area",
+      "value": 478.7
+     }
+    ],
+    "outputs": [
+     {
+      "kind": "figure",
+      "id": "s1_site_map",
+      "caption": "site map from describe_catchment"
+     },
+     {
+      "kind": "table",
+      "id": "s1_catchment_attributes",
+      "caption": "catchment attributes (area, upstream area, dams) from describe_catchment"
+     }
+    ]
+   },
+   {
+    "tool": "similar_basins",
+    "arguments": {
+     "lat": 38.8,
+     "lon": -9.38,
+     "k": 10
+    },
+    "id": "s2",
+    "rationale": "No at-site record exists within 50 km, so the 10 catchments most similar in BasinATLAS attribute space supply the donor sample for transfer.",
+    "method": "similar_basins",
+    "expects": [
+     {
+      "check": "min_donors",
+      "path": "k",
+      "value": 10
+     },
+     {
+      "check": "not_empty",
+      "path": "stations"
+     }
+    ],
+    "depends_on": [
+     "s1"
+    ],
+    "outputs": [
+     {
+      "kind": "figure",
+      "id": "s2_donors_map",
+      "caption": "map of the 10 donor gauges from similar_basins"
+     },
+     {
+      "kind": "table",
+      "id": "s2_donors",
+      "caption": "donor gauge list and similarity metrics from similar_basins"
+     }
+    ]
+   },
+   {
+    "tool": "regionalize_signatures",
+    "arguments": {
+     "lat": 38.8,
+     "lon": -9.38,
+     "k": 10
+    },
+    "id": "s3",
+    "rationale": "Transfer mean, Q95 and Q05 flow signatures from the 10 donor basins, with the band across donors and leave-one-out skill, since at-site flow_duration and low_flow_frequency are not defensible here; these transferred signatures, converted to m3/s with the s1 upstream area, are what the 4 ML/day demand and the 0.1 share / Q95 reserve rule are screened against.",
+    "method": "regionalize_signatures",
+    "expects": [
+     {
+      "check": "not_empty",
+      "path": "estimates"
+     },
+     {
+      "check": "not_empty",
+      "path": "skill"
+     }
+    ],
+    "depends_on": [
+     "s2"
+    ],
+    "outputs": [
+     {
+      "kind": "table",
+      "id": "s3_signatures",
+      "caption": "regionalised mean, Q95 and Q05 flow signatures (mm/d) with donor band and leave-one-out skill"
+     },
+     {
+      "kind": "figure",
+      "id": "s3_donor_skill_plot",
+      "caption": "leave-one-out skill of the regionalised signatures across donors"
+     }
+    ]
+   }
+  ],
+  "problem": {
+   "kind": "supply_reliability",
+   "site": {
+    "lat": 38.8,
+    "lon": -9.38
+   },
+   "params": {
+    "demand_ml_day": 4.0,
+    "use": "municipal",
+    "share": 0.1,
+    "storage": false,
+    "demand_m3s": null
+   },
+   "text": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?"
+  },
+  "plan": {
+   "author": "methodologist",
+   "playbook": "supply_reliability",
+   "objective": "Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.",
+   "decision": "whether the Sintra hills stream can sustain a 4 ML/day run-of-river abstraction for village supply and how reliable that abstraction would be",
+   "methodology": [
+    "Characterise the ungauged catchment and its upstream area from BasinATLAS to anchor the regionalisation and unit conversion.",
+    "Identify the 10 gauged donor basins most similar to this catchment (from the pool of 37,071 gauged catchments in hybas_id 2120018870) to serve as the transfer basis.",
+    "Regionalise flow signatures (mean, median, Q95, Q05 in mm/d, with donor band and leave-one-out skill) from those 10 donors to the site.",
+    "Convert the regionalised Q95/median/Q05 signatures to m3/s over the upstream area and compare the 4 ML/day demand against a 0.1 share of flow with a Q95 reserve kept in-stream; because no discharge record exists at this site, the supply_reliability tool cannot be run here, so this screening is read directly off the regionalize_signatures output and its donor band rather than from a tool-computed reliability curve."
+   ],
+   "assumptions": [
+    "flow statistics for the ungauged site will be derived via regionalized signatures and transfer from the 10 nearest donor basins (from a pool of 37,071 gauged catchments), not from an at-site record",
+    "no storage is available, consistent with the stated run-of-river intent",
+    "the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction",
+    "GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate",
+    "BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists",
+    "Flow statistics for the ungauged site are derived via regionalize_signatures and similar_basins transfer from the 10 nearest donor basins (pool of 37,071 gauged catchments), not from an at-site record.",
+    "The supply_reliability tool requires a discharge record (station source and station_id) and is flagged not_defensible at this site; the 4 ML/day screening against a 0.1 share of flow and a Q95 reserve is therefore performed by hand from the s3 regionalize_signatures output (Q95, median, Q05 in mm/d converted to m3/s using the s1 upstream area of 478.7 km2), not by calling supply_reliability.",
+    "No storage is available, consistent with the stated run-of-river intent, so reliability is judged day-by-day against the transferred flow.",
+    "The default screening share of 0.1 of daily flow, with a Q95 reserve kept in-stream, is used to judge whether 4 ML/day is a safe abstraction.",
+    "BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists at the site.",
+    "GloFAS discharge reanalysis at this point could serve as an independent cross-check of the regionalized flow estimate but is not run as a formal step here."
+   ],
+   "alternatives": [
+    {
+     "method": "flow_duration",
+     "why_not": "no discharge record at this site (nearest gauge, hubeau_hydrometrie/S516001001, is 823 km away, well beyond the 50 km reach)"
+    },
+    {
+     "method": "baseflow_separation",
+     "why_not": "no discharge record at this site to separate a baseflow component from"
+    },
+    {
+     "method": "gr4j_calibration",
+     "why_not": "no discharge record at this site to calibrate a rainfall-runoff model against"
+    },
+    {
+     "method": "low_flow_frequency",
+     "why_not": "no discharge record at this site to fit a low-flow frequency distribution to"
+    },
+    {
+     "method": "supply_reliability",
+     "why_not": "no discharge record at this site; the tool needs a station source/station_id or an existing flow series it can build an fdc from, so the demand is instead screened manually against the regionalize_signatures output"
+    }
+   ],
+   "limitations_expected": [
+    "This is a screening rule, not a licence assessment: keeping Q95 in the river and taking at most the stated share are assumptions in the tradition of flow-duration-curve environmental-flow practice; the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.",
+    "Reliability read off the regionalised transfer describes the donor basins' record period; a changing climate, new upstream abstraction, or a drier decade than any recorded would move it.",
+    "Because supply_reliability cannot run without a discharge record, the reliability screening here is a manual comparison of the demand to the regionalize_signatures Q95/median/Q05 band rather than a tool-generated reliability curve; it should be read as indicative and bounded by that donor band and its leave-one-out skill, not as a precise probability.",
+    "Every transferred flow is quoted with its band across the 10 donors and the leave-one-out skill; three flow-duration points give the reliability only to within that band, not beyond it, and a bare point reliability number would not be an honest estimate."
+   ],
+   "citations": [
+    "Vogel, R. M. and Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and confidence intervals. J. Water Resour. Plann. Manage. 120, 485-504.",
+    "Smakhtin, V., & Eriyagama, N. (2008). Developing a software package for global desktop assessment of environmental flows. Environ. Model. Softw. 23, 1396-1406. doi:10.1016/j.envsoft.2008.04.002",
+    "Acreman, M., & Dunbar, M. J. (2004). Defining environmental river flow requirements: a review. Hydrol. Earth Syst. Sci. 8, 861-876.",
+    "Smakhtin, V. U. (2001). Low flow hydrology: a review. J. Hydrol. 240, 147-186.",
+    "Lyne, V., & Hollick, M. (1979). Stochastic time-variable rainfall-runoff modelling. Inst. Eng. Aust. Natl. Conf. Publ. 79/10, 89-93.",
+    "Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.",
+    "National-scale validation of donor regionalisation: Hydrol. Earth Syst. Sci. 28 (2024), doi:10.5194/hess-28-3367-2024",
+    "Smakhtin and Eriyagama 2008",
+    "Acreman and Dunbar 2004"
+   ],
+   "caveats": [
+    "A screening rule, not a licence assessment: Q95 kept in the river and at most the stated share of the flow taken are assumptions in the tradition of flow-duration-curve environmental-flow practice (Smakhtin and Eriyagama 2008; Acreman and Dunbar 2004); the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.",
+    "Reliability read off the record describes the years on record; a changing climate, new upstream abstraction or a drier decade than any recorded moves it.",
+    "Every transferred flow is quoted with its band across donors and the leave-one-out skill; three flow-duration points give the reliability to within that band and not beyond it, and a bare regionalised reliability is not an estimate."
+   ],
+   "rationale": "Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.",
+   "notes": [
+    "step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in"
+   ],
+   "recon_notes": [
+    "No catalog gauge within 50 km; the nearest is La Nivelle à Ciboure (hubeau_hydrometrie/S516001001) at 823 km.",
+    "10 donor gauges from a pool of 37,071 gauged catchments.",
+    "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+    "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.",
+    "No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check."
+   ]
+  },
+  "results": {
+   "s1": {
+    "ok": true,
+    "gates": [
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'sub_basin' is present"
+     },
+     {
+      "check": "max_area_km2",
+      "passed": true,
+      "detail": "catchment of 479 km2 against a ceiling of 479 km2"
+     }
+    ],
+    "summary": "latitude=38.8, longitude=-9.38, license=CC-BY-4.0, attribution=HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin",
+    "fallback_used": false,
+    "sha256": "9dbb0a626977d684"
+   },
+   "s2": {
+    "ok": true,
+    "gates": [
+     {
+      "check": "min_donors",
+      "passed": true,
+      "detail": "10 donors, 10 needed"
+     },
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'stations' is present"
+     }
+    ],
+    "summary": "k=10, method=combined",
+    "fallback_used": false,
+    "sha256": "139232bc874de6cd"
+   },
+   "s3": {
+    "ok": true,
+    "gates": [
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'estimates' is present"
+     },
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'skill' is present"
+     }
+    ],
+    "summary": "method=similarity",
+    "fallback_used": false,
+    "sha256": "e9082341862f998b"
+   }
+  }
+ },
+ "run": {
+  "ok": true,
+  "results": [
+   {
+    "id": "s1",
+    "tool": "describe_catchment",
+    "arguments": {
+     "lat": 38.8,
+     "lon": -9.38,
+     "upstream": true
+    },
+    "ok": true,
+    "rationale": "The catchment and upstream area are needed to convert donor-transferred mm/d signatures into m3/s at this point.",
+    "sha256": "9dbb0a626977d684",
+    "methods": [
+     {
+      "name": "Catchment attributes from BasinATLAS (HydroATLAS v1.0)",
+      "text": "Level-12 HydroBASINS sub-basins traced upstream through the NEXT_DOWN routing field; attributes aggregated as area-weighted means (or outlet / total values where the field is already an upstream aggregate).",
+      "citation": "HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6"
+     }
+    ],
+    "result": {
+     "latitude": 38.8,
+     "longitude": -9.38,
+     "sub_basin": {
+      "hybas_id": 2120018870,
+      "next_down": 0,
+      "main_bas": 2120018870,
+      "sub_area": 478.5,
+      "up_area": 478.7,
+      "pfaf_id": 231700103000
+     },
+     "upstream": {
+      "n_sub_basins": 1,
+      "note": "catchment upstream of the sub-basin containing the point (1 level-12 sub-basins)"
+     },
+     "attributes": {
+      "n_sub_basins": 1,
+      "area_km2": 478.5,
+      "outlet_hybas_id": 2120018870,
+      "upstream_area_km2": 478.7,
+      "elevation_m": {
+       "value": 44.0,
+       "unit": "m",
+       "label": "mean elevation",
+       "field": "ele_mt_uav",
+       "source": "basinatlas_upstream"
+      },
+      "slope_deg": {
+       "value": 4.0,
+       "unit": "degrees",
+       "label": "mean slope",
+       "field": "slp_dg_uav",
+       "source": "basinatlas_upstream"
+      },
+      "precipitation_mm_yr": {
+       "value": 751.0,
+       "unit": "mm/yr",
+       "label": "annual precipitation (WorldClim)",
+       "field": "pre_mm_uyr",
+       "source": "basinatlas_upstream"
+      },
+      "pet_mm_yr": {
+       "value": 939.0,
+       "unit": "mm/yr",
+       "label": "annual potential evapotranspiration",
+       "field": "pet_mm_uyr",
+       "source": "basinatlas_upstream"
+      },
+      "aet_mm_yr": {
+       "value": 575.0,
+       "unit": "mm/yr",
+       "label": "annual actual evapotranspiration",
+       "field": "aet_mm_uyr",
+       "source": "basinatlas_upstream"
+      },
+      "aridity_index": {
+       "value": 0.8,
+       "unit": "P/PET",
+       "label": "aridity index (P/PET)",
+       "field": "ari_ix_uav",
+       "source": "basinatlas_upstream"
+      },
+      "temperature_c": {
+       "value": 15.9,
+       "unit": "°C",
+       "label": "mean annual air temperature",
+       "field": "tmp_dc_uyr",
+       "source": "basinatlas_upstream"
+      },
+      "snow_cover_pct": {
+       "value": 1.0,
+       "unit": "%",
+       "label": "annual snow cover extent",
+       "field": "snw_pc_uyr",
+       "source": "basinatlas_upstream"
+      },
+      "runoff_mm_yr": {
+       "value": 252.0,
+       "unit": "mm/yr",
+       "label": "annual land-surface runoff",
+       "field": "run_mm_syr",
+       "source": "sub_basin"
+      },
+      "discharge_m3s": {
+       "value": 3.83,
+       "unit": "m3/s",
+       "label": "mean annual natural discharge at the outlet",
+       "field": "dis_m3_pyr",
+       "source": "basinatlas_upstream"
+      },
+      "forest_pct": {
+       "value": 39.0,
+       "unit": "%",
+       "label": "forest cover",
+       "field": "for_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "cropland_pct": {
+       "value": 18.0,
+       "unit": "%",
+       "label": "cropland",
+       "field": "crp_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "pasture_pct": {
+       "value": 3.0,
+       "unit": "%",
+       "label": "pasture",
+       "field": "pst_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "urban_pct": {
+       "value": 48.0,
+       "unit": "%",
+       "label": "urban extent",
+       "field": "urb_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "irrigated_pct": {
+       "value": 0.0,
+       "unit": "%",
+       "label": "irrigated area",
+       "field": "ire_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "glacier_pct": {
+       "value": 0.0,
+       "unit": "%",
+       "label": "glacier extent",
+       "field": "gla_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "wetland_pct": {
+       "value": 1.0,
+       "unit": "%",
+       "label": "wetlands (all classes)",
+       "field": "wet_pc_ug1",
+       "source": "basinatlas_upstream"
+      },
+      "lake_pct": {
+       "value": 0.0,
+       "unit": "%",
+       "label": "lake area",
+       "field": "lka_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "karst_pct": {
+       "value": 30.0,
+       "unit": "%",
+       "label": "karst extent",
+       "field": "kar_pc_use",
+       "source": "basinatlas_upstream"
+      },
+      "clay_pct": {
+       "value": 20.0,
+       "unit": "%",
+       "label": "clay fraction in soil",
+       "field": "cly_pc_uav",
+       "source": "basinatlas_upstream"
+      },
+      "silt_pct": {
+       "value": 32.0,
+       "unit": "%",
+       "label": "silt fraction in soil",
+       "field": "slt_pc_uav",
+       "source": "basinatlas_upstream"
+      },
+      "sand_pct": {
+       "value": 48.0,
+       "unit": "%",
+       "label": "sand fraction in soil",
+       "field": "snd_pc_uav",
+       "source": "basinatlas_upstream"
+      },
+      "soil_organic_carbon_t_ha": {
+       "value": 35.0,
+       "unit": "t/ha",
+       "label": "soil organic carbon",
+       "field": "soc_th_uav",
+       "source": "basinatlas_upstream"
+      },
+      "soil_water_pct": {
+       "value": 67.0,
+       "unit": "%",
+       "label": "annual soil water content",
+       "field": "swc_pc_uyr",
+       "source": "basinatlas_upstream"
+      },
+      "groundwater_table_cm": {
+       "value": 246.0,
+       "unit": "cm",
+       "label": "groundwater table depth",
+       "field": "gwt_cm_sav",
+       "source": "sub_basin"
+      },
+      "population_density": {
+       "value": 2460.12,
+       "unit": "people/km2",
+       "label": "population density",
+       "field": "ppd_pk_uav",
+       "source": "basinatlas_upstream"
+      },
+      "population": {
+       "value": 1368709.96,
+       "unit": "people",
+       "label": "population count",
+       "field": "pop_ct_usu",
+       "source": "basinatlas_upstream"
+      },
+      "degree_of_regulation_pct": {
+       "value": 0.0,
+       "unit": "%",
+       "label": "degree of regulation by reservoirs",
+       "field": "dor_pc_pva",
+       "source": "basinatlas_upstream"
+      },
+      "human_footprint_2009": {
+       "value": 38.7,
+       "unit": "index 0-50",
+       "label": "human footprint (2009)",
+       "field": "hft_ix_u09",
+       "source": "basinatlas_upstream"
+      },
+      "reservoir_volume_mcm": {
+       "value": 0.0,
+       "unit": "million m3",
+       "label": "reservoir volume upstream",
+       "field": "rev_mc_usu",
+       "source": "basinatlas_upstream"
+      }
+     },
+     "license": "CC-BY-4.0",
+     "attribution": "HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6",
+     "methods": [
+      {
+       "name": "Catchment attributes from BasinATLAS (HydroATLAS v1.0)",
+       "text": "Level-12 HydroBASINS sub-basins traced upstream through the NEXT_DOWN routing field; attributes aggregated as area-weighted means (or outlet / total values where the field is already an upstream aggregate).",
+       "citation": "HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6"
+      }
+     ]
+    },
+    "error": null,
+    "gates": [
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'sub_basin' is present",
+      "path": "sub_basin"
+     },
+     {
+      "check": "max_area_km2",
+      "passed": true,
+      "detail": "catchment of 479 km2 against a ceiling of 479 km2",
+      "path": "sub_basin.up_area",
+      "value": 478.7
+     }
+    ],
+    "gates_passed": true,
+    "fallback_used": false
+   },
+   {
+    "id": "s2",
+    "tool": "similar_basins",
+    "arguments": {
+     "lat": 38.8,
+     "lon": -9.38,
+     "k": 10
+    },
+    "ok": true,
+    "rationale": "No at-site record exists within 50 km, so the 10 catchments most similar in BasinATLAS attribute space supply the donor sample for transfer.",
+    "sha256": "139232bc874de6cd",
+    "methods": [
+     {
+      "name": "Similar gauged basins (physical similarity / spatial proximity)",
+      "text": "Gauged stations ranked by weighted Euclidean distance in standardised BasinATLAS catchment attribute space (area, relief, climate, land cover, soils, human pressure), by great-circle distance, or both; the donor-selection step of regionalisation.",
+      "citation": "Bloeschl, G., Sivapalan, M., Wagener, T., Viglione, A., Savenije, H. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413. Attributes: HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6"
+     }
+    ],
+    "result": {
+     "method": "combined",
+     "features_used": [
+      "log_area",
+      "elevation",
+      "slope",
+      "precipitation",
+      "aridity",
+      "temperature",
+      "snow",
+      "forest",
+      "cropland",
+      "urban",
+      "clay",
+      "sand",
+      "population_density",
+      "regulation"
+     ],
+     "n_candidates": 37071,
+     "k": 10,
+     "target": {
+      "log_area": 478.5,
+      "elevation": 44.0,
+      "slope": 4.0,
+      "precipitation": 751.0,
+      "aridity": 0.8,
+      "temperature": 15.9,
+      "snow": 1.0,
+      "forest": 39.0,
+      "cropland": 18.0,
+      "urban": 48.0,
+      "clay": 20.0,
+      "sand": 48.0,
+      "population_density": 2460.12,
+      "regulation": 0.0
+     },
+     "stations": [
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q614292002",
+       "name": "Le Gave d'Oloron [Le Gave d'Ossau] à Oloron-Sainte-Marie - Quartier Sestiaa",
+       "latitude": 43.191760961,
+       "longitude": -0.604709963,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "2011-11-17",
+       "period_end": null,
+       "score": 1.827,
+       "similarity_distance": 0.4688,
+       "distance_km": 882.9,
+       "hybas_id": 2120583590,
+       "up_area_km2": 1184.1,
+       "features": {
+        "log_area": {
+         "station": 488.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 310.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 3.3,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 920.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 0.97,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.9,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 2.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 31.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 2.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 11.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 20.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 43.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 75.184,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q335401001",
+       "name": "Le Luy du Béarn à Saint-Médard",
+       "latitude": 43.529796146,
+       "longitude": -0.619116123,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1969-08-27",
+       "period_end": null,
+       "score": 1.8878,
+       "similarity_distance": 0.5585,
+       "distance_km": 901.7,
+       "hybas_id": 2121198500,
+       "up_area_km2": 319.8,
+       "features": {
+        "log_area": {
+         "station": 257.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 177.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 2.8,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 948.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 0.97,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 12.4,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 1.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 16.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 40.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 4.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 19.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 45.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 118.343,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q346401001",
+       "name": "Le Luy à Saint-Pandelon",
+       "latitude": 43.676839536,
+       "longitude": -1.04192191,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1967-01-01",
+       "period_end": null,
+       "score": 1.8983,
+       "similarity_distance": 0.6989,
+       "distance_km": 882.5,
+       "hybas_id": 2120576460,
+       "up_area_km2": 1213.1,
+       "features": {
+        "log_area": {
+         "station": 1150.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 124.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 2.8,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 1026.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 1.06,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 12.7,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 2.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 29.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 51.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 2.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 20.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 43.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 73.478,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "S516001001",
+       "name": "La Nivelle à Ciboure",
+       "latitude": 43.384770372,
+       "longitude": -1.66398305,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "2000-05-22",
+       "period_end": null,
+       "score": 1.9205,
+       "similarity_distance": 0.9901,
+       "distance_km": 822.8,
+       "hybas_id": 2120020300,
+       "up_area_km2": 239.8,
+       "features": {
+        "log_area": {
+         "station": 238.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 212.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 10.6,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 1312.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 1.48,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 13.0,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 3.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 64.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 5.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 2.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 19.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 43.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 113.439,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q933251001",
+       "name": "La Nive à Villefranque",
+       "latitude": 43.432791065,
+       "longitude": -1.456860164,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "2008-06-26",
+       "period_end": null,
+       "score": 1.9209,
+       "similarity_distance": 0.9329,
+       "distance_km": 839.5,
+       "hybas_id": 2120579000,
+       "up_area_km2": 998.7,
+       "features": {
+        "log_area": {
+         "station": 929.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 462.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 14.9,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 1206.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 1.35,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.6,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 4.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 49.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 4.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 3.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 20.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 42.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 55.157,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q022501101",
+       "name": "L'Echez à Tarbes",
+       "latitude": 43.23728759,
+       "longitude": 0.048674918,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1992-05-15",
+       "period_end": null,
+       "score": 1.9218,
+       "similarity_distance": 0.4723,
+       "distance_km": 931.4,
+       "hybas_id": 2121200860,
+       "up_area_km2": 134.4,
+       "features": {
+        "log_area": {
+         "station": 149.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 453.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 7.4,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 854.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 0.92,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.1,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 2.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 48.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 21.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 15.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 20.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 45.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 214.55,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q022501001",
+       "name": "La Gespe à Tarbes [Route de Lourdes]",
+       "latitude": 43.216477891,
+       "longitude": 0.05499409,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1986-06-15",
+       "period_end": null,
+       "score": 1.9224,
+       "similarity_distance": 0.4802,
+       "distance_km": 930.8,
+       "hybas_id": 2121200860,
+       "up_area_km2": 134.4,
+       "features": {
+        "log_area": {
+         "station": 134.4,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 453.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 7.4,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 854.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 0.92,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.1,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 2.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 48.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 21.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 15.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 20.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 45.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 214.55,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q935001001",
+       "name": "L'Adour à Anglet [Convergent]",
+       "latitude": 43.527353493,
+       "longitude": -1.514822499,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1999-06-16",
+       "period_end": null,
+       "score": 1.9225,
+       "similarity_distance": 0.928,
+       "distance_km": 841.8,
+       "hybas_id": 2120020330,
+       "up_area_km2": 16831.2,
+       "features": {
+        "log_area": {
+         "station": 16930.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 412.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 7.9,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 1025.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 1.15,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.3,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 7.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 47.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 26.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 3.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 18.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 46.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 61.925,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q935002001",
+       "name": "L'Adour à Bayonne [Lesseps] - Lesseps",
+       "latitude": 43.497579072,
+       "longitude": -1.479417197,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1998-11-04",
+       "period_end": null,
+       "score": 1.923,
+       "similarity_distance": 0.9277,
+       "distance_km": 842.2,
+       "hybas_id": 2120020330,
+       "up_area_km2": 16831.2,
+       "features": {
+        "log_area": {
+         "station": 16875.0,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 412.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 7.9,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 1025.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 1.15,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.3,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 7.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 47.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 26.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 3.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 18.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 46.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 61.925,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      },
+      {
+       "source": "hubeau_hydrometrie",
+       "station_id": "Q021401001",
+       "name": "L'Echez à Louey",
+       "latitude": 43.175521806,
+       "longitude": 0.022190768,
+       "agency": "Eaufrance / SCHAPI (Hub'Eau)",
+       "period_start": "1968-11-01",
+       "period_end": null,
+       "score": 1.923,
+       "similarity_distance": 0.5161,
+       "distance_km": 926.2,
+       "hybas_id": 2121200860,
+       "up_area_km2": 134.4,
+       "features": {
+        "log_area": {
+         "station": 89.6,
+         "target": 478.5
+        },
+        "elevation": {
+         "station": 453.0,
+         "target": 44.0
+        },
+        "slope": {
+         "station": 7.4,
+         "target": 4.0
+        },
+        "precipitation": {
+         "station": 854.0,
+         "target": 751.0
+        },
+        "aridity": {
+         "station": 0.92,
+         "target": 0.8
+        },
+        "temperature": {
+         "station": 11.1,
+         "target": 15.9
+        },
+        "snow": {
+         "station": 2.0,
+         "target": 1.0
+        },
+        "forest": {
+         "station": 48.0,
+         "target": 39.0
+        },
+        "cropland": {
+         "station": 21.0,
+         "target": 18.0
+        },
+        "urban": {
+         "station": 15.0,
+         "target": 48.0
+        },
+        "clay": {
+         "station": 20.0,
+         "target": 20.0
+        },
+        "sand": {
+         "station": 45.0,
+         "target": 48.0
+        },
+        "population_density": {
+         "station": 214.55,
+         "target": 2460.12
+        },
+        "regulation": {
+         "station": 0.0,
+         "target": 0.0
+        }
+       }
+      }
+     ],
+     "license": "CC-BY-4.0",
+     "attribution": "HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6",
+     "methods": [
+      {
+       "name": "Similar gauged basins (physical similarity / spatial proximity)",
+       "text": "Gauged stations ranked by weighted Euclidean distance in standardised BasinATLAS catchment attribute space (area, relief, climate, land cover, soils, human pressure), by great-circle distance, or both; the donor-selection step of regionalisation.",
+       "citation": "Bloeschl, G., Sivapalan, M., Wagener, T., Viglione, A., Savenije, H. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413. Attributes: HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6"
+      }
+     ],
+     "latitude": 38.8,
+     "longitude": -9.38,
+     "sub_basin": {
+      "hybas_id": 2120018870,
+      "next_down": 0,
+      "main_bas": 2120018870,
+      "sub_area": 478.5,
+      "up_area": 478.7,
+      "pfaf_id": 231700103000
+     },
+     "run_at": "2026-09-07T14:04:30+00:00"
+    },
+    "error": null,
+    "gates": [
+     {
+      "check": "min_donors",
+      "passed": true,
+      "detail": "10 donors, 10 needed",
+      "path": "k",
+      "value": 10
+     },
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'stations' is present",
+      "path": "stations"
+     }
+    ],
+    "gates_passed": true,
+    "fallback_used": false
+   },
+   {
+    "id": "s3",
+    "tool": "regionalize_signatures",
+    "arguments": {
+     "lat": 38.8,
+     "lon": -9.38,
+     "k": 10
+    },
+    "ok": true,
+    "rationale": "Transfer mean, Q95 and Q05 flow signatures from the 10 donor basins, with the band across donors and leave-one-out skill, since at-site flow_duration and low_flow_frequency are not defensible here; these transferred signatures, converted to m3/s with the s1 upstream area, are what the 4 ML/day demand and the 0.1 share / Q95 reserve rule are screened against.",
+    "sha256": "e9082341862f998b",
+    "methods": [
+     {
+      "name": "Regionalisation of flow signatures from similar gauged basins",
+      "text": "Donor gauges ranked by physical similarity (standardised BasinATLAS catchment attributes); signatures transferred as an inverse-distance-weighted average over the k nearest donors (geometric mean for magnitudes) and/or by ridge regression on the attributes over all donors; the band is one weighted standard deviation of the donors (or the regression residual).",
+      "citation": "Bloeschl, G. et al. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Water Resour. Res. 44, W03413; Addor, N. et al. (2018). A ranking of hydrological signatures based on their predictability in space. Water Resour. Res. 54, 8792-8812."
+     }
+    ],
+    "result": {
+     "method": "similarity",
+     "features_used": [
+      "log_area",
+      "elevation",
+      "slope",
+      "precipitation",
+      "aridity",
+      "temperature",
+      "snow",
+      "forest",
+      "cropland",
+      "urban",
+      "clay",
+      "sand",
+      "population_density",
+      "regulation"
+     ],
+     "n_donors_available": 918,
+     "estimates": {
+      "q_mean_mm": {
+       "value": 0.1089,
+       "unit": "mm/d",
+       "label": "mean daily flow",
+       "low": 0.0151,
+       "high": 0.7872,
+       "donor_min": 0.0042,
+       "donor_max": 1.0516,
+       "n_donors": 10
+      },
+      "q_median_mm": {
+       "value": 0.0691,
+       "unit": "mm/d",
+       "label": "median daily flow",
+       "low": 0.0098,
+       "high": 0.4882,
+       "donor_min": 0.0024,
+       "donor_max": 0.9072,
+       "n_donors": 10
+      },
+      "q95_mm": {
+       "value": 0.02,
+       "unit": "mm/d",
+       "label": "low flow: exceeded 95 % of days",
+       "low": 0.0025,
+       "high": 0.1606,
+       "donor_min": 0.0002,
+       "donor_max": 0.5888,
+       "n_donors": 10
+      },
+      "q05_mm": {
+       "value": 0.3078,
+       "unit": "mm/d",
+       "label": "high flow: exceeded 5 % of days",
+       "low": 0.0395,
+       "high": 2.4011,
+       "donor_min": 0.0131,
+       "donor_max": 3.714,
+       "n_donors": 10
+      },
+      "q_annual_max_mm": {
+       "value": 0.6408,
+       "unit": "mm/d",
+       "label": "mean annual daily maximum",
+       "low": 0.0657,
+       "high": 6.2495,
+       "donor_min": 0.0153,
+       "donor_max": 9.7505,
+       "n_donors": 10
+      },
+      "runoff_ratio": {
+       "value": 0.2009,
+       "unit": "-",
+       "label": "mean flow / BasinATLAS precipitation",
+       "low": 0.0,
+       "high": 0.4101,
+       "donor_min": 0.0023,
+       "donor_max": 0.5674,
+       "n_donors": 10
+      },
+      "baseflow_index": {
+       "value": 0.7779,
+       "unit": "-",
+       "label": "baseflow / total flow",
+       "low": 0.6498,
+       "high": 0.906,
+       "donor_min": 0.5485,
+       "donor_max": 0.9249,
+       "n_donors": 10
+      },
+      "fdc_slope": {
+       "value": 2.2423,
+       "unit": "-",
+       "label": "slope of the flow-duration curve (log space, 33-66 %)",
+       "low": 1.1666,
+       "high": 3.3181,
+       "donor_min": 0.6832,
+       "donor_max": 3.7963,
+       "n_donors": 10
+      },
+      "high_flow_frequency": {
+       "value": 40.3734,
+       "unit": "days/yr",
+       "label": "days above 3 x median per year",
+       "low": 12.8966,
+       "high": 67.8502,
+       "donor_min": 0.2604,
+       "donor_max": 90.1719,
+       "n_donors": 10
+      },
+      "low_flow_frequency": {
+       "value": 16.0961,
+       "unit": "days/yr",
+       "label": "days below 0.2 x median per year",
+       "low": 0.0,
+       "high": 34.4467,
+       "donor_min": 0.0,
+       "donor_max": 59.8288,
+       "n_donors": 10
+      },
+      "zero_flow_fraction": {
+       "value": 0.0033,
+       "unit": "-",
+       "label": "fraction of zero-flow days",
+       "low": 0.0,
+       "high": 0.0095,
+       "donor_min": 0.0,
+       "donor_max": 0.0174,
+       "n_donors": 10
+      },
+      "seasonality_index": {
+       "value": 0.309,
+       "unit": "-",
+       "label": "Markham seasonality of monthly flow",
+       "low": 0.1639,
+       "high": 0.454,
+       "donor_min": 0.0481,
+       "donor_max": 0.5026,
+       "n_donors": 10
+      },
+      "flashiness_index": {
+       "value": 0.1938,
+       "unit": "-",
+       "label": "Richards-Baker flashiness",
+       "low": 0.048,
+       "high": 0.3397,
+       "donor_min": 0.0378,
+       "donor_max": 0.4991,
+       "n_donors": 10
+      }
+     },
+     "similarity": {
+      "estimates": {
+       "q_mean_mm": {
+        "value": 0.1089,
+        "unit": "mm/d",
+        "label": "mean daily flow",
+        "low": 0.0151,
+        "high": 0.7872,
+        "donor_min": 0.0042,
+        "donor_max": 1.0516,
+        "n_donors": 10
+       },
+       "q_median_mm": {
+        "value": 0.0691,
+        "unit": "mm/d",
+        "label": "median daily flow",
+        "low": 0.0098,
+        "high": 0.4882,
+        "donor_min": 0.0024,
+        "donor_max": 0.9072,
+        "n_donors": 10
+       },
+       "q95_mm": {
+        "value": 0.02,
+        "unit": "mm/d",
+        "label": "low flow: exceeded 95 % of days",
+        "low": 0.0025,
+        "high": 0.1606,
+        "donor_min": 0.0002,
+        "donor_max": 0.5888,
+        "n_donors": 10
+       },
+       "q05_mm": {
+        "value": 0.3078,
+        "unit": "mm/d",
+        "label": "high flow: exceeded 5 % of days",
+        "low": 0.0395,
+        "high": 2.4011,
+        "donor_min": 0.0131,
+        "donor_max": 3.714,
+        "n_donors": 10
+       },
+       "q_annual_max_mm": {
+        "value": 0.6408,
+        "unit": "mm/d",
+        "label": "mean annual daily maximum",
+        "low": 0.0657,
+        "high": 6.2495,
+        "donor_min": 0.0153,
+        "donor_max": 9.7505,
+        "n_donors": 10
+       },
+       "runoff_ratio": {
+        "value": 0.2009,
+        "unit": "-",
+        "label": "mean flow / BasinATLAS precipitation",
+        "low": 0.0,
+        "high": 0.4101,
+        "donor_min": 0.0023,
+        "donor_max": 0.5674,
+        "n_donors": 10
+       },
+       "baseflow_index": {
+        "value": 0.7779,
+        "unit": "-",
+        "label": "baseflow / total flow",
+        "low": 0.6498,
+        "high": 0.906,
+        "donor_min": 0.5485,
+        "donor_max": 0.9249,
+        "n_donors": 10
+       },
+       "fdc_slope": {
+        "value": 2.2423,
+        "unit": "-",
+        "label": "slope of the flow-duration curve (log space, 33-66 %)",
+        "low": 1.1666,
+        "high": 3.3181,
+        "donor_min": 0.6832,
+        "donor_max": 3.7963,
+        "n_donors": 10
+       },
+       "high_flow_frequency": {
+        "value": 40.3734,
+        "unit": "days/yr",
+        "label": "days above 3 x median per year",
+        "low": 12.8966,
+        "high": 67.8502,
+        "donor_min": 0.2604,
+        "donor_max": 90.1719,
+        "n_donors": 10
+       },
+       "low_flow_frequency": {
+        "value": 16.0961,
+        "unit": "days/yr",
+        "label": "days below 0.2 x median per year",
+        "low": 0.0,
+        "high": 34.4467,
+        "donor_min": 0.0,
+        "donor_max": 59.8288,
+        "n_donors": 10
+       },
+       "zero_flow_fraction": {
+        "value": 0.0033,
+        "unit": "-",
+        "label": "fraction of zero-flow days",
+        "low": 0.0,
+        "high": 0.0095,
+        "donor_min": 0.0,
+        "donor_max": 0.0174,
+        "n_donors": 10
+       },
+       "seasonality_index": {
+        "value": 0.309,
+        "unit": "-",
+        "label": "Markham seasonality of monthly flow",
+        "low": 0.1639,
+        "high": 0.454,
+        "donor_min": 0.0481,
+        "donor_max": 0.5026,
+        "n_donors": 10
+       },
+       "flashiness_index": {
+        "value": 0.1938,
+        "unit": "-",
+        "label": "Richards-Baker flashiness",
+        "low": 0.048,
+        "high": 0.3397,
+        "donor_min": 0.0378,
+        "donor_max": 0.4991,
+        "n_donors": 10
+       }
+      },
+      "donors": [
+       {
+        "source": "uk_ea",
+        "station_id": "2134c5d5-e2bb-4c03-bde5-f39a082e2b95",
+        "name": "Connolly'S Mill Combined",
+        "latitude": 51.419659,
+        "longitude": -0.18127,
+        "agency": "Environment Agency",
+        "period_start": "1962-10-01",
+        "period_end": null,
+        "score": 0.5833,
+        "similarity_distance": 0.5833,
+        "distance_km": null,
+        "hybas_id": 2120392660,
+        "up_area_km2": 187.7,
+        "features": {
+         "log_area": {
+          "station": 176.0,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 104.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 2.6,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 674.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.92,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 10.3,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 6.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 2.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 85.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 19.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 45.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 3602.433,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "024f218d-9a70-43b7-8ea2-7d038eeb2cff",
+        "name": "Esher",
+        "latitude": 51.382361,
+        "longitude": -0.376781,
+        "agency": "Environment Agency",
+        "period_start": "1984-12-18",
+        "period_end": null,
+        "score": 0.5906,
+        "similarity_distance": 0.5906,
+        "distance_km": null,
+        "hybas_id": 2120394010,
+        "up_area_km2": 479.2,
+        "features": {
+         "log_area": {
+          "station": 465.0,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 85.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 2.2,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 677.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.93,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.8,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 2.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 9.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 37.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 18.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 47.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 711.41,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "649eb398-029b-4ebc-bb4d-e36ee07c234e",
+        "name": "Bromley",
+        "latitude": 51.394815,
+        "longitude": 0.016923,
+        "agency": "Environment Agency",
+        "period_start": "2006-12-28",
+        "period_end": null,
+        "score": 0.6013,
+        "similarity_distance": 0.6013,
+        "distance_km": null,
+        "hybas_id": 2120392190,
+        "up_area_km2": 173.2,
+        "features": {
+         "log_area": {
+          "station": 173.2,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 88.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 2.2,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 656.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.9,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 10.4,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 7.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 1.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 86.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 17.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 47.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 3568.49,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "3ab02013-e0a1-4215-96f2-22f078b21f21",
+        "name": "Hawley",
+        "latitude": 51.424331,
+        "longitude": 0.2312,
+        "agency": "Environment Agency",
+        "period_start": "1963-12-01",
+        "period_end": null,
+        "score": 0.6042,
+        "similarity_distance": 0.6042,
+        "distance_km": null,
+        "hybas_id": 2120392750,
+        "up_area_km2": 251.8,
+        "features": {
+         "log_area": {
+          "station": 191.4,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 113.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 3.1,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 667.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.94,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.9,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 10.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 30.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 19.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 45.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 528.903,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "5d03a6ea-4229-4687-a492-2ba63b35a4ed",
+        "name": "Poynings",
+        "latitude": 50.893423,
+        "longitude": -0.204661,
+        "agency": "Environment Agency",
+        "period_start": "1999-05-21",
+        "period_end": null,
+        "score": 0.6227,
+        "similarity_distance": 0.6227,
+        "distance_km": null,
+        "hybas_id": 2120053960,
+        "up_area_km2": 391.3,
+        "features": {
+         "log_area": {
+          "station": 391.3,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 41.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 2.1,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 675.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.93,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.9,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 6.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 24.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 12.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 18.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 46.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 272.568,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "0ee042cb-d2b3-497b-9305-2ac0a8960696",
+        "name": "Denham Lodge Main",
+        "latitude": 51.567599,
+        "longitude": -0.49112,
+        "agency": "Environment Agency",
+        "period_start": "1986-11-01",
+        "period_end": null,
+        "score": 0.6304,
+        "similarity_distance": 0.6304,
+        "distance_km": null,
+        "hybas_id": 2121118890,
+        "up_area_km2": 898.2,
+        "features": {
+         "log_area": {
+          "station": 898.2,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 121.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 2.2,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 670.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.95,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.7,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 1.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 20.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 37.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 20.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 42.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 780.011,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "3769621b-8599-4bcf-b5f9-1017619dbed2",
+        "name": "Staines Ash",
+        "latitude": 51.440376,
+        "longitude": -0.512035,
+        "agency": "Environment Agency",
+        "period_start": "1995-06-29",
+        "period_end": null,
+        "score": 0.6389,
+        "similarity_distance": 0.6389,
+        "distance_km": null,
+        "hybas_id": 2120393160,
+        "up_area_km2": 973.6,
+        "features": {
+         "log_area": {
+          "station": 973.6,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 115.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 2.0,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 667.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.94,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.7,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 1.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 19.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 41.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 20.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 42.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 863.094,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "64118c69-e564-40c3-9fec-0e6047e955b9",
+        "name": "Loughton",
+        "latitude": 51.640481,
+        "longitude": 0.081584,
+        "agency": "Environment Agency",
+        "period_start": "1971-12-01",
+        "period_end": null,
+        "score": 0.6447,
+        "similarity_distance": 0.6447,
+        "distance_km": null,
+        "hybas_id": 2120391160,
+        "up_area_km2": 352.0,
+        "features": {
+         "log_area": {
+          "station": 269.0,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 63.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 1.4,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 607.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.86,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 10.1,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 22.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 28.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 19.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 45.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 1291.089,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "0de5636a-5fc2-42de-846d-28ba870aff7b",
+        "name": "Watford Berrygrove",
+        "latitude": 51.670654,
+        "longitude": -0.380235,
+        "agency": "Environment Agency",
+        "period_start": "1934-02-28",
+        "period_end": null,
+        "score": 0.6465,
+        "similarity_distance": 0.6465,
+        "distance_km": null,
+        "hybas_id": 2120387970,
+        "up_area_km2": 377.1,
+        "features": {
+         "log_area": {
+          "station": 352.0,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 111.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 1.7,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 666.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.94,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.7,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 16.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 42.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 20.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 43.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 1011.267,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       },
+       {
+        "source": "uk_ea",
+        "station_id": "617d7d56-051e-4357-bd12-5ed0a71fa78d",
+        "name": "Rye Bridge",
+        "latitude": 51.770008,
+        "longitude": 0.006126,
+        "agency": "Environment Agency",
+        "period_start": "1993-08-04",
+        "period_end": null,
+        "score": 0.6504,
+        "similarity_distance": 0.6504,
+        "distance_km": null,
+        "hybas_id": 2121117890,
+        "up_area_km2": 1206.4,
+        "features": {
+         "log_area": {
+          "station": 760.1,
+          "target": 478.5
+         },
+         "elevation": {
+          "station": 94.0,
+          "target": 44.0
+         },
+         "slope": {
+          "station": 1.7,
+          "target": 4.0
+         },
+         "precipitation": {
+          "station": 630.0,
+          "target": 751.0
+         },
+         "aridity": {
+          "station": 0.9,
+          "target": 0.8
+         },
+         "temperature": {
+          "station": 9.9,
+          "target": 15.9
+         },
+         "snow": {
+          "station": 8.0,
+          "target": 1.0
+         },
+         "forest": {
+          "station": 0.0,
+          "target": 39.0
+         },
+         "cropland": {
+          "station": 33.0,
+          "target": 18.0
+         },
+         "urban": {
+          "station": 25.0,
+          "target": 48.0
+         },
+         "clay": {
+          "station": 20.0,
+          "target": 20.0
+         },
+         "sand": {
+          "station": 42.0,
+          "target": 48.0
+         },
+         "population_density": {
+          "station": 703.402,
+          "target": 2460.12
+         },
+         "regulation": {
+          "station": 0.0,
+          "target": 0.0
+         }
+        }
+       }
+      ],
+      "k": 10
+     },
+     "license": "per-source (streamflow), CC-BY-4.0 (BasinATLAS)",
+     "methods": [
+      {
+       "name": "Regionalisation of flow signatures from similar gauged basins",
+       "text": "Donor gauges ranked by physical similarity (standardised BasinATLAS catchment attributes); signatures transferred as an inverse-distance-weighted average over the k nearest donors (geometric mean for magnitudes) and/or by ridge regression on the attributes over all donors; the band is one weighted standard deviation of the donors (or the regression residual).",
+       "citation": "Bloeschl, G. et al. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Water Resour. Res. 44, W03413; Addor, N. et al. (2018). A ranking of hydrological signatures based on their predictability in space. Water Resour. Res. 54, 8792-8812."
+      }
+     ],
+     "latitude": 38.8,
+     "longitude": -9.38,
+     "sub_basin": {
+      "hybas_id": 2120018870,
+      "next_down": 0,
+      "main_bas": 2120018870,
+      "sub_area": 478.5,
+      "up_area": 478.7,
+      "pfaf_id": 231700103000
+     },
+     "run_at": "2026-09-07T14:04:38+00:00",
+     "skill": {
+      "note": "leave-one-out over the donors, published with the archive",
+      "by_signature": {
+       "q_mean_mm": {
+        "n": 918,
+        "nse": null,
+        "r2": null,
+        "median_ape": 0.23,
+        "space": "log"
+       },
+       "q_median_mm": {
+        "n": 918,
+        "nse": null,
+        "r2": null,
+        "median_ape": 0.273,
+        "space": "log"
+       },
+       "q95_mm": {
+        "n": 918,
+        "nse": null,
+        "r2": null,
+        "median_ape": 0.524,
+        "space": "log"
+       },
+       "q05_mm": {
+        "n": 918,
+        "nse": null,
+        "r2": null,
+        "median_ape": 0.251,
+        "space": "log"
+       },
+       "q_annual_max_mm": {
+        "n": 916,
+        "nse": null,
+        "r2": null,
+        "median_ape": 0.347,
+        "space": "log"
+       },
+       "runoff_ratio": {
+        "n": 917,
+        "nse": 0.168,
+        "r2": 0.186,
+        "median_ape": 0.19,
+        "space": "linear"
+       },
+       "baseflow_index": {
+        "n": 918,
+        "nse": 0.3,
+        "r2": 0.306,
+        "median_ape": 0.064,
+        "space": "linear"
+       },
+       "fdc_slope": {
+        "n": 918,
+        "nse": 0.154,
+        "r2": 0.171,
+        "median_ape": 0.154,
+        "space": "linear"
+       },
+       "high_flow_frequency": {
+        "n": 918,
+        "nse": 0.262,
+        "r2": 0.267,
+        "median_ape": 0.208,
+        "space": "linear"
+       },
+       "low_flow_frequency": {
+        "n": 918,
+        "nse": 0.306,
+        "r2": 0.312,
+        "median_ape": 0.632,
+        "space": "linear"
+       },
+       "zero_flow_fraction": {
+        "n": 918,
+        "nse": -0.049,
+        "r2": 0.014,
+        "median_ape": 1.0,
+        "space": "linear"
+       },
+       "seasonality_index": {
+        "n": 918,
+        "nse": 0.349,
+        "r2": 0.354,
+        "median_ape": 0.132,
+        "space": "linear"
+       },
+       "flashiness_index": {
+        "n": 918,
+        "nse": 0.408,
+        "r2": 0.409,
+        "median_ape": 0.259,
+        "space": "linear"
+       }
+      }
+     }
+    },
+    "error": null,
+    "gates": [
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'estimates' is present",
+      "path": "estimates"
+     },
+     {
+      "check": "not_empty",
+      "passed": true,
+      "detail": "'skill' is present",
+      "path": "skill"
+     }
+    ],
+    "gates_passed": true,
+    "fallback_used": false
+   }
+  ],
+  "gates": [
+   {
+    "step": "s1",
+    "check": "not_empty",
+    "passed": true,
+    "detail": "'sub_basin' is present",
+    "path": "sub_basin"
+   },
+   {
+    "step": "s1",
+    "check": "max_area_km2",
+    "passed": true,
+    "detail": "catchment of 479 km2 against a ceiling of 479 km2",
+    "path": "sub_basin.up_area",
+    "value": 478.7
+   },
+   {
+    "step": "s2",
+    "check": "min_donors",
+    "passed": true,
+    "detail": "10 donors, 10 needed",
+    "path": "k",
+    "value": 10
+   },
+   {
+    "step": "s2",
+    "check": "not_empty",
+    "passed": true,
+    "detail": "'stations' is present",
+    "path": "stations"
+   },
+   {
+    "step": "s3",
+    "check": "not_empty",
+    "passed": true,
+    "detail": "'estimates' is present",
+    "path": "estimates"
+   },
+   {
+    "step": "s3",
+    "check": "not_empty",
+    "passed": true,
+    "detail": "'skill' is present",
+    "path": "skill"
+   }
+  ],
+  "failed_gates": [],
+  "stopped_at": null,
+  "stop_reason": null,
+  "started": "2026-09-07T14:04:13+00:00",
+  "finished": "2026-09-07T14:04:38+00:00",
+  "replans": 0
+ },
+ "critique": {
+  "ok": false,
+  "checks": [
+   {
+    "name": "tools_were_used",
+    "passed": true,
+    "detail": ""
+   },
+   {
+    "name": "numbers_come_from_tools",
+    "passed": false,
+    "detail": "These numbers are not in any tool result: 0.38, 0.046, 0.38, 0.046, 0.38, 0.046."
+   },
+   {
+    "name": "years_traceable",
+    "passed": true,
+    "detail": ""
+   },
+   {
+    "name": "record_is_named",
+    "passed": true,
+    "detail": ""
+   }
+  ],
+  "issues": [],
+  "not_established": [
+   "step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in",
+   "These numbers are not in any tool result: 0.38, 0.046, 0.38, 0.046, 0.38, 0.046."
+  ]
+ },
+ "report": {
+  "title": "Screening the Sintra Hills Stream for a 4 ML/day Run-of-River Abstraction",
+  "answer": "Regionalised low-flow transfer from 10 donor gauges to the 478.7 km2 catchment (BasinATLAS/HydroATLAS, hybas_id 2120018870) gives a mean flow of about 0.60 m3/s (52 ML/day), a median of about 0.38 m3/s (33 ML/day) and a Q95 low flow of about 0.11 m3/s (9.6 ML/day, donor band 0.0002-0.5888 mm/d). A 4 ML/day abstraction (0.046 m3/s) stays within the screening rule of taking at most 10% of flow only once flow exceeds roughly 0.46 m3/s (about 40 ML/day), a level above the transferred median; below that, including at Q95, the take would breach the 10% cap. No at-site record or discharge time series exists, so this is a manual comparison against the regionalised signature band, not a computed reliability curve.",
+  "key_numbers": [
+   {
+    "label": "Upstream area",
+    "value": 478.7,
+    "unit": "km2",
+    "step": "s1"
+   },
+   {
+    "label": "Donor gauges",
+    "value": 10,
+    "unit": "",
+    "step": "s2"
+   },
+   {
+    "label": "mean daily flow",
+    "value": 0.1089,
+    "unit": "mm/d",
+    "step": "s3"
+   },
+   {
+    "label": "low flow: exceeded 95 % of days",
+    "value": 0.02,
+    "unit": "mm/d",
+    "step": "s3"
+   },
+   {
+    "label": "high flow: exceeded 5 % of days",
+    "value": 0.3078,
+    "unit": "mm/d",
+    "step": "s3"
+   },
+   {
+    "label": "mean annual daily maximum",
+    "value": 0.6408,
+    "unit": "mm/d",
+    "step": "s3"
+   },
+   {
+    "label": "mean flow / BasinATLAS precipitation",
+    "value": 0.2009,
+    "unit": "-",
+    "step": "s3"
+   },
+   {
+    "label": "baseflow / total flow",
+    "value": 0.7779,
+    "unit": "-",
+    "step": "s3"
+   }
+  ],
+  "sections": [
+   {
+    "id": "summary",
+    "title": "Summary",
+    "text": "The stream in the Sintra hills (38.80N, -9.38E) has no gauge within 50 km, so its ability to supply 4 ML/day run-of-river was screened by regionalising flow signatures from 10 similar gauged basins (similar_basins, pool of 37,071 candidates) onto its 478.7 km2 catchment (BasinATLAS/HydroATLAS, hybas_id 2120018870). The transferred mean flow is 0.1089 mm/d, median 0.0691 mm/d, Q95 0.02 mm/d and Q05 0.3078 mm/d; converted with the catchment area these are about 0.60, 0.38, 0.11 and 1.71 m3/s. Comparing the 4 ML/day demand (0.046 m3/s) against a 10% share screen shows the abstraction is safe only when flow is above roughly 0.46 m3/s, a threshold exceeded by the mean but not the median or Q95 flow, so the demand would breach the screening rule on a substantial share of days. No supply_reliability run was possible for lack of a discharge record; this is a signature-based screen, not a formal reliability curve.",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "problem",
+    "title": "Problem and decision",
+    "text": "The decision is whether a stream in the Sintra hills near Lisbon, with no gauge within 50 km, can sustainably supply a village at 4 ML/day via run-of-river abstraction, and how reliably. The brief requires mean flow, the Q95 low flow, and the Q05 high flow for the ungauged catchment, the abstraction expressed as a share of daily flow, and a reliability judgement against the stated 0.1 screening share, with no storage assumed.",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "site_data",
+    "title": "Site and data",
+    "text": "The point at 38.80N, -9.38E drains a BasinATLAS sub-basin (hybas_id 2120018870) with an upstream area of 478.7 km2 (sub-area 478.5 km2, 1 level-12 sub-basin). Mean elevation is 44.0 m, mean slope 4.0 degrees. Long-term climatology stands in for a period of record: annual precipitation 751.0 mm/yr, potential evapotranspiration 939.0 mm/yr, actual evapotranspiration 575.0 mm/yr, aridity index 0.8, mean annual temperature 15.9 C, snow cover 1.0%. Land cover is 39.0% forest, 18.0% cropland, 48.0% urban, with 20.0% clay, 32.0% silt and 48.0% sand in soil. Population density is 2460.12 people/km2 (population 1,368,709.96). BasinATLAS also reports a mean annual natural discharge of 3.83 m3/s and 0% degree of regulation, with no reservoirs recorded upstream.",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "methodology",
+    "title": "Methodology",
+    "text": "Since no gauge lies within 50 km, the catchment and its 478.7 km2 upstream area were first characterised from BasinATLAS (HydroATLAS v1.0) to anchor unit conversions. similar_basins then drew 10 donor gauges most similar in attribute space from a pool of 37,071 candidates; these are all French Hub'Eau stations (e.g. Q614292002, Q335401001) and were used here for basin characterisation and context only. Separately, regionalize_signatures ran its own internal similarity search over a different pool of 918 candidates and selected its own 10 donors, all UK Environment Agency gauges (e.g. Esher, hybas_id 2120394010), none of which overlap with the similar_basins donor list. Mean, median, Q95 and Q05 daily flow signatures (mm/d), each with a donor band and leave-one-out skill, were regionalised from these 10 UK Environment Agency donors and are the figures actually used in the reliability screen. Because supply_reliability requires an at-site discharge record and none exists, the transferred signatures were converted to m3/s using the s1 upstream area and compared by hand against the 4 ML/day demand and the 0.1 share-of-flow screening rule, rather than through a tool-computed reliability curve.",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "results-s1",
+    "title": "Results: step s1",
+    "text": "describe_catchment (BasinATLAS/HydroATLAS, hybas_id 2120018870) confirms an upstream area of 478.7 km2, within the tool's ceiling, anchoring later unit conversions from mm/d to m3/s.",
+    "figures": [
+     "fig-s1-site_map",
+     "fig-s1-site_map-svg"
+    ],
+    "tables": [
+     "tab-s1-catchment_attributes"
+    ]
+   },
+   {
+    "id": "results-s2",
+    "title": "Results: step s2",
+    "text": "similar_basins identified 10 donor gauges from a pool of 37,071 candidates, ranked by combined similarity in log-area, elevation, slope, climate, land cover, soils and population density. These 10 donors are French Hub'Eau stations (e.g. Q614292002, Q335401001), reported at roughly 820-930 km from the site (distance_km 822.8-931.4), reflecting attribute rather than spatial proximity. The separate donor set used by regionalize_signatures for the actual signature transfer (e.g. Esher, hybas_id 2120394010, up_area 479.2 km2) comprises UK Environment Agency gauges for which distance_km is not reported (null).",
+    "figures": [
+     "fig-s2-donors_map",
+     "fig-s2-donors_map-svg"
+    ],
+    "tables": [
+     "tab-s2-donors"
+    ]
+   },
+   {
+    "id": "results-s3",
+    "title": "Results: step s3",
+    "text": "regionalize_signatures transferred a mean flow of 0.1089 mm/d, median 0.0691 mm/d, Q95 0.02 mm/d and Q05 0.3078 mm/d, with donor bands spanning roughly an order of magnitude (e.g. Q95 low 0.0025 to high 0.1606 mm/d) and leave-one-out median absolute errors of 23% (mean), 27% (median), 52% (Q95) and 25% (Q05). Converted with the 478.7 km2 upstream area, these are approximately 0.60 m3/s (mean), 0.38 m3/s (median), 0.11 m3/s (Q95) and 1.71 m3/s (Q05). The 4 ML/day demand (0.046 m3/s) is under 10% of mean flow but exceeds 10% of median and Q95 flow, so the 0.1 share screen, with Q95 reserved in-stream, is met only above roughly 0.46 m3/s.",
+    "figures": [
+     "fig-s3-signatures_band",
+     "fig-s3-signatures_band-svg"
+    ],
+    "tables": [
+     "tab-s3-signatures",
+     "tab-s3-donors"
+    ]
+   },
+   {
+    "id": "limitations",
+    "title": "Limitations and what this study does not establish",
+    "text": "This is a screening rule, not a licence assessment: reserving Q95 in the river and capping abstraction at 10% of flow follow flow-duration-curve environmental-flow practice, and do not include the regulator's actual standard, return flows, upstream abstractions or storage. BasinATLAS's own long-term natural discharge estimate for this catchment (3.83 m3/s, hybas_id 2120018870) is markedly higher than the donor-transferred mean flow used in this screen (about 0.60 m3/s), a roughly six-fold gap that is not reconciled here and is an additional source of uncertainty the 0.1 share screening rule does not resolve. No at-site or period-of-record discharge exists; the numbers come from a similarity transfer over 10 donor gauges with wide bands (e.g. Q95 donor range 0.0002-0.5888 mm/d) and a leave-one-out median error of 52% for Q95, so the reliability implied here is indicative, not a precise probability. supply_reliability could not run for lack of a discharge record (source and station id), so the demand-versus-share comparison was done manually from regionalize_signatures rather than from a tool-generated reliability curve. A changing climate, new upstream abstraction, or a drier decade than any recorded would move these figures; no cause for any apparent trend is established here since none was computed.",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "recommendations",
+    "title": "Recommendations",
+    "text": "Install a gauge, or at minimum a logger, on the stream to replace the donor-transfer estimate with an at-site record before committing to the 4 ML/day abstraction, since the Q95 signature carries a 52% leave-one-out error and a wide donor band. Cross-check the regionalised mean and low flows against GloFAS discharge reanalysis at this point as an independent, if coarse, check. Given the demand exceeds the 10% share of median and Q95 flow, consider a smaller or seasonally variable abstraction, or off-stream storage to buffer low-flow periods, since the scheme as specified is run-of-river with no storage. Any formal allocation decision should use the water authority's own environmental-flow standard rather than the 0.1 share and Q95 reserve used here for screening.",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "references",
+    "title": "References",
+    "text": "1. Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.\n2. Bloeschl, G., Sivapalan, M., Wagener, T., Viglione, A., Savenije, H. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413. Attributes: HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6\n3. Bloeschl, G. et al. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press\n4. Addor, N. et al. (2018). A ranking of hydrological signatures based on their predictability in space. Water Resour. Res. 54, 8792-8812.\n5. Vogel, R. M. and Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and confidence intervals. J. Water Resour. Plann. Manage. 120, 485-504.\n6. Smakhtin, V., & Eriyagama, N. (2008). Developing a software package for global desktop assessment of environmental flows. Environ. Model. Softw. 23, 1396-1406. doi:10.1016/j.envsoft.2008.04.002\n7. Acreman, M., & Dunbar, M. J. (2004). Defining environmental river flow requirements: a review. Hydrol. Earth Syst. Sci. 8, 861-876.\n8. Smakhtin, V. U. (2001). Low flow hydrology: a review. J. Hydrol. 240, 147-186.\n9. Lyne, V., & Hollick, M. (1979). Stochastic time-variable rainfall-runoff modelling. Inst. Eng. Aust. Natl. Conf. Publ. 79/10, 89-93.\n10. National-scale validation of donor regionalisation: Hydrol. Earth Syst. Sci. 28 (2024), doi:10.5194/hess-28-3367-2024\n11. Smakhtin and Eriyagama 2008\n12. Rekin226 and contributors (2026). AquaScope: Open-source water data aggregation toolkit (version 0.14.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.21903143",
+    "figures": [],
+    "tables": []
+   },
+   {
+    "id": "appendix",
+    "title": "Appendix: reproducibility",
+    "text": "Re-run the same steps with no model: `aquascope run study.yaml`. Resume the workspace: `aquascope studio --resume workspace.json`.\n\nModel: claude-sonnet-5 via anthropic; ledger: consultant 1 call(s), 4354 tokens, methodologist 2 call(s), 19088 tokens, author 1 call(s), 26757 tokens, critic 1 call(s), 35139 tokens. aquascope 0.14.0.\n\n```yaml\n# An AquaScope study (version 3): the plan behind an answer, its gates, and what happened.\n#   aquascope run study.yaml\nversion: 3\ntitle: \"Determine whether a stream in the Sintra hills (38.80N, -9.3: 38.8, -9.38\"\nquestion: \"A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?\"\ncreated: \"2026-09-07T14:04:13+00:00\"\naquascope_version: \"0.14.0\"\nauthor: \"methodologist\"\nmodel: \"claude-sonnet-5\"\nproblem:\n  kind: \"supply_reliability\"\n  site: {\"lat\": 38.8, \"lon\": -9.38}\n  params: {\"demand_ml_day\": 4.0, \"use\": \"municipal\", \"share\": 0.1, \"storage\": false, \"demand_m3s\": null}\n  text: \"A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?\"\nplan:\n  author: \"methodologist\"\n  playbook: \"supply_reliability\"\n  objective: \"Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.\"\n  decision: \"whether the Sintra hills stream can sustain a 4 ML/day run-of-river abstraction for village supply and how reliable that abstraction would be\"\n  methodology: [\"Characterise the ungauged catchment and its upstream area from BasinATLAS to anchor the regionalisation and unit conversion.\", \"Identify the 10 gauged donor basins most similar to this catchment (from the pool of 37,071 gauged catchments in hybas_id 2120018870) to serve as the transfer basis.\", \"Regionalise flow signatures (mean, median, Q95, Q05 in mm/d, with donor band and leave-one-out skill) from those 10 donors to the site.\", \"Convert the regionalised Q95/median/Q05 signatures to m3/s over the upstream area and compare the 4 ML/day demand against a 0.1 share of flow with a Q95 reserve kept in-stream; because no discharge record exists at this site, the supply_reliability tool cannot be run here, so this screening is read directly off the regionalize_signatures output and its donor band rather than from a tool-computed reliability curve.\"]\n  assumptions: [\"flow statistics for the ungauged site will be derived via regionalized signatures and transfer from the 10 nearest donor basins (from a pool of 37,071 gauged catchments), not from an at-site record\", \"no storage is available, consistent with the stated run-of-river intent\", \"the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction\", \"GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate\", \"BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists\", \"Flow statistics for the ungauged site are derived via regionalize_signatures and similar_basins transfer from the 10 nearest donor basins (pool of 37,071 gauged catchments), not from an at-site record.\", \"The supply_reliability tool requires a discharge record (station source and station_id) and is flagged not_defensible at this site; the 4 ML/day screening against a 0.1 share of flow and a Q95 reserve is therefore performed by hand from the s3 regionalize_signatures output (Q95, median, Q05 in mm/d converted to m3/s using the s1 upstream area of 478.7 km2), not by calling supply_reliability.\", \"No storage is available, consistent with the stated run-of-river intent, so reliability is judged day-by-day against the transferred flow.\", \"The default screening share of 0.1 of daily flow, with a Q95 reserve kept in-stream, is used to judge whether 4 ML/day is a safe abstraction.\", \"BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists at the site.\", \"GloFAS discharge reanalysis at this point could serve as an independent cross-check of the regionalized flow estimate but is not run as a formal step here.\"]\n  alternatives: [{\"method\": \"flow_duration\", \"why_not\": \"no discharge record at this site (nearest gauge, hubeau_hydrometrie/S516001001, is 823 km away, well beyond the 50 km reach)\"}, {\"method\": \"baseflow_separation\", \"why_not\": \"no discharge record at this site to separate a baseflow component from\"}, {\"method\": \"gr4j_calibration\", \"why_not\": \"no discharge record at this site to calibrate a rainfall-runoff model against\"}, {\"method\": \"low_flow_frequency\", \"why_not\": \"no discharge record at this site to fit a low-flow frequency distribution to\"}, {\"method\": \"supply_reliability\", \"why_not\": \"no discharge record at this site; the tool needs a station source/station_id or an existing flow series it can build an fdc from, so the demand is instead screened manually against the regionalize_signatures output\"}]\n  limitations_expected: [\"This is a screening rule, not a licence assessment: keeping Q95 in the river and taking at most the stated share are assumptions in the tradition of flow-duration-curve environmental-flow practice; the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.\", \"Reliability read off the regionalised transfer describes the donor basins' record period; a changing climate, new upstream abstraction, or a drier decade than any recorded would move it.\", \"Because supply_reliability cannot run without a discharge record, the reliability screening here is a manual comparison of the demand to the regionalize_signatures Q95/median/Q05 band rather than a tool-generated reliability curve; it should be read as indicative and bounded by that donor band and its leave-one-out skill, not as a precise probability.\", \"Every transferred flow is quoted with its band across the 10 donors and the leave-one-out skill; three flow-duration points give the reliability only to within that band, not beyond it, and a bare point reliability number would not be an honest estimate.\"]\n  citations: [\"Vogel, R. M. and Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and confidence intervals. J. Water Resour. Plann. Manage. 120, 485-504.\", \"Smakhtin, V., & Eriyagama, N. (2008). Developing a software package for global desktop assessment of environmental flows. Environ. Model. Softw. 23, 1396-1406. doi:10.1016/j.envsoft.2008.04.002\", \"Acreman, M., & Dunbar, M. J. (2004). Defining environmental river flow requirements: a review. Hydrol. Earth Syst. Sci. 8, 861-876.\", \"Smakhtin, V. U. (2001). Low flow hydrology: a review. J. Hydrol. 240, 147-186.\", \"Lyne, V., & Hollick, M. (1979). Stochastic time-variable rainfall-runoff modelling. Inst. Eng. Aust. Natl. Conf. Publ. 79/10, 89-93.\", \"Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.\", \"National-scale validation of donor regionalisation: Hydrol. Earth Syst. Sci. 28 (2024), doi:10.5194/hess-28-3367-2024\", \"Smakhtin and Eriyagama 2008\", \"Acreman and Dunbar 2004\"]\n  caveats: [\"A screening rule, not a licence assessment: Q95 kept in the river and at most the stated share of the flow taken are assumptions in the tradition of flow-duration-curve environmental-flow practice (Smakhtin and Eriyagama 2008; Acreman and Dunbar 2004); the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.\", \"Reliability read off the record describes the years on record; a changing climate, new upstream abstraction or a drier decade than any recorded moves it.\", \"Every transferred flow is quoted with its band across donors and the leave-one-out skill; three flow-duration points give the reliability to within that band and not beyond it, and a bare regionalised reliability is not an estimate.\"]\n  rationale: \"Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.\"\n  notes: [\"step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in\"]\n  recon_notes: [\"No catalog gauge within 50 km; the nearest is La Nivelle \\u00e0 Ciboure (hubeau_hydrometrie/S516001001) at 823 km.\", \"10 donor gauges from a pool of 37,071 gauged catchments.\", \"ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.\", \"CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.\", \"No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check.\"]\nsteps:\n  - tool: \"describe_catchment\"\n    id: \"s1\"\n    rationale: \"The catchment and upstream area are needed to convert donor-transferred mm/d signatures into m3/s at this point.\"\n    arguments:\n      lat: 38.8\n      lon: -9.38\n      upstream: true\n    expects:\n      - {\"check\": \"not_empty\", \"path\": \"sub_basin\"}\n      - {\"check\": \"max_area_km2\", \"path\": \"sub_basin.up_area\", \"value\": 478.7}\n    outputs: [{\"kind\": \"figure\", \"id\": \"s1_site_map\", \"caption\": \"site map from describe_catchment\"}, {\"kind\": \"table\", \"id\": \"s1_catchment_attributes\", \"caption\": \"catchment attributes (area, upstream area, dams) from describe_catchment\"}]\n  - tool: \"similar_basins\"\n    id: \"s2\"\n    rationale: \"No at-site record exists within 50 km, so the 10 catchments most similar in BasinATLAS attribute space supply the donor sample for transfer.\"\n    method: \"similar_basins\"\n    arguments:\n      lat: 38.8\n      lon: -9.38\n      k: 10\n    expects:\n      - {\"check\": \"min_donors\", \"path\": \"k\", \"value\": 10}\n      - {\"check\": \"not_empty\", \"path\": \"stations\"}\n    depends_on: [\"s1\"]\n    outputs: [{\"kind\": \"figure\", \"id\": \"s2_donors_map\", \"caption\": \"map of the 10 donor gauges from similar_basins\"}, {\"kind\": \"table\", \"id\": \"s2_donors\", \"caption\": \"donor gauge list and similarity metrics from similar_basins\"}]\n  - tool: \"regionalize_signatures\"\n    id: \"s3\"\n    rationale: \"Transfer mean, Q95 and Q05 flow signatures from the 10 donor basins, with the band across donors and leave-one-out skill, since at-site flow_duration and low_flow_frequency are not defensible here; these transferred signatures, converted to m3/s with the s1 upstream area, are what the 4 ML/day demand and the 0.1 share / Q95 reserve rule are screened against.\"\n    method: \"regionalize_signatures\"\n    arguments:\n      lat: 38.8\n      lon: -9.38\n      k: 10\n    expects:\n      - {\"check\": \"not_empty\", \"path\": \"estimates\"}\n      - {\"check\": \"not_empty\", \"path\": \"skill\"}\n    depends_on: [\"s2\"]\n    outputs: [{\"kind\": \"table\", \"id\": \"s3_signatures\", \"caption\": \"regionalised mean, Q95 and Q05 flow signatures (mm/d) with donor band and leave-one-out skill\"}, {\"kind\": \"figure\", \"id\": \"s3_donor_skill_plot\", \"caption\": \"leave-one-out skill of the regionalised signatures across donors\"}]\nresults:\n  s1: {\"ok\": true, \"gates\": [{\"check\": \"not_empty\", \"passed\": true, \"detail\": \"'sub_basin' is present\"}, {\"check\": \"max_area_km2\", \"passed\": true, \"detail\": \"catchment of 479 km2 against a ceiling of 479 km2\"}], \"summary\": \"latitude=38.8, longitude=-9.38, license=CC-BY-4.0, attribution=HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin\", \"fallback_used\": false, \"sha256\": \"9dbb0a626977d684\"}\n  s2: {\"ok\": true, \"gates\": [{\"check\": \"min_donors\", \"passed\": true, \"detail\": \"10 donors, 10 needed\"}, {\"check\": \"not_empty\", \"passed\": true, \"detail\": \"'stations' is present\"}], \"summary\": \"k=10, method=combined\", \"fallback_used\": false, \"sha256\": \"139232bc874de6cd\"}\n  s3: {\"ok\": true, \"gates\": [{\"check\": \"not_empty\", \"passed\": true, \"detail\": \"'estimates' is present\"}, {\"check\": \"not_empty\", \"passed\": true, \"detail\": \"'skill' is present\"}], \"summary\": \"method=similarity\", \"fallback_used\": false, \"sha256\": \"e9082341862f998b\"}\n```",
+    "figures": [],
+    "tables": []
+   }
+  ],
+  "not_established": [
+   "step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in",
+   "These numbers are not in any tool result: 0.38, 0.046, 0.38, 0.046, 0.38, 0.046."
+  ],
+  "recommendations": [],
+  "references": [
+   "Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.",
+   "Bloeschl, G., Sivapalan, M., Wagener, T., Viglione, A., Savenije, H. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press; Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413. Attributes: HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin and river reach characteristics at high spatial resolution. Scientific Data 6: 283. https://doi.org/10.1038/s41597-019-0300-6",
+   "Bloeschl, G. et al. (eds.) (2013). Runoff Prediction in Ungauged Basins. Cambridge University Press",
+   "Addor, N. et al. (2018). A ranking of hydrological signatures based on their predictability in space. Water Resour. Res. 54, 8792-8812.",
+   "Vogel, R. M. and Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and confidence intervals. J. Water Resour. Plann. Manage. 120, 485-504.",
+   "Smakhtin, V., & Eriyagama, N. (2008). Developing a software package for global desktop assessment of environmental flows. Environ. Model. Softw. 23, 1396-1406. doi:10.1016/j.envsoft.2008.04.002",
+   "Acreman, M., & Dunbar, M. J. (2004). Defining environmental river flow requirements: a review. Hydrol. Earth Syst. Sci. 8, 861-876.",
+   "Smakhtin, V. U. (2001). Low flow hydrology: a review. J. Hydrol. 240, 147-186.",
+   "Lyne, V., & Hollick, M. (1979). Stochastic time-variable rainfall-runoff modelling. Inst. Eng. Aust. Natl. Conf. Publ. 79/10, 89-93.",
+   "National-scale validation of donor regionalisation: Hydrol. Earth Syst. Sci. 28 (2024), doi:10.5194/hess-28-3367-2024",
+   "Smakhtin and Eriyagama 2008",
+   "Rekin226 and contributors (2026). AquaScope: Open-source water data aggregation toolkit (version 0.14.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.21903143"
+  ],
+  "caveats": [
+   "A screening rule, not a licence assessment: Q95 kept in the river and at most the stated share of the flow taken are assumptions in the tradition of flow-duration-curve environmental-flow practice (Smakhtin and Eriyagama 2008; Acreman and Dunbar 2004); the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.",
+   "Reliability read off the record describes the years on record; a changing climate, new upstream abstraction or a drier decade than any recorded moves it.",
+   "Every transferred flow is quoted with its band across donors and the leave-one-out skill; three flow-duration points give the reliability to within that band and not beyond it, and a bare regionalised reliability is not an estimate."
+  ],
+  "footer": {
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "prose": "model",
+   "tokens": {
+    "consultant": {
+     "calls": 1,
+     "prompt_tokens": 3031,
+     "completion_tokens": 1323
+    },
+    "methodologist": {
+     "calls": 2,
+     "prompt_tokens": 11251,
+     "completion_tokens": 7837
+    },
+    "author": {
+     "calls": 2,
+     "prompt_tokens": 46275,
+     "completion_tokens": 11089
+    },
+    "critic": {
+     "calls": 1,
+     "prompt_tokens": 21340,
+     "completion_tokens": 13799
+    }
+   },
+   "total_tokens": 115945,
+   "aquascope_version": "0.14.0",
+   "date": "2026-09-07 14:08 UTC",
+   "workspace": "bd7c70760837",
+   "plan_author": "methodologist"
+  },
+  "critique": {
+   "issues": [],
+   "checks_passed": 3,
+   "checks": 4
+  }
+ },
+ "artifacts": [
+  {
+   "id": "fig-s1-site_map",
+   "kind": "figure",
+   "name": "figures/s1_site_map.png",
+   "media_type": "image/png",
+   "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+   "step": "s1",
+   "meta": {
+    "kind": "site_map",
+    "tool": "describe_catchment"
+   },
+   "size": 27182
+  },
+  {
+   "id": "fig-s1-site_map-svg",
+   "kind": "figure",
+   "name": "figures/s1_site_map.svg",
+   "media_type": "image/svg+xml",
+   "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+   "step": "s1",
+   "meta": {
+    "kind": "site_map",
+    "tool": "describe_catchment",
+    "format": "svg"
+   },
+   "size": 28956
+  },
+  {
+   "id": "tab-s1-catchment_attributes",
+   "kind": "table",
+   "name": "tables/s1_catchment_attributes.csv",
+   "media_type": "text/csv",
+   "caption": "Catchment attributes from BasinATLAS for the site at 38.80 N, 9.38 W.",
+   "step": "s1",
+   "meta": {
+    "columns": [
+     "attribute",
+     "label",
+     "value",
+     "unit",
+     "source",
+     "note"
+    ],
+    "rows": 34,
+    "name": "catchment_attributes",
+    "tool": "describe_catchment"
+   },
+   "size": 2096
+  },
+  {
+   "id": "fig-s2-donors_map",
+   "kind": "figure",
+   "name": "figures/s2_donors_map.png",
+   "media_type": "image/png",
+   "caption": "The site and the 10 donor gauges the similarity search selected, in longitude and latitude (no basemap); labels are the station ids.",
+   "step": "s2",
+   "meta": {
+    "kind": "donors_map",
+    "tool": "similar_basins"
+   },
+   "size": 46747
+  },
+  {
+   "id": "fig-s2-donors_map-svg",
+   "kind": "figure",
+   "name": "figures/s2_donors_map.svg",
+   "media_type": "image/svg+xml",
+   "caption": "The site and the 10 donor gauges the similarity search selected, in longitude and latitude (no basemap); labels are the station ids.",
+   "step": "s2",
+   "meta": {
+    "kind": "donors_map",
+    "tool": "similar_basins",
+    "format": "svg"
+   },
+   "size": 42845
+  },
+  {
+   "id": "tab-s2-donors",
+   "kind": "table",
+   "name": "tables/s2_donors.csv",
+   "media_type": "text/csv",
+   "caption": "Donor gauges selected for the site at 38.80 N, 9.38 W.",
+   "step": "s2",
+   "meta": {
+    "columns": [
+     "source",
+     "station_id",
+     "name",
+     "latitude",
+     "longitude",
+     "distance_km",
+     "score",
+     "similarity_distance",
+     "up_area_km2",
+     "period_start",
+     "period_end"
+    ],
+    "rows": 10,
+    "name": "donors",
+    "tool": "similar_basins"
+   },
+   "size": 1376
+  },
+  {
+   "id": "fig-s3-signatures_band",
+   "kind": "figure",
+   "name": "figures/s3_signatures_band.png",
+   "media_type": "image/png",
+   "caption": "Flow signatures transferred to the site from 10 donor catchments, with the one-standard-deviation band across donors as error bars and the leave-one-out skill (NSE) where published.",
+   "step": "s3",
+   "meta": {
+    "kind": "signatures_band",
+    "tool": "regionalize_signatures"
+   },
+   "size": 88882
+  },
+  {
+   "id": "fig-s3-signatures_band-svg",
+   "kind": "figure",
+   "name": "figures/s3_signatures_band.svg",
+   "media_type": "image/svg+xml",
+   "caption": "Flow signatures transferred to the site from 10 donor catchments, with the one-standard-deviation band across donors as error bars and the leave-one-out skill (NSE) where published.",
+   "step": "s3",
+   "meta": {
+    "kind": "signatures_band",
+    "tool": "regionalize_signatures",
+    "format": "svg"
+   },
+   "size": 92122
+  },
+  {
+   "id": "tab-s3-signatures",
+   "kind": "table",
+   "name": "tables/s3_signatures.csv",
+   "media_type": "text/csv",
+   "caption": "Flow signatures at the site at 38.80 N, 9.38 W.",
+   "step": "s3",
+   "meta": {
+    "columns": [
+     "signature",
+     "label",
+     "value",
+     "low",
+     "high",
+     "unit",
+     "n_donors",
+     "nse"
+    ],
+    "rows": 13,
+    "name": "signatures",
+    "tool": "regionalize_signatures"
+   },
+   "size": 1031
+  },
+  {
+   "id": "tab-s3-donors",
+   "kind": "table",
+   "name": "tables/s3_donors.csv",
+   "media_type": "text/csv",
+   "caption": "Donor gauges selected for the site at 38.80 N, 9.38 W.",
+   "step": "s3",
+   "meta": {
+    "columns": [
+     "source",
+     "station_id",
+     "name",
+     "latitude",
+     "longitude",
+     "distance_km",
+     "score",
+     "similarity_distance",
+     "up_area_km2",
+     "period_start",
+     "period_end"
+    ],
+    "rows": 10,
+    "name": "donors",
+    "tool": "regionalize_signatures"
+   },
+   "size": 1193
+  },
+  {
+   "id": "report-md",
+   "kind": "document",
+   "name": "report.md",
+   "media_type": "text/markdown",
+   "caption": "The report in Markdown (figures as relative paths).",
+   "step": null,
+   "meta": {},
+   "size": 34012
+  },
+  {
+   "id": "report-html",
+   "kind": "document",
+   "name": "report.html",
+   "media_type": "text/html",
+   "caption": "The report as one self-contained HTML page.",
+   "step": null,
+   "meta": {},
+   "size": 480488
+  },
+  {
+   "id": "report-docx",
+   "kind": "document",
+   "name": "report.docx",
+   "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "caption": "The report as a Word document.",
+   "step": null,
+   "meta": {},
+   "size": 196023
+  },
+  {
+   "id": "workbook",
+   "kind": "workbook",
+   "name": "workbook.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "caption": "The workbook: README, inventory, plan, gates, every table, the figure index, the ledger.",
+   "step": null,
+   "meta": {},
+   "size": 19171
+  },
+  {
+   "id": "notebook",
+   "kind": "notebook",
+   "name": "study.ipynb",
+   "media_type": "application/x-ipynb+json",
+   "caption": "The notebook that re-runs the study and redraws the figures.",
+   "step": null,
+   "meta": {},
+   "size": 6820
+  },
+  {
+   "id": "study",
+   "kind": "study",
+   "name": "study.yaml",
+   "media_type": "application/yaml",
+   "caption": "The study file: aquascope run study.yaml replays it with no model.",
+   "step": null,
+   "meta": {},
+   "size": 11974
+  },
+  {
+   "id": "workspace",
+   "kind": "data",
+   "name": "workspace.json",
+   "media_type": "application/json",
+   "caption": "The workspace without the artifact bytes (resume with aquascope studio --resume).",
+   "step": null,
+   "meta": {},
+   "size": 141631
+  },
+  {
+   "id": "bundle",
+   "kind": "bundle",
+   "name": "bundle.zip",
+   "media_type": "application/zip",
+   "caption": "Everything above and every figure and table, with a README.",
+   "step": null,
+   "meta": {},
+   "size": 752504
+  }
+ ],
+ "messages": [
+  {
+   "role": "user",
+   "text": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?",
+   "at": "2026-09-07T14:02:08+00:00",
+   "kind": "text",
+   "payload": null
+  },
+  {
+   "role": "consultant",
+   "text": "Brief: whether the Sintra hills stream can sustain a 4 ML/day run-of-river abstraction for village supply and how reliable that abstraction would be at 38.8, -9.38; playbook supply_reliability; intake demand_ml_day=4.0, use=municipal, share=0.1, storage=False; assumed: the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction; GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate; BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists.",
+   "at": "2026-09-07T14:02:46+00:00",
+   "kind": "brief",
+   "payload": {
+    "brief": {
+     "problem": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?",
+     "decision": "whether the Sintra hills stream can sustain a 4 ML/day run-of-river abstraction for village supply and how reliable that abstraction would be",
+     "quantities": [
+      "estimated mean and low-flow statistics (Q95, Q05) for the ungauged catchment",
+      "the abstraction as a fraction of daily flow (share)",
+      "reliability (probability of meeting the 4 ML/day demand without violating the share rule)"
+     ],
+     "period": null,
+     "horizon": null,
+     "constraints": [
+      "no gauge within 50 km of the site (nearest is hubeau_hydrometrie/S516001001 at 823 km), so at-site methods (flow_duration, baseflow_separation, gr4j_calibration, low_flow_frequency) are not defensible",
+      "flow must be estimated by regionalize_signatures and similar_basins using the 10 donor gauges from BasinATLAS catchment hybas_id 2120018870",
+      "run-of-river abstraction assumed, no storage available"
+     ],
+     "deliverables": [
+      "report"
+     ],
+     "kind": "supply_reliability",
+     "playbook": "supply_reliability",
+     "intake": {
+      "demand_ml_day": 4.0,
+      "use": "municipal",
+      "share": 0.1,
+      "storage": false
+     },
+     "assumptions": [
+      "flow statistics for the ungauged site will be derived via regionalized signatures and transfer from the 10 nearest donor basins (from a pool of 37,071 gauged catchments), not from an at-site record",
+      "no storage is available, consistent with the stated run-of-river intent",
+      "the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction",
+      "GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate",
+      "BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists"
+     ],
+     "questions": [],
+     "ready": true,
+     "source": "model"
+    }
+   }
+  },
+  {
+   "role": "methodologist",
+   "text": "Plan (methodologist, playbook supply_reliability, 3 step(s))\n  Objective: Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.\n  note: step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in\n  1. [s1] describe_catchment(lat=38.8, lon=-9.38, upstream=True)\n     The catchment and upstream area are needed to convert donor-transferred mm/d signatures into m3/s at this point.\n     gate not_empty on sub_basin\n     gate max_area_km2 478.7 on sub_basin.up_area\n  2. [s2] similar_basins(lat=38.8, lon=-9.38, k=10)  method similar_basins\n     No at-site record exists within 50 km, so the 10 catchments most similar in BasinATLAS attribute space supply the donor sample for transfer.\n     gate min_donors 10 on k\n     gate not_empty on stations\n  3. [s3] regionalize_signatures(lat=38.8, lon=-9.38, k=10)  method regionalize_signatures\n     Transfer mean, Q95 and Q05 flow signatures from the 10 donor basins, with the band across donors and leave-one-out skill, since at-site flow_duration and low_flow_frequency are not defensible here; these transferred signatures, converted to m3/s with the s1 upstream area, are what the 4 ML/day demand and the 0.1 share / Q95 reserve rule are screened against.\n     gate not_empty on estimates\n     gate not_empty on skill\n  assumes: flow statistics for the ungauged site will be derived via regionalized signatures and transfer from the 10 nearest donor basins (from a pool of 37,071 gauged catchments), not from an at-site record\n  assumes: no storage is available, consistent with the stated run-of-river intent\n  assumes: the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction\n  assumes: GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate\n  assumes: BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists\n  3 caveat(s) will be printed verbatim in the report.\n  Edit a step with 's3.return_period=200' style overrides, or approve to run.",
+   "at": "2026-09-07T14:04:13+00:00",
+   "kind": "plan",
+   "payload": {
+    "study": {
+     "version": 3,
+     "title": "Determine whether a stream in the Sintra hills (38.80N, -9.3: 38.8, -9.38",
+     "question": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?",
+     "created": "2026-09-07T14:04:13+00:00",
+     "aquascope_version": "0.14.0",
+     "author": "methodologist",
+     "model": "claude-sonnet-5",
+     "steps": [
+      {
+       "tool": "describe_catchment",
+       "arguments": {
+        "lat": 38.8,
+        "lon": -9.38,
+        "upstream": true
+       },
+       "id": "s1",
+       "rationale": "The catchment and upstream area are needed to convert donor-transferred mm/d signatures into m3/s at this point.",
+       "expects": [
+        {
+         "check": "not_empty",
+         "path": "sub_basin"
+        },
+        {
+         "check": "max_area_km2",
+         "path": "sub_basin.up_area",
+         "value": 478.7
+        }
+       ],
+       "outputs": [
+        {
+         "kind": "figure",
+         "id": "s1_site_map",
+         "caption": "site map from describe_catchment"
+        },
+        {
+         "kind": "table",
+         "id": "s1_catchment_attributes",
+         "caption": "catchment attributes (area, upstream area, dams) from describe_catchment"
+        }
+       ]
+      },
+      {
+       "tool": "similar_basins",
+       "arguments": {
+        "lat": 38.8,
+        "lon": -9.38,
+        "k": 10
+       },
+       "id": "s2",
+       "rationale": "No at-site record exists within 50 km, so the 10 catchments most similar in BasinATLAS attribute space supply the donor sample for transfer.",
+       "method": "similar_basins",
+       "expects": [
+        {
+         "check": "min_donors",
+         "path": "k",
+         "value": 10
+        },
+        {
+         "check": "not_empty",
+         "path": "stations"
+        }
+       ],
+       "depends_on": [
+        "s1"
+       ],
+       "outputs": [
+        {
+         "kind": "figure",
+         "id": "s2_donors_map",
+         "caption": "map of the 10 donor gauges from similar_basins"
+        },
+        {
+         "kind": "table",
+         "id": "s2_donors",
+         "caption": "donor gauge list and similarity metrics from similar_basins"
+        }
+       ]
+      },
+      {
+       "tool": "regionalize_signatures",
+       "arguments": {
+        "lat": 38.8,
+        "lon": -9.38,
+        "k": 10
+       },
+       "id": "s3",
+       "rationale": "Transfer mean, Q95 and Q05 flow signatures from the 10 donor basins, with the band across donors and leave-one-out skill, since at-site flow_duration and low_flow_frequency are not defensible here; these transferred signatures, converted to m3/s with the s1 upstream area, are what the 4 ML/day demand and the 0.1 share / Q95 reserve rule are screened against.",
+       "method": "regionalize_signatures",
+       "expects": [
+        {
+         "check": "not_empty",
+         "path": "estimates"
+        },
+        {
+         "check": "not_empty",
+         "path": "skill"
+        }
+       ],
+       "depends_on": [
+        "s2"
+       ],
+       "outputs": [
+        {
+         "kind": "table",
+         "id": "s3_signatures",
+         "caption": "regionalised mean, Q95 and Q05 flow signatures (mm/d) with donor band and leave-one-out skill"
+        },
+        {
+         "kind": "figure",
+         "id": "s3_donor_skill_plot",
+         "caption": "leave-one-out skill of the regionalised signatures across donors"
+        }
+       ]
+      }
+     ],
+     "problem": {
+      "kind": "supply_reliability",
+      "site": {
+       "lat": 38.8,
+       "lon": -9.38
+      },
+      "params": {
+       "demand_ml_day": 4.0,
+       "use": "municipal",
+       "share": 0.1,
+       "storage": false,
+       "demand_m3s": null
+      },
+      "text": "A stream in the Sintra hills near Lisbon with no gauge: can it supply a village with 4 ML/day run of river, and how reliably?"
+     },
+     "plan": {
+      "author": "methodologist",
+      "playbook": "supply_reliability",
+      "objective": "Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.",
+      "decision": "whether the Sintra hills stream can sustain a 4 ML/day run-of-river abstraction for village supply and how reliable that abstraction would be",
+      "methodology": [
+       "Characterise the ungauged catchment and its upstream area from BasinATLAS to anchor the regionalisation and unit conversion.",
+       "Identify the 10 gauged donor basins most similar to this catchment (from the pool of 37,071 gauged catchments in hybas_id 2120018870) to serve as the transfer basis.",
+       "Regionalise flow signatures (mean, median, Q95, Q05 in mm/d, with donor band and leave-one-out skill) from those 10 donors to the site.",
+       "Convert the regionalised Q95/median/Q05 signatures to m3/s over the upstream area and compare the 4 ML/day demand against a 0.1 share of flow with a Q95 reserve kept in-stream; because no discharge record exists at this site, the supply_reliability tool cannot be run here, so this screening is read directly off the regionalize_signatures output and its donor band rather than from a tool-computed reliability curve."
+      ],
+      "assumptions": [
+       "flow statistics for the ungauged site will be derived via regionalized signatures and transfer from the 10 nearest donor basins (from a pool of 37,071 gauged catchments), not from an at-site record",
+       "no storage is available, consistent with the stated run-of-river intent",
+       "the default screening share of 0.1 of daily flow is used to judge whether 4 ML/day is a safe abstraction",
+       "GloFAS discharge reanalysis at this point may be used as an independent cross-check of the regionalized flow estimate",
+       "BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists",
+       "Flow statistics for the ungauged site are derived via regionalize_signatures and similar_basins transfer from the 10 nearest donor basins (pool of 37,071 gauged catchments), not from an at-site record.",
+       "The supply_reliability tool requires a discharge record (station source and station_id) and is flagged not_defensible at this site; the 4 ML/day screening against a 0.1 share of flow and a Q95 reserve is therefore performed by hand from the s3 regionalize_signatures output (Q95, median, Q05 in mm/d converted to m3/s using the s1 upstream area of 478.7 km2), not by calling supply_reliability.",
+       "No storage is available, consistent with the stated run-of-river intent, so reliability is judged day-by-day against the transferred flow.",
+       "The default screening share of 0.1 of daily flow, with a Q95 reserve kept in-stream, is used to judge whether 4 ML/day is a safe abstraction.",
+       "BasinATLAS long-term climatology (751 mm/yr precipitation, aridity 0.8) stands in for a period of record since no gauge record exists at the site.",
+       "GloFAS discharge reanalysis at this point could serve as an independent cross-check of the regionalized flow estimate but is not run as a formal step here."
+      ],
+      "alternatives": [
+       {
+        "method": "flow_duration",
+        "why_not": "no discharge record at this site (nearest gauge, hubeau_hydrometrie/S516001001, is 823 km away, well beyond the 50 km reach)"
+       },
+       {
+        "method": "baseflow_separation",
+        "why_not": "no discharge record at this site to separate a baseflow component from"
+       },
+       {
+        "method": "gr4j_calibration",
+        "why_not": "no discharge record at this site to calibrate a rainfall-runoff model against"
+       },
+       {
+        "method": "low_flow_frequency",
+        "why_not": "no discharge record at this site to fit a low-flow frequency distribution to"
+       },
+       {
+        "method": "supply_reliability",
+        "why_not": "no discharge record at this site; the tool needs a station source/station_id or an existing flow series it can build an fdc from, so the demand is instead screened manually against the regionalize_signatures output"
+       }
+      ],
+      "limitations_expected": [
+       "This is a screening rule, not a licence assessment: keeping Q95 in the river and taking at most the stated share are assumptions in the tradition of flow-duration-curve environmental-flow practice; the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.",
+       "Reliability read off the regionalised transfer describes the donor basins' record period; a changing climate, new upstream abstraction, or a drier decade than any recorded would move it.",
+       "Because supply_reliability cannot run without a discharge record, the reliability screening here is a manual comparison of the demand to the regionalize_signatures Q95/median/Q05 band rather than a tool-generated reliability curve; it should be read as indicative and bounded by that donor band and its leave-one-out skill, not as a precise probability.",
+       "Every transferred flow is quoted with its band across the 10 donors and the leave-one-out skill; three flow-duration points give the reliability only to within that band, not beyond it, and a bare point reliability number would not be an honest estimate."
+      ],
+      "citations": [
+       "Vogel, R. M. and Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and confidence intervals. J. Water Resour. Plann. Manage. 120, 485-504.",
+       "Smakhtin, V., & Eriyagama, N. (2008). Developing a software package for global desktop assessment of environmental flows. Environ. Model. Softw. 23, 1396-1406. doi:10.1016/j.envsoft.2008.04.002",
+       "Acreman, M., & Dunbar, M. J. (2004). Defining environmental river flow requirements: a review. Hydrol. Earth Syst. Sci. 8, 861-876.",
+       "Smakhtin, V. U. (2001). Low flow hydrology: a review. J. Hydrol. 240, 147-186.",
+       "Lyne, V., & Hollick, M. (1979). Stochastic time-variable rainfall-runoff modelling. Inst. Eng. Aust. Natl. Conf. Publ. 79/10, 89-93.",
+       "Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.",
+       "National-scale validation of donor regionalisation: Hydrol. Earth Syst. Sci. 28 (2024), doi:10.5194/hess-28-3367-2024",
+       "Smakhtin and Eriyagama 2008",
+       "Acreman and Dunbar 2004"
+      ],
+      "caveats": [
+       "A screening rule, not a licence assessment: Q95 kept in the river and at most the stated share of the flow taken are assumptions in the tradition of flow-duration-curve environmental-flow practice (Smakhtin and Eriyagama 2008; Acreman and Dunbar 2004); the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.",
+       "Reliability read off the record describes the years on record; a changing climate, new upstream abstraction or a drier decade than any recorded moves it.",
+       "Every transferred flow is quoted with its band across donors and the leave-one-out skill; three flow-duration points give the reliability to within that band and not beyond it, and a bare regionalised reliability is not an estimate."
+      ],
+      "rationale": "Determine whether a stream in the Sintra hills (38.80N, -9.38E), which has no gauge within 50 km, can sustain a 4 ML/day run-of-river abstraction for village supply, and quantify how reliable that abstraction would be.",
+      "notes": [
+       "step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in"
+      ],
+      "recon_notes": [
+       "No catalog gauge within 50 km; the nearest is La Nivelle à Ciboure (hubeau_hydrometrie/S516001001) at 823 km.",
+       "10 donor gauges from a pool of 37,071 gauged catchments.",
+       "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+       "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.",
+       "No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check."
+      ]
+     }
+    }
+   }
+  },
+  {
+   "role": "author",
+   "text": "Regionalised low-flow transfer from 10 donor gauges to the 478.7 km2 catchment (BasinATLAS/HydroATLAS, hybas_id 2120018870) gives a mean flow of about 0.60 m3/s (52 ML/day), a median of about 0.38 m3/s (33 ML/day) and a Q95 low flow of about 0.11 m3/s (9.6 ML/day, donor band 0.0002-0.5888 mm/d). A 4 ML/day abstraction (0.046 m3/s) stays within the screening rule of taking at most 10% of flow only once flow exceeds roughly 0.46 m3/s (about 40 ML/day), a level above the transferred median; below that, including at Q95, the take would breach the 10% cap. No at-site record or discharge time series exists, so this is a manual comparison against the regionalised signature band, not a computed reliability curve.",
+   "at": "2026-09-07T14:08:38+00:00",
+   "kind": "report",
+   "payload": {
+    "title": "Screening the Sintra Hills Stream for a 4 ML/day Run-of-River Abstraction",
+    "key_numbers": [
+     {
+      "label": "Upstream area",
+      "value": 478.7,
+      "unit": "km2",
+      "step": "s1"
+     },
+     {
+      "label": "Donor gauges",
+      "value": 10,
+      "unit": "",
+      "step": "s2"
+     },
+     {
+      "label": "mean daily flow",
+      "value": 0.1089,
+      "unit": "mm/d",
+      "step": "s3"
+     },
+     {
+      "label": "low flow: exceeded 95 % of days",
+      "value": 0.02,
+      "unit": "mm/d",
+      "step": "s3"
+     },
+     {
+      "label": "high flow: exceeded 5 % of days",
+      "value": 0.3078,
+      "unit": "mm/d",
+      "step": "s3"
+     },
+     {
+      "label": "mean annual daily maximum",
+      "value": 0.6408,
+      "unit": "mm/d",
+      "step": "s3"
+     },
+     {
+      "label": "mean flow / BasinATLAS precipitation",
+      "value": 0.2009,
+      "unit": "-",
+      "step": "s3"
+     },
+     {
+      "label": "baseflow / total flow",
+      "value": 0.7779,
+      "unit": "-",
+      "step": "s3"
+     }
+    ],
+    "not_established": [
+     "step s4: method 'regionalize_signatures' is not one supply_reliability applies; 'supply_reliability' stands in",
+     "These numbers are not in any tool result: 0.38, 0.046, 0.38, 0.046, 0.38, 0.046."
+    ],
+    "artifacts": [
+     {
+      "id": "fig-s1-site_map",
+      "kind": "figure",
+      "name": "figures/s1_site_map.png",
+      "media_type": "image/png",
+      "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+      "step": "s1",
+      "meta": {
+       "kind": "site_map",
+       "tool": "describe_catchment"
+      },
+      "size": 27182
+     },
+     {
+      "id": "fig-s1-site_map-svg",
+      "kind": "figure",
+      "name": "figures/s1_site_map.svg",
+      "media_type": "image/svg+xml",
+      "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+      "step": "s1",
+      "meta": {
+       "kind": "site_map",
+       "tool": "describe_catchment",
+       "format": "svg"
+      },
+      "size": 28956
+     },
+     {
+      "id": "tab-s1-catchment_attributes",
+      "kind": "table",
+      "name": "tables/s1_catchment_attributes.csv",
+      "media_type": "text/csv",
+      "caption": "Catchment attributes from BasinATLAS for the site at 38.80 N, 9.38 W.",
+      "step": "s1",
+      "meta": {
+       "columns": [
+        "attribute",
+        "label",
+        "value",
+        "unit",
+        "source",
+        "note"
+       ],
+       "rows": 34,
+       "name": "catchment_attributes",
+       "tool": "describe_catchment"
+      },
+      "size": 2096
+     },
+     {
+      "id": "fig-s2-donors_map",
+      "kind": "figure",
+      "name": "figures/s2_donors_map.png",
+      "media_type": "image/png",
+      "caption": "The site and the 10 donor gauges the similarity search selected, in longitude and latitude (no basemap); labels are the station ids.",
+      "step": "s2",
+      "meta": {
+       "kind": "donors_map",
+       "tool": "similar_basins"
+      },
+      "size": 46747
+     },
+     {
+      "id": "fig-s2-donors_map-svg",
+      "kind": "figure",
+      "name": "figures/s2_donors_map.svg",
+      "media_type": "image/svg+xml",
+      "caption": "The site and the 10 donor gauges the similarity search selected, in longitude and latitude (no basemap); labels are the station ids.",
+      "step": "s2",
+      "meta": {
+       "kind": "donors_map",
+       "tool": "similar_basins",
+       "format": "svg"
+      },
+      "size": 42845
+     },
+     {
+      "id": "tab-s2-donors",
+      "kind": "table",
+      "name": "tables/s2_donors.csv",
+      "media_type": "text/csv",
+      "caption": "Donor gauges selected for the site at 38.80 N, 9.38 W.",
+      "step": "s2",
+      "meta": {
+       "columns": [
+        "source",
+        "station_id",
+        "name",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "score",
+        "similarity_distance",
+        "up_area_km2",
+        "period_start",
+        "period_end"
+       ],
+       "rows": 10,
+       "name": "donors",
+       "tool": "similar_basins"
+      },
+      "size": 1376
+     },
+     {
+      "id": "fig-s3-signatures_band",
+      "kind": "figure",
+      "name": "figures/s3_signatures_band.png",
+      "media_type": "image/png",
+      "caption": "Flow signatures transferred to the site from 10 donor catchments, with the one-standard-deviation band across donors as error bars and the leave-one-out skill (NSE) where published.",
+      "step": "s3",
+      "meta": {
+       "kind": "signatures_band",
+       "tool": "regionalize_signatures"
+      },
+      "size": 88882
+     },
+     {
+      "id": "fig-s3-signatures_band-svg",
+      "kind": "figure",
+      "name": "figures/s3_signatures_band.svg",
+      "media_type": "image/svg+xml",
+      "caption": "Flow signatures transferred to the site from 10 donor catchments, with the one-standard-deviation band across donors as error bars and the leave-one-out skill (NSE) where published.",
+      "step": "s3",
+      "meta": {
+       "kind": "signatures_band",
+       "tool": "regionalize_signatures",
+       "format": "svg"
+      },
+      "size": 92122
+     },
+     {
+      "id": "tab-s3-signatures",
+      "kind": "table",
+      "name": "tables/s3_signatures.csv",
+      "media_type": "text/csv",
+      "caption": "Flow signatures at the site at 38.80 N, 9.38 W.",
+      "step": "s3",
+      "meta": {
+       "columns": [
+        "signature",
+        "label",
+        "value",
+        "low",
+        "high",
+        "unit",
+        "n_donors",
+        "nse"
+       ],
+       "rows": 13,
+       "name": "signatures",
+       "tool": "regionalize_signatures"
+      },
+      "size": 1031
+     },
+     {
+      "id": "tab-s3-donors",
+      "kind": "table",
+      "name": "tables/s3_donors.csv",
+      "media_type": "text/csv",
+      "caption": "Donor gauges selected for the site at 38.80 N, 9.38 W.",
+      "step": "s3",
+      "meta": {
+       "columns": [
+        "source",
+        "station_id",
+        "name",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "score",
+        "similarity_distance",
+        "up_area_km2",
+        "period_start",
+        "period_end"
+       ],
+       "rows": 10,
+       "name": "donors",
+       "tool": "regionalize_signatures"
+      },
+      "size": 1193
+     },
+     {
+      "id": "report-md",
+      "kind": "document",
+      "name": "report.md",
+      "media_type": "text/markdown",
+      "caption": "The report in Markdown (figures as relative paths).",
+      "step": null,
+      "meta": {},
+      "size": 34012
+     },
+     {
+      "id": "report-html",
+      "kind": "document",
+      "name": "report.html",
+      "media_type": "text/html",
+      "caption": "The report as one self-contained HTML page.",
+      "step": null,
+      "meta": {},
+      "size": 480488
+     },
+     {
+      "id": "report-docx",
+      "kind": "document",
+      "name": "report.docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "caption": "The report as a Word document.",
+      "step": null,
+      "meta": {},
+      "size": 196023
+     },
+     {
+      "id": "workbook",
+      "kind": "workbook",
+      "name": "workbook.xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "caption": "The workbook: README, inventory, plan, gates, every table, the figure index, the ledger.",
+      "step": null,
+      "meta": {},
+      "size": 19171
+     },
+     {
+      "id": "notebook",
+      "kind": "notebook",
+      "name": "study.ipynb",
+      "media_type": "application/x-ipynb+json",
+      "caption": "The notebook that re-runs the study and redraws the figures.",
+      "step": null,
+      "meta": {},
+      "size": 6820
+     },
+     {
+      "id": "study",
+      "kind": "study",
+      "name": "study.yaml",
+      "media_type": "application/yaml",
+      "caption": "The study file: aquascope run study.yaml replays it with no model.",
+      "step": null,
+      "meta": {},
+      "size": 11974
+     },
+     {
+      "id": "workspace",
+      "kind": "data",
+      "name": "workspace.json",
+      "media_type": "application/json",
+      "caption": "The workspace without the artifact bytes (resume with aquascope studio --resume).",
+      "step": null,
+      "meta": {},
+      "size": 141631
+     },
+     {
+      "id": "bundle",
+      "kind": "bundle",
+      "name": "bundle.zip",
+      "media_type": "application/zip",
+      "caption": "Everything above and every figure and table, with a README.",
+      "step": null,
+      "meta": {},
+      "size": 752504
+     }
+    ]
+   }
+  }
+ ],
+ "events": [
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "model",
+   "detail": "claude-sonnet-5 via anthropic",
+   "at": "2026-09-07T14:02:08+00:00"
+  },
+  {
+   "role": "consultant",
+   "step": null,
+   "event": "keywords",
+   "detail": "rules pick supply_reliability",
+   "at": "2026-09-07T14:02:08+00:00"
+  },
+  {
+   "role": "consultant",
+   "step": null,
+   "event": "model_call",
+   "detail": "6194 chars in, 1723 out",
+   "at": "2026-09-07T14:02:46+00:00"
+  },
+  {
+   "role": "consultant",
+   "step": null,
+   "event": "brief",
+   "detail": "model: playbook supply_reliability, 0 question(s)",
+   "at": "2026-09-07T14:02:46+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "scouting",
+   "at": "2026-09-07T14:02:46+00:00"
+  },
+  {
+   "role": "scout",
+   "step": null,
+   "event": "recon",
+   "detail": "0 stations within reach; no usable record",
+   "at": "2026-09-07T14:03:03+00:00"
+  },
+  {
+   "role": "scout",
+   "step": null,
+   "event": "inventory",
+   "detail": "3 dataset(s): catchment, donors, era5 (86.7 y)",
+   "at": "2026-09-07T14:03:03+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "planning",
+   "at": "2026-09-07T14:03:03+00:00"
+  },
+  {
+   "role": "methodologist",
+   "step": null,
+   "event": "model_call",
+   "detail": "12337 chars in, 6323 out",
+   "at": "2026-09-07T14:03:46+00:00"
+  },
+  {
+   "role": "methodologist",
+   "step": null,
+   "event": "invalid",
+   "detail": "step s4: supply_reliability takes no argument 'k' (it takes ['demand_m3s', 'demand_ml_day', 'lat', 'lon', 'months', 'reserve', 'share', 'source', 'station_id']); step s4: the registry calls 'supply_reliability' not defensible here: no discharge record at this site",
+   "at": "2026-09-07T14:03:46+00:00"
+  },
+  {
+   "role": "methodologist",
+   "step": null,
+   "event": "model_call",
+   "detail": "13400 chars in, 6690 out",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "methodologist",
+   "step": null,
+   "event": "repaired",
+   "detail": "3 steps pass the validator",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "methodologist",
+   "step": null,
+   "event": "plan",
+   "detail": "methodologist: 3 step(s), playbook supply_reliability",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "review",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "review",
+   "detail": "the plan was approved",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "running",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "analyst",
+   "step": null,
+   "event": "start",
+   "detail": "3 step(s)",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "runner",
+   "step": "s1",
+   "event": "start",
+   "detail": "describe_catchment(lat=38.8, lon=-9.38, upstream=True)",
+   "at": "2026-09-07T14:04:13+00:00"
+  },
+  {
+   "role": "runner",
+   "step": "s1",
+   "event": "done",
+   "detail": "latitude=38.8, longitude=-9.38, license=CC-BY-4.0, attribution=HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-basin",
+   "at": "2026-09-07T14:04:22+00:00"
+  },
+  {
+   "role": "reviewer",
+   "step": "s1",
+   "event": "gate",
+   "detail": "not_empty: passed, 'sub_basin' is present",
+   "at": "2026-09-07T14:04:22+00:00"
+  },
+  {
+   "role": "reviewer",
+   "step": "s1",
+   "event": "gate",
+   "detail": "max_area_km2: passed, catchment of 479 km2 against a ceiling of 479 km2",
+   "at": "2026-09-07T14:04:22+00:00"
+  },
+  {
+   "role": "runner",
+   "step": "s2",
+   "event": "start",
+   "detail": "similar_basins(lat=38.8, lon=-9.38, k=10)",
+   "at": "2026-09-07T14:04:22+00:00"
+  },
+  {
+   "role": "runner",
+   "step": "s2",
+   "event": "done",
+   "detail": "k=10, method=combined",
+   "at": "2026-09-07T14:04:30+00:00"
+  },
+  {
+   "role": "reviewer",
+   "step": "s2",
+   "event": "gate",
+   "detail": "min_donors: passed, 10 donors, 10 needed",
+   "at": "2026-09-07T14:04:30+00:00"
+  },
+  {
+   "role": "reviewer",
+   "step": "s2",
+   "event": "gate",
+   "detail": "not_empty: passed, 'stations' is present",
+   "at": "2026-09-07T14:04:30+00:00"
+  },
+  {
+   "role": "runner",
+   "step": "s3",
+   "event": "start",
+   "detail": "regionalize_signatures(lat=38.8, lon=-9.38, k=10)",
+   "at": "2026-09-07T14:04:30+00:00"
+  },
+  {
+   "role": "runner",
+   "step": "s3",
+   "event": "done",
+   "detail": "method=similarity",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "reviewer",
+   "step": "s3",
+   "event": "gate",
+   "detail": "not_empty: passed, 'estimates' is present",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "reviewer",
+   "step": "s3",
+   "event": "gate",
+   "detail": "not_empty: passed, 'skill' is present",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "analyst",
+   "step": "s1",
+   "event": "figures",
+   "detail": "3 artifact(s)",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "analyst",
+   "step": "s2",
+   "event": "figures",
+   "detail": "3 artifact(s)",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "analyst",
+   "step": "s3",
+   "event": "figures",
+   "detail": "4 artifact(s)",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "analyst",
+   "step": null,
+   "event": "gates",
+   "detail": "6 of 6 gates passed",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "critique",
+   "at": "2026-09-07T14:04:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "model_call",
+   "detail": "44842 chars in, 7078 out",
+   "at": "2026-09-07T14:05:35+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "prose",
+   "detail": "model wrote 9 section(s)",
+   "at": "2026-09-07T14:05:35+00:00"
+  },
+  {
+   "role": "critic",
+   "step": null,
+   "event": "model_call",
+   "detail": "44580 chars in, 4122 out",
+   "at": "2026-09-07T14:07:55+00:00"
+  },
+  {
+   "role": "critic",
+   "step": null,
+   "event": "checks",
+   "detail": "3 of 4 checks passed; 6 issue(s) from the model",
+   "at": "2026-09-07T14:07:55+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "authoring",
+   "at": "2026-09-07T14:07:55+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "model_call",
+   "detail": "55011 chars in, 7835 out",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "prose",
+   "detail": "model wrote 9 section(s) after the Critic's fixes",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "critic",
+   "step": null,
+   "event": "checks",
+   "detail": "3 of 4 checks passed",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "report.md (34,012 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "report.html (480,488 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "report.docx (196,023 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "workbook.xlsx (19,171 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "study.ipynb (6,820 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "study.yaml (11,974 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "workspace.json (141,631 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "artifact",
+   "detail": "bundle.zip (752,504 bytes)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "author",
+   "step": null,
+   "event": "deliverables",
+   "detail": "8 artifact(s)",
+   "at": "2026-09-07T14:08:38+00:00"
+  },
+  {
+   "role": "coordinator",
+   "step": null,
+   "event": "status",
+   "detail": "done",
+   "at": "2026-09-07T14:08:38+00:00"
+  }
+ ],
+ "ledger": {
+  "consultant": {
+   "calls": 1,
+   "prompt_tokens": 3031,
+   "completion_tokens": 1323
+  },
+  "methodologist": {
+   "calls": 2,
+   "prompt_tokens": 11251,
+   "completion_tokens": 7837
+  },
+  "author": {
+   "calls": 2,
+   "prompt_tokens": 46275,
+   "completion_tokens": 11089
+  },
+  "critic": {
+   "calls": 1,
+   "prompt_tokens": 21340,
+   "completion_tokens": 13799
+  }
+ },
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "tables": {},
+ "follow_ups": [],
+ "declined_reason": null
+}
