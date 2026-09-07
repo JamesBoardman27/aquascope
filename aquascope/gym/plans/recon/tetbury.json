@@ -1,0 +1,599 @@
+{
+ "site": {
+  "lat": 51.633147,
+  "lon": -2.153993,
+  "source": "uk_ea",
+  "station_id": "02bd4687-2b55-4f42-b1cf-77066f01cc70",
+  "name": "Tetbury",
+  "country": "GBR",
+  "variables": [
+   "precipitation"
+  ],
+  "period_start": "1991-10-01",
+  "period_end": null,
+  "years": 34.9
+ },
+ "captured": "2026-09-07",
+ "command": "aquascope.explore.assess_site(51.633147, -2.153993)",
+ "recon": {
+  "point": {
+   "lat": 51.63315,
+   "lon": -2.15399
+  },
+  "stations": [
+   {
+    "source": "uk_ea",
+    "station_id": "02bd4687-2b55-4f42-b1cf-77066f01cc70",
+    "name": "Tetbury",
+    "distance_km": 0.0,
+    "variables": [
+     "precipitation"
+    ],
+    "period_start": "1991-10-01",
+    "period_end": null,
+    "years": 34.9,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/02bd4687-2b55-4f42-b1cf-77066f01cc70"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92",
+    "name": "Tetbury Slads Farm",
+    "distance_km": 0.7,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1978-06-01",
+    "period_end": null,
+    "years": 48.3,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "66caada4-aab4-415a-9eba-1e21dfdaee6e_91498242",
+    "name": "Brokenborough 2",
+    "distance_km": 3.9,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1976-05-05",
+    "period_end": null,
+    "years": 50.3,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/66caada4-aab4-415a-9eba-1e21dfdaee6e_91498242"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "66caada4-aab4-415a-9eba-1e21dfdaee6e_90898244",
+    "name": "Brokenborough 3",
+    "distance_km": 3.9,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1998-03-16",
+    "period_end": null,
+    "years": 28.5,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/66caada4-aab4-415a-9eba-1e21dfdaee6e_90898244"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "91375047-e239-472d-93e4-96e1413b5567",
+    "name": "Brokenborough",
+    "distance_km": 3.9,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1977-11-03",
+    "period_end": null,
+    "years": 48.8,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/91375047-e239-472d-93e4-96e1413b5567"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "b6ebb017-63b5-4f30-8b6b-63dfed5f1e4f",
+    "name": "Shipton Moyne",
+    "distance_km": 4.1,
+    "variables": [
+     "precipitation"
+    ],
+    "period_start": "2010-12-31",
+    "period_end": null,
+    "years": 15.7,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/b6ebb017-63b5-4f30-8b6b-63dfed5f1e4f"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "6baf136b-dcd9-4f8f-a056-7c46e4567656",
+    "name": "Trull House B Great Oolite",
+    "distance_km": 5.5,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1982-10-07",
+    "period_end": null,
+    "years": 43.9,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/6baf136b-dcd9-4f8f-a056-7c46e4567656"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "af06d470-e485-4fd8-bf54-a824521bfc0f",
+    "name": "Trull House A Inferior Oolite",
+    "distance_km": 5.5,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "2021-09-23",
+    "period_end": null,
+    "years": 5.0,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/af06d470-e485-4fd8-bf54-a824521bfc0f"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "53450672-fa32-414b-888a-fc5480aaf67d",
+    "name": "Fosseway",
+    "distance_km": 5.7,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1976-10-29",
+    "period_end": null,
+    "years": 49.9,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/53450672-fa32-414b-888a-fc5480aaf67d"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "fb0d36f2-a8f1-491b-9757-43dd56199d90",
+    "name": "Minchinhampton",
+    "distance_km": 5.7,
+    "variables": [
+     "precipitation"
+    ],
+    "period_start": "2008-11-25",
+    "period_end": null,
+    "years": 17.8,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/fb0d36f2-a8f1-491b-9757-43dd56199d90"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "3e8d4efd-ea0c-40b1-b0a0-ae8ac47dce6c",
+    "name": "Malmesbury",
+    "distance_km": 6.1,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1984-10-03",
+    "period_end": null,
+    "years": 41.9,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/3e8d4efd-ea0c-40b1-b0a0-ae8ac47dce6c"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "a8c57c07-a2de-4dc9-88c5-953b3c176cb7",
+    "name": "Crudwell",
+    "distance_km": 6.2,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1983-05-10",
+    "period_end": null,
+    "years": 43.3,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/a8c57c07-a2de-4dc9-88c5-953b3c176cb7"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "569357f0-f904-45e0-a423-88665fd47cd0",
+    "name": "Minchinhampton",
+    "distance_km": 6.3,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1994-06-14",
+    "period_end": null,
+    "years": 32.2,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/569357f0-f904-45e0-a423-88665fd47cd0"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "b3aa0f20-7f68-4fb1-b271-c69c14996e41",
+    "name": "Foxley 2",
+    "distance_km": 6.8,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1976-07-28",
+    "period_end": null,
+    "years": 50.1,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/b3aa0f20-7f68-4fb1-b271-c69c14996e41"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "e3a8de3e-3bb5-482e-a558-baec0dd88194",
+    "name": "St Johns Weir",
+    "distance_km": 7.1,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2002-05-27",
+    "period_end": null,
+    "years": 24.3,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/e3a8de3e-3bb5-482e-a558-baec0dd88194"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "38673a1a-d6e7-4d0b-90f3-c8b0a8314cd1",
+    "name": "MacMillan Way",
+    "distance_km": 7.4,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "2011-04-27",
+    "period_end": null,
+    "years": 15.4,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/38673a1a-d6e7-4d0b-90f3-c8b0a8314cd1"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "892ed11f-eaf5-4281-980c-9565753d2035",
+    "name": "Pinnegar Bottom",
+    "distance_km": 7.5,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1962-03-21",
+    "period_end": null,
+    "years": 64.5,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/892ed11f-eaf5-4281-980c-9565753d2035"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "562d4d42-1783-4fba-a2be-b755caabd08f",
+    "name": "Sherston",
+    "distance_km": 7.9,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1976-12-13",
+    "period_end": null,
+    "years": 49.7,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/562d4d42-1783-4fba-a2be-b755caabd08f"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "9e4f7156-b832-4882-86b6-7155d30ffced",
+    "name": "Garsdon",
+    "distance_km": 8.0,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1992-05-18",
+    "period_end": null,
+    "years": 34.3,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/9e4f7156-b832-4882-86b6-7155d30ffced"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "6c004e41-937b-48a1-876e-30599f38229c",
+    "name": "Sandpool Lane",
+    "distance_km": 8.2,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "2011-03-22",
+    "period_end": null,
+    "years": 15.5,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/6c004e41-937b-48a1-876e-30599f38229c"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "f02dce57-8c7c-4741-941e-9638164be462",
+    "name": "Crabb Mill",
+    "distance_km": 8.2,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1969-08-01",
+    "period_end": null,
+    "years": 57.1,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/f02dce57-8c7c-4741-941e-9638164be462"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "E01802A",
+    "name": "WSX_WOODBRIDGE BROOK_DS LEA _E_202605",
+    "distance_km": 8.3,
+    "variables": [],
+    "period_start": "1970-01-01",
+    "period_end": "1970-01-01",
+    "years": 0.0,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/E01802A"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "c7627f42-45a1-4a06-8868-6f82c5d588a7",
+    "name": "Egypt Mill",
+    "distance_km": 8.4,
+    "variables": [
+     "water_level"
+    ],
+    "period_start": "2014-05-26",
+    "period_end": null,
+    "years": 12.3,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/c7627f42-45a1-4a06-8868-6f82c5d588a7"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "fb96d7c7-28ee-4ff3-957c-8ce1bcd4a339_90888236",
+    "name": "DIDMARTON 1",
+    "distance_km": 8.5,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "1975-11-12",
+    "period_end": null,
+    "years": 50.8,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/fb96d7c7-28ee-4ff3-957c-8ce1bcd4a339_90888236"
+   },
+   {
+    "source": "uk_ea",
+    "station_id": "fb96d7c7-28ee-4ff3-957c-8ce1bcd4a339_91488237",
+    "name": "DIDMARTON 2",
+    "distance_km": 8.5,
+    "variables": [
+     "groundwater_level"
+    ],
+    "period_start": "2010-10-18",
+    "period_end": null,
+    "years": 15.9,
+    "url": "http://environment.data.gov.uk/hydrology/id/stations/fb96d7c7-28ee-4ff3-957c-8ce1bcd4a339_91488237"
+   }
+  ],
+  "catchment": {
+   "hybas_id": 2121118390,
+   "area_km2": 182.7,
+   "upstream_area_km2": 182.7,
+   "n_sub_basins": 1,
+   "elevation_m": 130.0,
+   "precipitation_mm_yr": 760.0,
+   "aridity": 1.14,
+   "dams": 0.0,
+   "source": "BasinATLAS (HydroATLAS v1.0)"
+  },
+  "context": {
+   "years_by_variable": {
+    "precipitation": 34.9,
+    "discharge": 48.3,
+    "groundwater_level": 50.3,
+    "water_level": 48.8
+   },
+   "resolution_by_variable": {
+    "precipitation": "daily",
+    "discharge": "daily",
+    "groundwater_level": "daily",
+    "water_level": "daily"
+   },
+   "area_km2": 182.7,
+   "return_period": null,
+   "donors": 10,
+   "available": [
+    "forcing",
+    "glofas",
+    "temperature"
+   ],
+   "ungauged": false
+  },
+  "sufficiency": [
+   {
+    "method": "at_site_flood_frequency",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "At-site flood frequency (GEV, LP3 / Bulletin 17C)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+    }
+   },
+   {
+    "method": "baseflow_separation",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Baseflow separation and baseflow index",
+    "tool": "baseflow",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+    }
+   },
+   {
+    "method": "crop_water_requirement",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Crop water requirement (single or dual Kc)",
+    "tool": "crop_water_demand",
+    "station": null
+   },
+   {
+    "method": "fao56_et0",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "FAO-56 Penman-Monteith reference evapotranspiration",
+    "tool": "reference_et",
+    "station": null
+   },
+   {
+    "method": "flow_duration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow duration curve and Q95",
+    "tool": "analyze_station",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+    }
+   },
+   {
+    "method": "glofas_cross_check",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GloFAS modelled discharge as an independent check",
+    "tool": "anywhere",
+    "station": null
+   },
+   {
+    "method": "gr4j_calibration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GR4J rainfall-runoff calibration",
+    "tool": "gr4j",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+    }
+   },
+   {
+    "method": "groundwater_trend",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Groundwater-level trend (m/yr) with confidence interval",
+    "tool": "analyze_station",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "66caada4-aab4-415a-9eba-1e21dfdaee6e_91498242"
+    }
+   },
+   {
+    "method": "low_flow_frequency",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Low-flow frequency (annual minima)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+    }
+   },
+   {
+    "method": "recharge_wtf",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Recharge by water-table fluctuation",
+    "tool": "recharge",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "66caada4-aab4-415a-9eba-1e21dfdaee6e_91498242"
+    }
+   },
+   {
+    "method": "regionalize_signatures",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow signatures transferred from donors",
+    "tool": "regionalize_signatures",
+    "station": null
+   },
+   {
+    "method": "sgi",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Standardized Groundwater Index",
+    "tool": "sgi_drought",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "66caada4-aab4-415a-9eba-1e21dfdaee6e_91498242"
+    }
+   },
+   {
+    "method": "spei",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Standardized Precipitation-Evapotranspiration Index",
+    "tool": "drought_indices",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "02bd4687-2b55-4f42-b1cf-77066f01cc70"
+    }
+   },
+   {
+    "method": "spei_reanalysis",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "SPI and SPEI from ERA5 reanalysis for the cell (no rain gauge)",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "spi",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Standardized Precipitation Index",
+    "tool": "drought_indices",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "02bd4687-2b55-4f42-b1cf-77066f01cc70"
+    }
+   },
+   {
+    "method": "supply_reliability",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Run-of-river supply reliability against a demand (flow-duration screening)",
+    "tool": "supply_reliability",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "90db0ee9-354c-4c0d-8c41-59a1ed012e92"
+    }
+   },
+   {
+    "method": "trend_mann_kendall",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Mann-Kendall trend with Sen's slope",
+    "tool": "analyze_station",
+    "station": {
+     "source": "uk_ea",
+     "station_id": "66caada4-aab4-415a-9eba-1e21dfdaee6e_91498242"
+    }
+   },
+   {
+    "method": "similar_basins",
+    "status": "marginal",
+    "reason": "meant for an ungauged point; a gauge is available here",
+    "label": "Donor gauges by catchment similarity",
+    "tool": "similar_basins",
+    "station": null
+   },
+   {
+    "method": "climate_projection",
+    "status": "not_defensible",
+    "reason": "needs gcms of at least 3, not available here",
+    "label": "CMIP6 ensemble change factors on the baseline statistic",
+    "tool": "climate",
+    "station": null
+   },
+   {
+    "method": "iwqi",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Irrigation water quality (SAR, sodium percentage, RSC, FAO 29 restriction)",
+    "tool": "iwqi",
+    "station": null
+   },
+   {
+    "method": "water_quality_index",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Water quality index against guideline values (CCME WQI 1.0, NSF WQI)",
+    "tool": "wqi",
+    "station": null
+   }
+  ],
+  "notes": [
+   "Record resolution is not in the catalog; daily is assumed for every variable.",
+   "10 donor gauges from a pool of 37,053 gauged catchments.",
+   "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+   "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted."
+  ]
+ }
+}

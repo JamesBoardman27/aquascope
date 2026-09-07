@@ -1,0 +1,216 @@
+{
+ "site": {
+  "lat": 38.0,
+  "lon": -117.0
+ },
+ "captured": "2026-09-07",
+ "command": "aquascope.explore.assess_site(38.0, -117.0)",
+ "recon": {
+  "point": {
+   "lat": 38.0,
+   "lon": -117.0
+  },
+  "stations": [],
+  "catchment": {
+   "hybas_id": 7120592170,
+   "area_km2": 526.3,
+   "upstream_area_km2": 526.3,
+   "n_sub_basins": 4,
+   "elevation_m": 1737.0,
+   "precipitation_mm_yr": 156.0,
+   "aridity": 0.13,
+   "dams": 0.0,
+   "source": "BasinATLAS (HydroATLAS v1.0)"
+  },
+  "context": {
+   "years_by_variable": {},
+   "resolution_by_variable": {},
+   "area_km2": 526.3,
+   "return_period": null,
+   "donors": 10,
+   "available": [
+    "forcing",
+    "glofas",
+    "temperature"
+   ],
+   "ungauged": true
+  },
+  "sufficiency": [
+   {
+    "method": "crop_water_requirement",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Crop water requirement (single or dual Kc)",
+    "tool": "crop_water_demand",
+    "station": null
+   },
+   {
+    "method": "fao56_et0",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "FAO-56 Penman-Monteith reference evapotranspiration",
+    "tool": "reference_et",
+    "station": null
+   },
+   {
+    "method": "glofas_cross_check",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GloFAS modelled discharge as an independent check",
+    "tool": "anywhere",
+    "station": null
+   },
+   {
+    "method": "regionalize_signatures",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow signatures transferred from donors",
+    "tool": "regionalize_signatures",
+    "station": null
+   },
+   {
+    "method": "similar_basins",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Donor gauges by catchment similarity",
+    "tool": "similar_basins",
+    "station": null
+   },
+   {
+    "method": "spei_reanalysis",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "SPI and SPEI from ERA5 reanalysis for the cell (no rain gauge)",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "at_site_flood_frequency",
+    "status": "not_defensible",
+    "reason": "no discharge record at this site",
+    "label": "At-site flood frequency (GEV, LP3 / Bulletin 17C)",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "baseflow_separation",
+    "status": "not_defensible",
+    "reason": "no discharge record at this site",
+    "label": "Baseflow separation and baseflow index",
+    "tool": "baseflow",
+    "station": null
+   },
+   {
+    "method": "climate_projection",
+    "status": "not_defensible",
+    "reason": "needs gcms of at least 3, not available here",
+    "label": "CMIP6 ensemble change factors on the baseline statistic",
+    "tool": "climate",
+    "station": null
+   },
+   {
+    "method": "flow_duration",
+    "status": "not_defensible",
+    "reason": "no discharge record at this site",
+    "label": "Flow duration curve and Q95",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "gr4j_calibration",
+    "status": "not_defensible",
+    "reason": "no discharge record at this site",
+    "label": "GR4J rainfall-runoff calibration",
+    "tool": "gr4j",
+    "station": null
+   },
+   {
+    "method": "groundwater_trend",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Groundwater-level trend (m/yr) with confidence interval",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "iwqi",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Irrigation water quality (SAR, sodium percentage, RSC, FAO 29 restriction)",
+    "tool": "iwqi",
+    "station": null
+   },
+   {
+    "method": "low_flow_frequency",
+    "status": "not_defensible",
+    "reason": "no discharge record at this site",
+    "label": "Low-flow frequency (annual minima)",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "recharge_wtf",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Recharge by water-table fluctuation",
+    "tool": "recharge",
+    "station": null
+   },
+   {
+    "method": "sgi",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Standardized Groundwater Index",
+    "tool": "sgi_drought",
+    "station": null
+   },
+   {
+    "method": "spei",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation-Evapotranspiration Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "spi",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "supply_reliability",
+    "status": "not_defensible",
+    "reason": "no discharge record at this site",
+    "label": "Run-of-river supply reliability against a demand (flow-duration screening)",
+    "tool": "supply_reliability",
+    "station": null
+   },
+   {
+    "method": "trend_mann_kendall",
+    "status": "not_defensible",
+    "reason": "no record at this site",
+    "label": "Mann-Kendall trend with Sen's slope",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "water_quality_index",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Water quality index against guideline values (CCME WQI 1.0, NSF WQI)",
+    "tool": "wqi",
+    "station": null
+   }
+  ],
+  "notes": [
+   "No catalog gauge within 50 km; the nearest is WILLOW CK NR WARM SPGS, NV (usgs/USGS-10249190) at 73 km.",
+   "10 donor gauges from a pool of 37,053 gauged catchments.",
+   "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+   "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.",
+   "No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check."
+  ]
+ }
+}

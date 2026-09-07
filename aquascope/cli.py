@@ -1078,6 +1078,70 @@ def cmd_gym(args: argparse.Namespace) -> None:
         if not getattr(args, "quiet", False):
             print(f"  · {msg}", file=sys.stderr)
 
+    if args.gym_cmd == "plans":
+        from aquascope.gym import plans as gp
+
+        if args.plans_cmd == "list":
+            rows = gp.list_references(args.plans)
+            if args.json:
+                print(json.dumps(rows, indent=2, default=str))
+                return
+            print(f"  {len(rows)} reference plans in {args.plans or gp.PLANS_DIR}")
+            for r in rows:
+                what = "decline" if r["decline"] else (f"{r['steps']} step(s)"
+                                                       + (f" + {r['optional']} optional" if r["optional"] else ""))
+                tags = f" [{', '.join(r['tags'])}]" if r["tags"] else ""
+                print(f"  {r['id']:<42} {r['playbook']:<24} {what:<24} {str(r['site'])[:44]}{tags}")
+            return
+        if args.plans_cmd == "show":
+            ref = gp.load_reference(args.id, args.plans)
+            if args.json or not ref.path:
+                print(json.dumps(ref.to_dict(), indent=2, default=str))
+                return
+            print(Path(ref.path).read_text(encoding="utf-8"))
+            return
+        if args.plans_cmd == "validate":
+            refs = gp.load_references(args.plans)
+            bad = 0
+            for ref in refs:
+                errors = gp.validate_reference(ref, args.plans)
+                if errors:
+                    bad += 1
+                    print(f"  {ref.id}: " + "; ".join(errors))
+            print(f"  {len(refs)} reference plans, {len(refs) - bad} valid, {bad} with errors")
+            if bad:
+                sys.exit(1)
+            return
+        if args.plans_cmd == "rescore":
+            for path in args.results:
+                rows = gp.load_plan_results([path], latest=False)
+                rows = gp.rescore_plans(rows, plans_dir=args.plans)
+                target = Path(args.out) if args.out and len(args.results) == 1 else Path(path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("".join(json.dumps(r.to_dict(), ensure_ascii=False, default=str) + "\n"
+                                          for r in rows), encoding="utf-8")
+                print(f"  {len(rows)} rows re-scored -> {target}")
+            return
+        if args.plans_cmd == "score":
+            ref = gp.load_reference(args.id, args.plans)
+            if args.candidate:
+                with open(args.candidate, encoding="utf-8") as fh:
+                    cand = gp.candidate_from(json.load(fh))
+            else:
+                cand, _detail = gp.tree_candidate(ref, args.plans)
+            scored = gp.score_plan(ref, cand)
+            if args.json:
+                print(json.dumps({"case": ref.id, **scored, "candidate": cand.to_dict()}, indent=2, default=str))
+                return
+            pct = lambda x: "-" if x is None else f"{100 * x:.0f} %"  # noqa: E731
+            print(f"  {ref.id} ({'the tree' if not args.candidate else args.candidate}): score {scored['score']:.2f}; "
+                  f"tools {pct(scored['coverage_tools'])}, methods {pct(scored['coverage_methods'])}, gates "
+                  f"{pct(scored['coverage_gates'])}, extraneous {pct(scored['extraneous'])}, forbidden "
+                  f"{scored['forbidden_used']}, decline correct {scored['decline_correct']}")
+            for line in scored["explain"]:
+                print(f"    {line}")
+            return
+
     if args.gym_cmd == "tasks":
         from aquascope.gym import tasks as gt
         from aquascope.playbooks import list_playbooks
@@ -1114,6 +1178,24 @@ def cmd_gym(args: argparse.Namespace) -> None:
     if args.gym_cmd == "bench":
         from aquascope.gym import bench as gb
 
+        if args.agent in ("methodologist", "file") or args.plans or not args.tasks:
+            # Phase 2: plan quality against the reference plans.
+            from aquascope.gym import plans as gp
+
+            if args.agent not in gp.AGENTS:
+                sys.exit(f"  --agent {args.agent} plays Phase 1 tasks; pass --tasks, or one of {gp.AGENTS} for Phase 2")
+            plan_results = gp.run_plan_bench(
+                args.plans, args.agent, provider=args.provider, model=args.model, api_key=args.api_key,
+                base_url=args.base_url, candidates_dir=args.candidates, limit=args.limit, case_ids=args.case or None,
+                repeats=args.repeats, out=args.out, resume=args.resume, timeout=args.timeout or None, on_event=say,
+            )
+            if args.json:
+                print(json.dumps(gp.summarize_plans(plan_results), indent=2, default=str))
+                return
+            print(gp.plan_leaderboard(plan_results, title=f"aquascope gym bench: {args.agent}"))
+            if args.out:
+                print(f"  -> {args.out}")
+            return
         results = gb.run_bench(
             args.tasks, args.agent, provider=args.provider, model=args.model, api_key=args.api_key,
             base_url=args.base_url, limit=args.limit, unsolvable=args.unsolvable, task_ids=args.task or None,
@@ -1130,13 +1212,28 @@ def cmd_gym(args: argparse.Namespace) -> None:
 
     if args.gym_cmd == "leaderboard" and args.results:
         from aquascope.gym import bench as gb
+        from aquascope.gym import plans as gp
 
         results = gb.load_results(args.results)
+        plan_results = gp.load_plan_results(args.results)
         if args.json:
-            print(json.dumps(gb.summarize(results), indent=2, default=str))
+            if results and plan_results:
+                print(json.dumps({"tasks": gb.summarize(results), "plans": gp.summarize_plans(plan_results)},
+                                 indent=2, default=str))
+            else:
+                print(json.dumps(gp.summarize_plans(plan_results) if plan_results else gb.summarize(results),
+                                 indent=2, default=str))
             return
-        print(gb.leaderboard(results, out=args.out, title=args.title))
+        parts = []
+        if results:
+            parts.append(gb.leaderboard(results, title=args.title))
+        if plan_results:
+            parts.append(gp.plan_leaderboard(plan_results, title=(args.title if not results else None)))
+        text = "\n".join(parts)
+        print(text)
         if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(text, encoding="utf-8")
             print(f"  -> {args.out}")
         return
 
@@ -2419,9 +2516,35 @@ def main() -> None:
                       help="Do not ask BasinATLAS whether a bare point is on land (offline; the gauge proxy still applies)")
     p_gt.add_argument("--out", default="tasks.jsonl")
     p_gt.add_argument("--quiet", action="store_true")
-    p_gbench = gym_sub.add_parser("bench", help="Play an agent on the tasks and score it against the keys (Phase 1)")
-    p_gbench.add_argument("--tasks", required=True, help="tasks.jsonl from `gym tasks`")
-    p_gbench.add_argument("--agent", choices=["tree", "team", "ask"], default="tree")
+    p_gp = gym_sub.add_parser("plans", help="The reference plans of the plan-quality benchmark (Phase 2)")
+    gp_sub = p_gp.add_subparsers(dest="plans_cmd", required=True)
+    for name, help_ in (("list", "List the cases"), ("show", "Print one case"),
+                        ("validate", "Check every case against the catalogue, the registry and its recon"),
+                        ("score", "Score a plan (the tree's, or a JSON file) against one case"),
+                        ("rescore", "Score stored result rows again from the plans they carry (no model run)")):
+        p_gpc = gp_sub.add_parser(name, help=help_)
+        if name in ("show", "score"):
+            p_gpc.add_argument("id", help="The case id")
+        if name == "score":
+            p_gpc.add_argument("--candidate", default=None, help="A plan JSON (a study, a workspace or a decline)")
+        if name == "rescore":
+            p_gpc.add_argument("results", nargs="+", metavar="RESULTS.jsonl", help="Result files, rewritten in place")
+            p_gpc.add_argument("--out", default=None, help="Write the re-scored rows here instead (one file only)")
+        p_gpc.add_argument("--plans", default=None, help="A folder of reference plans (default: the package's)")
+        p_gpc.add_argument("--json", action="store_true")
+    p_gbench = gym_sub.add_parser("bench", help="Play an agent on the tasks (Phase 1) or on the reference plans "
+                                  "(Phase 2) and score it")
+    p_gbench.add_argument("--tasks", default=None, help="Phase 1: tasks.jsonl from `gym tasks`")
+    p_gbench.add_argument("--agent", choices=["tree", "team", "ask", "methodologist", "file"], default="tree",
+                          help="Phase 1: tree, team, ask; Phase 2: tree, methodologist, file")
+    p_gbench.add_argument("--plans", default=None,
+                          help="Phase 2: a folder of reference plans (default: the package's); with --agent "
+                               "methodologist or file, or without --tasks, the bench scores plan quality")
+    p_gbench.add_argument("--case", action="append", help="Phase 2: play these case ids only (repeatable)")
+    p_gbench.add_argument("--repeats", type=int, default=1,
+                          help="Phase 2: play every case this many times on a model (its spread)")
+    p_gbench.add_argument("--candidates", default=None,
+                          help="Phase 2, --agent file: a folder of <case id>.json plans produced elsewhere")
     p_gbench.add_argument("--provider", default=None,
                           help="LLM provider (anthropic, openai, groq, huggingface, ollama, ...); none: keyless team")
     p_gbench.add_argument("--model", default=None)

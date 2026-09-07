@@ -1,0 +1,47 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# Forty-six years of daily discharge at the point: the reliability is read off the record with the flow-duration
+# curve and the low-flow statistics beside it, as the supply_reliability gauged branch has it.
+id: supply_gauged_vegre
+playbook: supply_reliability
+title: Run-of-river supply of 0.5 m3/s to a town from a 46-year gauge
+brief: >-
+  Can the Vègre at Asnières-sur-Vègre supply 0.5 m3/s to the town as a run-of-river abstraction, and how
+  reliable would that be day by day and year by year?
+intake:
+  demand_m3s: 0.5
+  use: municipal
+site:
+  name: La Vègre à Asnières-sur-Vègre, Sarthe
+  lat: 47.88843
+  lon: -0.23269
+  source: hubeau_hydrometrie
+  station_id: M058302010
+  years: 45.8
+  recon: vegre
+expected_branch: gauged
+steps:
+  - tool: describe_catchment
+    optional: true
+  - tool: analyze_station
+    method: flow_duration
+    gates:
+      - {check: min_years, path: years}
+      - {check: unit_present, path: unit}
+  - tool: supply_reliability
+    method: supply_reliability
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: reliability}
+      - {check: not_empty, path: fdc}
+  - tool: low_flow_context
+    method: low_flow_frequency
+    optional: true
+    note: 7Q10 and the baseflow index say how the river behaves in dry spells.
+forbidden:
+  tools: [load_table, flow_duration]
+  methods: [spi, spei, groundwater_trend, sgi, recharge_wtf]
+rationale: >-
+  Forty-six years of daily discharge at the point pass the ten-year floor for the screening rule, so the
+  reliability is read off the record: the flow-duration curve gives Q95, Q50 and Q10, and the rule (Q95 kept in the
+  river, at most a tenth of the flow taken) gives the fraction of days, years and volume on which 0.5 m3/s can be
+  taken. The low-flow statistics are a sound addition. No rain gauge or well is within reach.
