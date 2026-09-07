@@ -1532,6 +1532,24 @@ def cmd_studio(args: argparse.Namespace) -> None:
     checkpoint()
 
 
+def cmd_studio_showcase(args: argparse.Namespace) -> None:
+    """`aquascope studio-showcase record | list`: the recorded studies the Explorer replays keyless."""
+    from aquascope.studio import showcase
+
+    if getattr(args, "showcase_cmd", None) == "list":
+        print(showcase.diagnose(args.out))
+        return
+    only = [s for s in (args.only or "").split(",") if s.strip()] or None
+    say = (lambda m: None) if args.quiet else (lambda m: print(m, flush=True))
+    written = showcase.record(out_dir=args.out, provider=args.provider, model=args.model, api_key=args.api_key,
+                              max_usd=args.max_usd, fresh_for_days=args.refresh_after, only=only, on_event=say)
+    ok = sum(1 for m in written if m.get("status") in ("done", "declined") and not m.get("error"))
+    print(f"recorded {ok}/{len(written)} this run, {sum(float(m.get('usd') or 0) for m in written):.2f} USD")
+    print(showcase.diagnose(args.out))
+    if written and ok == 0:
+        sys.exit(1)
+
+
 def cmd_forecast(args: argparse.Namespace) -> None:
     """Run a predictive model on a time-series data file."""
     import pandas as pd
@@ -2510,6 +2528,26 @@ def main() -> None:
     p_studio.add_argument("--resume", default=None, metavar="WORKSPACE.JSON", help="Resume a saved workspace")
     p_studio.add_argument("--quiet", "-q", action="store_true", help="Do not print the timeline as it happens")
 
+    # ── studio-showcase ───────────────────────────────────────────────
+    p_show = sub.add_parser(
+        "studio-showcase",
+        help="Record the crew's worked studies once with a model (a maintainer's command) and list them; the "
+        "Explorer replays them with no key",
+    )
+    show_sub = p_show.add_subparsers(dest="showcase_cmd")
+    p_show_rec = show_sub.add_parser("record", help="Run the cases that are not fresh and write the recordings")
+    p_show_rec.add_argument("--out", default="explorer/showcase/studies", help="The recordings' directory")
+    p_show_rec.add_argument("--only", default=None, help="Comma-separated case ids to (re)record whatever their age")
+    p_show_rec.add_argument("--max-usd", type=float, default=15.0, help="Stop the run at this estimated spend")
+    p_show_rec.add_argument("--provider", default="anthropic")
+    p_show_rec.add_argument("--model", default="claude-sonnet-5")
+    p_show_rec.add_argument("--api-key", default=None)
+    p_show_rec.add_argument("--refresh-after", type=float, default=30.0, metavar="DAYS",
+                            help="Re-record a case only when its recording is older than this (0: every case)")
+    p_show_rec.add_argument("--quiet", "-q", action="store_true", help="Do not print the timeline as it happens")
+    p_show_list = show_sub.add_parser("list", help="The recordings on disk, as a table")
+    p_show_list.add_argument("--out", default="explorer/showcase/studies", help="The recordings' directory")
+
     # ── forecast ──────────────────────────────────────────────────────
     p_forecast = sub.add_parser("forecast", help="Run a predictive model on time-series data")
     p_forecast.add_argument("--model", required=True, help="Model ID (prophet, arima, random_forest, xgboost, lstm)")
@@ -2701,6 +2739,7 @@ def main() -> None:
         "ingest": cmd_ingest,
         "solve": cmd_solve,
         "studio": cmd_studio,
+        "studio-showcase": cmd_studio_showcase,
         "playbooks": cmd_playbooks,
         "forecast": cmd_forecast,
         "plot": cmd_plot,
