@@ -156,6 +156,27 @@ def test_the_recorded_showcase_traces_are_part_of_the_build(tmp_path: Path, monk
     assert Path("showcase/kingston.json") in files
 
 
+def test_the_recorded_studies_are_part_of_the_build(tmp_path: Path, monkeypatch) -> None:
+    """The recorded studies (#366) are directories under explorer/showcase/studies/: the index, one meta,
+    workspace, report and study file per case as text, and the figures as bytes."""
+    build = _build_module()
+    src = tmp_path / "explorer"
+    case = src / "showcase" / "studies" / "kingston-flood"
+    (case / "figures").mkdir(parents=True)
+    (src / "index.html").write_text("<!-- page -->", encoding="utf-8")
+    (src / "showcase" / "studies" / "index.json").write_text('{"studies": []}', encoding="utf-8")
+    for name, text in (("meta.json", "{}"), ("workspace.json", "{}"), ("report.md", "# r"), ("study.yaml", "a: 1")):
+        (case / name).write_text(text, encoding="utf-8")
+    (case / "figures" / "s3_frequency_curve.png").write_bytes(b"\x89PNG")
+    monkeypatch.setattr(build, "SRC", src)
+
+    files = build.text_files()
+    for rel in ("index.json", "kingston-flood/meta.json", "kingston-flood/workspace.json", "kingston-flood/report.md",
+                "kingston-flood/study.yaml"):
+        assert Path("showcase/studies") / rel in files, rel
+    assert Path("showcase/studies/kingston-flood/figures/s3_frequency_curve.png") in build.binary_files()
+
+
 pytestmark_node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 
 
@@ -671,3 +692,17 @@ def test_the_study_surface_writes_with_plain_hyphens() -> None:
     html = _html()
     pane = html[html.index('id="study-pane"'):html.index("</aside>", html.index('id="study-pane"'))]
     assert "—" not in pane and "–" not in pane
+
+
+@pytestmark_node
+def test_the_node_tests_of_the_pure_modules_pass() -> None:
+    """explorer/tests/*.test.mjs are node:test suites over the pure modules (studio-showcase.js, #366)."""
+    out = subprocess.run(
+        ["node", "--test", str(EXPLORER / "tests")],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=str(EXPLORER.parent),
+    )
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert re.search(r"^# fail 0$", out.stdout, re.M), out.stdout

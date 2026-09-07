@@ -1,0 +1,117 @@
+{
+ "id": "wagga-flood",
+ "title": "Design flood of the Murrumbidgee at Wagga Wagga",
+ "kind": "flood_risk",
+ "shows": "A BoM gauge the catalog lists but cannot read yet: the regional path and its honest caveats.",
+ "site": {
+  "lat": -35.1,
+  "lon": 147.37,
+  "name": "Murrumbidgee at Wagga Wagga, NSW, Australia"
+ },
+ "problem": "Design flood for a levee upgrade on the Murrumbidgee at Wagga Wagga: the 100-year flow, and how far the evidence can be trusted.",
+ "intake": {
+  "return_period": 100,
+  "decision": "design flow"
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T14:17:39+00:00",
+ "seconds": 540.9,
+ "tokens": {
+  "prompt": 86334,
+  "completion": 39009,
+  "calls": 6,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3264,
+    "completion_tokens": 1029
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 8305,
+    "completion_tokens": 7061
+   },
+   "analyst": {
+    "calls": 1,
+    "prompt_tokens": 3194,
+    "completion_tokens": 249
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 48760,
+    "completion_tokens": 17361
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 22811,
+    "completion_tokens": 13309
+   }
+  },
+  "total": 125343
+ },
+ "usd": 0.8441,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "flood_risk",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 4,
+ "gates": {
+  "passed": 5,
+  "total": 9
+ },
+ "checks": {
+  "passed": 4,
+  "total": 4
+ },
+ "replans": 1,
+ "stop_reason": "gate failed: not_empty (nothing at 'climate'); not_empty (nothing at 'climate'); the fallback similar_basins failed too: similar basins lookup failed: ValueError: method must be similarity, proximity or combined",
+ "headline": "No Q100 discharge in cubic metres per second can be defended from this study.",
+ "not_established": [
+  "Step s4, gate not_empty: nothing at 'climate'",
+  "Step s4, gate not_empty: nothing at 'climate'",
+  "Step s4.fallback, gate min_donors: the step returned an error: similar basins lookup failed: ValueError: method must be similarity, proximity or combined",
+  "Step s4.fallback, gate not_empty: the step returned an error: similar basins lookup failed: ValueError: method must be similarity, proximity or combined",
+  "The study stopped at s4: gate failed: not_empty (nothing at 'climate'); not_empty (nothing at 'climate'); the fallback similar_basins failed too: similar basins lookup failed: ValueError: method must be similarity, proximity or combined"
+ ],
+ "figures": [
+  {
+   "name": "s1_site_map.png",
+   "id": "fig-s1-site_map",
+   "step": "s1",
+   "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+   "bytes": 30883
+  },
+  {
+   "name": "s2_donors_map.png",
+   "id": "fig-s2-donors_map",
+   "step": "s2",
+   "caption": "The site and the 10 donor gauges the similarity search selected, in longitude and latitude (no basemap); labels are the station ids.",
+   "bytes": 47949
+  },
+  {
+   "name": "s3_signatures_band.png",
+   "id": "fig-s3-signatures_band",
+   "step": "s3",
+   "caption": "Flow signatures transferred to the site from 10 donor catchments, with the one-standard-deviation band across donors as error bars and the leave-one-out skill (NSE) where published.",
+   "bytes": 87634
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_site_map.png",
+  "figures/s2_donors_map.png",
+  "figures/s3_signatures_band.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}
