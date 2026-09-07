@@ -178,9 +178,14 @@ def sufficiency_for_validation(ws: Workspace) -> list[dict[str, Any]] | None:
     return list(rows.values())
 
 
+#: Table tools that describe a table rather than analyse it: listed only when the client attached one.
+_GENERIC_TABLE_TOOLS = frozenset({"eda", "quality", "preprocess", "insights"})
+
+
 def _catalogue_for(problem: str | None, *, uploads: bool) -> list[dict[str, Any]]:
     """The catalogue as the Methodologist reads it: the entries that serve the problem, the generic site and
-    station tools, the table tools only when there is a table, ``about`` cut short. Tokens matter."""
+    station tools, the table tools (a step such as water_quality_samples, get_timeseries or load_table feeds
+    them with from_step), ``about`` cut short. Tokens matter."""
     from aquascope.methods import METHODS
 
     rows: list[dict[str, Any]] = []
@@ -188,7 +193,7 @@ def _catalogue_for(problem: str | None, *, uploads: bool) -> list[dict[str, Any]
         entry = catalogue.get(row["tool"])
         if entry is None or entry.kind == "recon" or entry.id == "find_stations":
             continue
-        if entry.kind in ("frame", "weather", "none") and not uploads:
+        if not uploads and (entry.kind == "none" or entry.id in _GENERIC_TABLE_TOOLS):
             continue
         if entry.methods and problem:
             serves = any(problem in METHODS[m].problems for m in entry.methods if m in METHODS)
@@ -350,8 +355,16 @@ def _fix_arguments(steps: list[dict[str, Any]]) -> list[str]:
     return notes
 
 
+def _stations_of(ws: Workspace) -> set[tuple[str, str]] | None:
+    """The (source, station_id) pairs the inventory knows, uploads included; None when there is no inventory."""
+    inv = ws.inventory
+    if inv is None or not inv.datasets:
+        return None
+    return {(str(d.source), str(d.station_id)) for d in inv.datasets if d.source and d.station_id}
+
+
 def _errors_of(steps: list[dict[str, Any]], ws: Workspace) -> list[str]:
-    errors = catalogue.validate_plan(steps, sufficiency=sufficiency_for_validation(ws))
+    errors = catalogue.validate_plan(steps, sufficiency=sufficiency_for_validation(ws), stations=_stations_of(ws))
     for st in steps:
         errors += _placeholder_errors(st)
     return errors
@@ -500,6 +513,10 @@ def _model_plan(ws: Workspace, model: Model) -> tuple[Study | None, list[str]]:
     system, context = plan_context(ws)
     uploads = context["uploads"]
     obj = model.call_json("methodologist", system, context)
+    if isinstance(obj, dict) and obj.get("decline"):
+        reason = str(obj.get("reason") or "the Methodologist found no method that can establish what the brief asks")
+        _decline(ws, reason)
+        return None, [reason]
     steps, errors, notes = _check(obj, ws)
     if errors and obj is not None:
         ws.event("methodologist", "invalid", "; ".join(errors[:6]))
@@ -522,6 +539,22 @@ def _model_plan(ws: Workspace, model: Model) -> tuple[Study | None, list[str]]:
     if errors:
         return None, errors
     return _study_from(ws, obj or {}, steps, notes=notes), []
+
+
+def _playbook_rule_decline(ws: Workspace) -> str | None:
+    """The sentence the playbook prints when one of its own decline rules holds for this brief, else None.
+    Data-driven declines (no branch for the record, a method the registry refuses) are not these: a model may
+    still find a defensible route there."""
+    from aquascope import playbooks as pbk
+
+    pb = _playbook(ws)
+    if pb is None:
+        return None
+    try:
+        said = pbk.declines_for(pb, _recon(ws), dict(ws.brief.intake))
+    except Exception:  # noqa: BLE001 - a rule that cannot be evaluated does not decline
+        return None
+    return str(said[0]) if said else None
 
 
 def _decline(ws: Workspace, reason: str) -> None:
@@ -551,8 +584,17 @@ def plan(ws: Workspace, model: Model | None) -> Study | None:
     known = sorted(p["id"] for p in pbk.list_playbooks() if "error" not in p)
     study: Study | None = None
     if model:
+        rule = _playbook_rule_decline(ws)
+        if rule:
+            # The playbook declines by one of its own rules (an inundation map, a cause without pumping data, a
+            # reservoir yield, a health verdict): that is domain knowledge, not a want of a plan, so no model
+            # gets to override it.
+            _decline(ws, rule)
+            return None
         study, errors = _model_plan(ws, model)
         if study is None:
+            if ws.status == "declined":
+                return None
             if ws.brief.playbook:
                 ws.event("methodologist", "fallback", "the model's plan did not pass the validator, the tree is used: "
                          + "; ".join(errors[:4]))
@@ -587,6 +629,10 @@ def adopt(ws: Workspace, obj: dict[str, Any], *, source: str = "device") -> tupl
     stands then). The study is announced and written to ``ws.study``."""
     from aquascope import playbooks as pbk
 
+    if isinstance(obj, dict) and obj.get("decline"):
+        reason = str(obj.get("reason") or f"the {source} model found no method that can establish what the brief asks")
+        _decline(ws, reason)
+        return None, [], "declined"
     steps, errors, notes = _check(obj if isinstance(obj, dict) else None, ws)
     study: Study | None = None
     if errors:

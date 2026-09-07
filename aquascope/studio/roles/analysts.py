@@ -64,11 +64,11 @@ def analyze_station_full(source: str, station_id: str, years: int | None = None,
     if variable and variables is not None and variable not in variables:
         return {"error": f"unknown variable {variable!r}; allowed: {list(variables)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable,
-                   return_periods=return_periods)
+    extra = {"return_periods": return_periods} if return_periods else {}
+    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable, **extra)
     if bootstrap_ci and res.get("ffa") and store.get("series") is not None:
         try:
-            ci = flood_ci(store["series"], return_periods=return_periods)
+            ci = flood_ci(store["series"], **extra)
             res["ffa"]["fits"]["gev_bootstrap"] = {
                 k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded") if k in ci
             }

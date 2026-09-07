@@ -66,6 +66,10 @@ sufficiency table itself uses. A method the sufficiency table calls not_defensib
 lists a table the brief points at, that table is the primary record: load_table first, then the table tools on
 it with from_step. Three to eight steps. When an exemplar is given it is the playbook tree's own plan for this
 site: keep what is sound and add what the brief needs. Cite only citations the catalogue or the exemplar carries.
+When no tool in the catalogue can establish what the brief asks for (an inundation map, the cause of a decline
+without pumping data, a reservoir yield, a day-by-day irrigation schedule, a health verdict beyond the sampled
+parameters), or when the exemplar says the playbook declined for such a reason, reply {{"decline": true,
+"reason": "<one sentence>"}} instead of a plan: a study that cannot answer is not started.
 {RULES}"""
 
 METHODOLOGIST_REPAIR = f"""You are the Methodologist of AquaScope Studio. Your plan did not pass the validator. Reply
