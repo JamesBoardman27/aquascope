@@ -613,11 +613,17 @@ def test_the_study_drawer_is_wired_end_to_end() -> None:
     assert 'id="solve-pane"' not in html and 'id="btn-solve"' not in html, "Study replaces Solve in the drawer"
     assert not (EXPLORER / "src" / "solve.js").exists()
     app = (EXPLORER / "app.js").read_text(encoding="utf-8")
-    assert "initStudy" in app and "url.study" in app
+    assert "url.study" in app
+    # Study is loaded on first use: app.js wires the button synchronously (before the boot awaits anything)
+    # and the click imports the module; studio.js no longer imports at boot.
+    assert 'import("./src/studio.js?v=__BUILD__")' in app, "the Study modules load on first use"
+    assert 'from "./src/studio.js' not in app, "studio.js must not be a static import of app.js"
+    boot = app[app.index("(async function boot()"):]
+    assert "initStudyLoader()" in boot[:boot.index("await ")], "the Study button is wired before any await"
+    loader = app[app.index("function initStudyLoader()"):]
+    assert '$("btn-study").addEventListener' in loader[:300], "the Study button is wired in the loader"
     studio = (EXPLORER / "src" / "studio.js").read_text(encoding="utf-8")
-    body = studio[studio.index("export function initStudy()"):]
-    assert '$("btn-study").addEventListener' in body[:400], "the Study button is wired first"
-    assert "\n  await " not in body[:body.index('$("btn-study").addEventListener')]
+    assert "export function initStudy()" in studio and "export function toggleStudy()" in studio
     shell = (EXPLORER / "src" / "shell.js").read_text(encoding="utf-8")
     assert 'const MODES = ["ask", "study"]' in shell
     url = (EXPLORER / "src" / "url.js").read_text(encoding="utf-8")

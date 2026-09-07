@@ -80,8 +80,10 @@ def test_the_page_the_worker_and_the_package_agree_on_the_brief_path() -> None:
     assert "briefPrompt()" in studio and "briefSchema()" in studio and "parseBriefReply" in studio
     assert re.search(r'availability\(\)\) === "available"', local), "Study must not start a model download"
     assert "timeoutMs" in local and "responseConstraint" in local
-    # what the device read travels as the brief and the intake, and the worker marks the source
-    assert "intake, brief" in studio
-    assert 'a.get("intake")' in worker and 'a.get("brief")' in worker and 'source = "device"' in worker
+    # what the device read travels as the intake and the proposed brief; the engine takes the proposal when it
+    # can (Studio.say(text, proposed=...)), else the worker sets the fields itself and marks the source
+    assert 'proposed: brief ? { brief, source: "device" } : null' in studio
+    assert 'a.get("intake")' in worker and 'a.get("proposed")' in worker and 's.say(text, proposed=proposed)' in worker
+    assert 'source = proposed["source"]' in worker
     for text in (studio, worker, local, INTAKE.read_text(encoding="utf-8")):
         assert "—" not in text and "–" not in text
