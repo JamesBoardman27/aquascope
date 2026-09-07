@@ -299,6 +299,15 @@ json.dumps(_res.to_dict(), default=str)
 // as they happen. matplotlib is loaded before the first run, openpyxl and
 // python-docx before the first bundle, never on a visit that runs no study.
 //
+// A model on the reader's device joins the crew through the same message:
+// `prompts` hands the page the crew's prompts and schemas, `context` the
+// compact context a role would send (methodologist, author, consultant) with
+// its system prompt, `check_plan` the validator's verdict on a plan the page
+// wrote, and `start`/`say` take a `proposed` brief, `approve` a `plan`, and
+// `narrate` the sections, each validated by the engine and falling back to
+// the tree and the templates. Every one of those is guarded: an engine
+// without the method answers {error} and the page keeps the keyless path.
+//
 // The Python between the markers is plain functions over dicts, so the test
 // suite can run it in CPython against the studio fixtures.
 
@@ -405,13 +414,96 @@ def _studio_file(art):
             "data": _b64.b64encode(art.data).decode("ascii")}
 
 
+def _accepts(fn, name):
+    """Whether an engine method takes the keyword this face wants to pass. The face is built against the
+    bring-your-own-model contract (proposed, plan, narrate, the role contexts); an engine without it gets the
+    call it knows, and the page is told what did not happen."""
+    import inspect
+
+    try:
+        return name in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _proposed(a):
+    """What a model on the reader's device wrote for the Consultant: the page's proposed dict, or the older
+    brief field wrapped the same way."""
+    proposed = a.get("proposed")
+    if isinstance(proposed, dict) and proposed.get("brief"):
+        return {"brief": dict(proposed["brief"]), "source": str(proposed.get("source") or "device")}
+    brief = a.get("brief")
+    if isinstance(brief, dict) and brief:
+        return {"brief": dict(brief), "source": "device"}
+    return None
+
+
+def _studio_say(s, text, proposed):
+    if proposed and _accepts(s.say, "proposed"):
+        return s.say(text, proposed=proposed)
+    r = s.say(text)
+    if proposed:
+        # The engine has no proposed brief yet: the fields the device read go straight in, as before.
+        brief = proposed["brief"]
+        if isinstance(brief.get("decision"), str) and brief["decision"].strip():
+            s.ws.brief.decision = brief["decision"].strip()
+        if isinstance(brief.get("quantities"), list):
+            s.ws.brief.quantities = [str(q) for q in brief["quantities"] if str(q).strip()]
+        if s.ws.brief.source == "rules":
+            s.ws.brief.source = proposed["source"]
+    return r
+
+
+def studio_prompts():
+    """The crew's prompts and schemas as one JSON-able dict, for a model the page runs; None when this engine
+    has no export (the page then reads only the brief on the device)."""
+    try:
+        from aquascope.studio import prompts as _prompts
+    except ImportError:
+        return None
+    as_json = getattr(_prompts, "as_json", None)
+    if as_json is None:
+        return None
+    out = as_json()
+    return _json.loads(out) if isinstance(out, str) else out
+
+
+def _studio_context(s, a):
+    """The compact context a role would send to its model, with the system prompt under "system"."""
+    role = str(a.get("role") or "")
+    fn = getattr(s, f"{role}_context", None) if role in ("consultant", "methodologist", "author") else None
+    if fn is None:
+        return {"error": f"no {role or 'such'} context in this engine"}
+    ctx = fn(str(a.get("text") or "")) if role == "consultant" else fn()
+    if not isinstance(ctx, dict):
+        return {"error": f"the {role} context is not a dict"}
+    return ctx
+
+
+def _studio_check_plan(s, a):
+    """The validator's verdict on a plan written outside the crew, before the page shows it: ok, the errors, the
+    normalised steps. ok is None when the engine lends no validator (the approval still checks)."""
+    try:
+        from aquascope.studio.roles import methodologist as _meth
+    except ImportError:
+        return {"ok": None, "errors": [], "steps": []}
+    check = getattr(_meth, "_check", None)
+    if check is None:
+        return {"ok": None, "errors": [], "steps": []}
+    steps, errors, notes = check(dict(a.get("plan") or {}), s.ws)
+    return {"ok": not errors, "errors": list(errors), "notes": list(notes), "steps": list(steps)}
+
+
 def studio_call(a, on_event=None, on_artifact=None, store=None):
-    """One message from the page. op is start, say, approve, follow_up, file or export."""
+    """One message from the page. op is start, say, approve, follow_up, narrate, context, check_plan, prompts,
+    file or export."""
     return _with_recon_context(a, lambda: _studio_dispatch(a, on_event, on_artifact, store))
 
 
 def _studio_dispatch(a, on_event, on_artifact, store):
     op = a.get("op")
+    if op == "prompts":
+        return studio_prompts()
     if op == "start":
         tables = dict(a.get("tables") or {})
         frame = (store or {}).get("frame") if store is not None else None
@@ -420,27 +512,41 @@ def _studio_dispatch(a, on_event, on_artifact, store):
         s = _Studio(float(a["lat"]), float(a["lon"]), data=tables or None, intake=a.get("intake") or None,
                     tools=_studio_tools(a.get("catchment"), a.get("donors_tables")), on_event=on_event, on_artifact=on_artifact,
                     **_studio_model(a))
-        brief = a.get("brief") or {}
-        if isinstance(brief.get("decision"), str) and brief["decision"].strip():
-            s.ws.brief.decision = brief["decision"].strip()
-        if isinstance(brief.get("quantities"), list):
-            s.ws.brief.quantities = [str(q) for q in brief["quantities"] if str(q).strip()]
         _STUDIO[s.ws.id] = s
-        r = s.say(str(a.get("text") or ""))
-        if brief and s.ws.brief.source == "rules":
-            s.ws.brief.source = "device"
-        return _studio_reply(s, r)
+        return _studio_reply(s, _studio_say(s, str(a.get("text") or ""), _proposed(a)))
     s = _studio_open(a, on_event, on_artifact)
     if op == "say":
-        return _studio_reply(s, s.say(str(a.get("text") or "")))
+        return _studio_reply(s, _studio_say(s, str(a.get("text") or ""), _proposed(a)))
     if op == "approve":
-        return _studio_reply(s, s.approve(a.get("edits") or None))
+        edits = a.get("edits") or None
+        plan = a.get("plan") if isinstance(a.get("plan"), dict) else None
+        if plan and _accepts(s.approve, "plan"):
+            return _studio_reply(s, s.approve(edits, plan=dict(plan, source=str(plan.get("source") or "device"))))
+        r = s.approve(edits)
+        if plan:
+            r.payload.setdefault("plan_used", "tree")
+            r.payload.setdefault("plan_errors", ["this engine does not take a proposed plan"])
+        return _studio_reply(s, r)
     if op == "follow_up":
         return _studio_reply(s, s.follow_up(str(a.get("text") or "")))
+    if op == "narrate":
+        narrate = getattr(s, "narrate", None)
+        if narrate is None:
+            return {"error": "narrate is not available in this engine"}
+        sections = {str(k): str(v) for k, v in (a.get("sections") or {}).items() if isinstance(v, str) and v.strip()}
+        return _studio_reply(s, narrate(sections=sections, source=str(a.get("source") or "device")))
+    if op == "context":
+        return _studio_context(s, a)
+    if op == "check_plan":
+        return _studio_check_plan(s, a)
     if op == "file":
         art = s.ws.artifact(str(a.get("artifact_id") or ""))
         if art is None:
             return {"error": f"no artifact {a.get('artifact_id')!r} in this study"}
+        if not art.data:
+            # A study resumed from the page's copy (a reload, a dropped workspace.json, a stopped run): the
+            # bytes were never here. The next run makes them again.
+            return {"error": f"the bytes of {art.name} are not in this session; a follow-up remakes the files"}
         return _studio_file(art)
     if op == "export":
         from aquascope.studio.deliverables.bundle import bundle_bytes
@@ -527,7 +633,9 @@ json.dumps(studio_table(_a["name"], _a["data"]), default=str)
     }
     return;
   }
-  if (args.op === "approve" || args.op === "follow_up") {
+  // A run draws figures and, at the end, the documents; narrate rewrites the
+  // report and remakes the documents with the new prose.
+  if (args.op === "approve" || args.op === "follow_up" || args.op === "narrate") {
     await ensurePlotting(id);
     await ensureDocs(id);
   }

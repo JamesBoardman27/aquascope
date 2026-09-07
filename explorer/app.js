@@ -23,11 +23,34 @@ import { initStationPanel, selectStation } from "./src/panel-station.js?v=__BUIL
 import { initPointPanel, selectPoint } from "./src/panel-point.js?v=__BUILD__";
 import { initWorkbench, openWorkbench } from "./src/panel-workbench.js?v=__BUILD__";
 import { initAsk } from "./src/ask.js?v=__BUILD__";
-import { initStudy } from "./src/studio.js?v=__BUILD__";
 import { initUrl, readUrl, writeUrl } from "./src/url.js?v=__BUILD__";
 import { ensureWorker } from "./src/worker-client.js?v=__BUILD__";
 import { openCite } from "./src/methods.js?v=__BUILD__";
 import { registerWebMcpTools } from "./src/webmcp.js?v=__BUILD__";
+
+// Study is loaded when it is first used (the Study button, the drawer's radio,
+// "Study this place", a #study=1 link): its modules are the larger part of the
+// drawer's code and most visits run no study. The button is wired here,
+// synchronously, before anything is awaited (#271), and the click loads the
+// module and toggles the drawer.
+let studyLoading = null;
+function loadStudy() {
+  if (!studyLoading) {
+    studyLoading = import("./src/studio.js?v=__BUILD__").then((m) => { m.initStudy(); return m; });
+    studyLoading.catch((err) => {
+      console.error(err);
+      studyLoading = null;
+      setStatusEl($("study-status"), `Study could not load: ${err.message}. Reload to try again.`, "error");
+    });
+  }
+  return studyLoading;
+}
+
+function initStudyLoader() {
+  actions.openStudy = (opts) => loadStudy().then((m) => m.openStudy(opts)).catch(() => {});
+  $("btn-study").addEventListener("click", () => loadStudy().then((m) => m.toggleStudy()).catch(() => {}));
+  $("drawer").addEventListener("drawermode", (e) => { if (e.detail.mode === "study") loadStudy(); });
+}
 
 // The Study drawer, after the selection it belongs to has been applied (a
 // selection closes the drawer, so the order matters).
@@ -155,7 +178,7 @@ function goHome() {
   initPointPanel();
   initWorkbench();
   initAsk();   // async: fills the provider list from providers.json
-  initStudy();
+  initStudyLoader();
   initSearch();
   initUrl();
   actions.applyUrl = applyUrl;
