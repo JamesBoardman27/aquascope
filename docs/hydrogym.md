@@ -375,6 +375,25 @@ hydrologist's references, the classification not measured, two repeats, no
 data-driven decline reachable at a real site, and the small-model row
 pending for want of a key.
 
+### 2026-09-08: the same 25 cases after the engine fixes
+
+The first run's headline (no declines with a model, the table tools hidden without an upload, the supply
+screening's ungauged mode unreachable, invented stations) went straight into the engine: a playbook's own
+decline rule is honoured before any model is asked, a model may reply with a decline, the analytic table tools
+are listed, the supply entry names its regional method, a plan may only name stations the site's inventory
+knows. The two model rows were then run again, one repeat each (`aquascope/gym/results/2026-09-08/`).
+
+| agent | model | score | solvable | off-tree | declined (of 7) | false declines | tools | gates | forbidden | tokens/case | USD |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| tree | none | 0.97 | 0.95 | 0.73 | 100 % | 0 % | 94 % | 93 % | 0 % | 0 | 0 |
+| methodologist | Claude Sonnet 5 | 0.96 (was 0.64) | 0.94 | 0.98 | 100 % | 6 % | 100 % | 100 % | 0 % | 10,151 | 1.02 |
+| methodologist | Claude Haiku 4.5 | 0.93 (was 0.66) | 0.90 | 0.89 | 100 % | 6 % | 100 % | 98 % | 11 % | 8,339 | 0.42 |
+
+What remains is judgement rather than plumbing: both models declined one solvable case (`gw_regional_potomac`,
+no well within reach, where the reference takes the ERA5 water balance for the cell and labels it regional), so
+groundwater is the weakest kind for a model; Haiku still uses a forbidden method on two cases. The device-class
+row waits for a free small-model endpoint. The discussion is in `results/2026-09-08/discussion.md`.
+
 ## Leaderboard
 
 ### 2026-09-03: the 60-task suite
