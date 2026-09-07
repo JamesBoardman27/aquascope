@@ -61,6 +61,8 @@ let table = null;      // { n, columns, insights, label }
 let runSeq = 0;
 
 export function hasTable() { return Boolean(table); }
+// The table's label, for a face that offers it elsewhere (Study attaches it to a study).
+export function tableLabel() { return table ? table.label : null; }
 
 // ── loading data in ─────────────────────────────────────────────────────────
 

@@ -1377,6 +1377,161 @@ def cmd_solve_team(args: argparse.Namespace) -> None:
             print(f"   · {line}", file=sys.stderr)
 
 
+def _parse_edits(text: str) -> dict:
+    """``s3.return_period=200, s2.k=8`` -> ``{"s3": {"arguments": {"return_period": 200}}, "s2": {...}}``."""
+    import re
+
+    out: dict = {}
+    for item in re.split(r"[,;]\s*|\s{2,}", text or ""):
+        item = item.strip()
+        if not item:
+            continue
+        key, sep, value = item.partition("=")
+        if not sep or "." not in key:
+            raise ValueError(f"an edit is STEP.ARG=VALUE, got {item!r}")
+        sid, _, arg = key.strip().partition(".")
+        try:
+            parsed = json.loads(value.strip())
+        except json.JSONDecodeError:
+            parsed = value.strip()
+        out.setdefault(sid, {"arguments": {}})["arguments"][arg.strip()] = parsed
+    return out
+
+
+def cmd_studio(args: argparse.Namespace) -> None:
+    """`aquascope studio`: the crew, from the brief you agree and the plan you approve to the bundle."""
+    from aquascope.studio import Studio
+
+    workspace = None
+    if args.resume:
+        try:
+            workspace = json.loads(Path(args.resume).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            logger.error("cannot read %s: %s", args.resume, exc)
+            sys.exit(1)
+    elif args.lat is None or args.lon is None:
+        logger.error("studio needs --lat and --lon (or --resume workspace.json).")
+        sys.exit(1)
+    try:
+        intake = _parse_intake(args.intake)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    data: dict = {}
+    for path in args.data or []:
+        try:
+            from aquascope.ingest import read_table
+
+            data[f"upload:{Path(path).name}"] = read_table(path)
+        except (OSError, ValueError) as exc:
+            logger.error("cannot read %s: %s", path, exc)
+            sys.exit(1)
+
+    def on_event(event: dict) -> None:
+        if not args.quiet:
+            print(f"  · {_format_event(event)}", file=sys.stderr)
+
+    try:
+        studio = Studio(args.lat, args.lon, provider=args.provider, model=args.model, api_key=args.api_key,
+                        base_url=args.base_url, data=data, on_event=on_event, workspace=workspace, intake=intake)
+    except (RuntimeError, ValueError, ImportError) as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    ws = studio.workspace
+    out_dir = Path(args.out or f"./studio-{ws.id}")
+    interactive = sys.stdin.isatty() and not args.yes
+
+    def checkpoint() -> None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "workspace.json").write_text(ws.to_json(), encoding="utf-8")
+
+    def ask(prompt: str) -> str | None:
+        try:
+            return input(prompt)
+        except EOFError:
+            return None
+
+    reply = None
+    if ws.status == "intake":
+        if not args.query and not ws.messages:
+            logger.error("studio needs the problem in plain language.")
+            sys.exit(1)
+        reply = studio.say(args.query) if args.query else studio.say("just go")
+        while reply.kind == "questions":
+            print(reply.text)
+            if not interactive:
+                print("  Proceeding on the defaults (--yes or no terminal).", file=sys.stderr)
+                reply = studio.say("just go")
+                continue
+            answer = ask("> ")
+            if answer is None:
+                checkpoint()
+                return
+            reply = studio.say(answer)
+    elif ws.status == "review":
+        reply = studio._plan_reply()
+    elif ws.status == "done":
+        reply = studio._report_reply()
+    if reply is None or reply.kind == "declined":
+        print(reply.text if reply else f"Status {ws.status}; nothing to do.", file=sys.stderr)
+        checkpoint()
+        sys.exit(1 if reply is not None else 0)
+    if reply.kind == "plan":
+        print(reply.text)
+        edits = None
+        if interactive:
+            while True:
+                answer = (ask("Run this plan? [y/N/e] ") or "n").strip().lower()
+                if answer in ("y", "yes"):
+                    break
+                if answer == "e":
+                    line = ask("Overrides, STEP.ARG=VALUE separated by commas (blank keeps the plan): ") or ""
+                    try:
+                        edits = _parse_edits(line) or None
+                    except ValueError as exc:
+                        print(f"  {exc}", file=sys.stderr)
+                        continue
+                    break
+                print("  Declined at review; the workspace is saved.", file=sys.stderr)
+                checkpoint()
+                return
+        elif not args.yes:
+            print("  Not a terminal: pass --yes to run the plan.", file=sys.stderr)
+            checkpoint()
+            return
+        reply = studio.approve(edits=edits)
+        while reply.kind == "plan" and reply.payload.get("errors") and interactive:
+            print(reply.text)
+            line = ask("Overrides again (blank runs the plan as it is): ") or ""
+            try:
+                reply = studio.approve(edits=_parse_edits(line) or None)
+            except ValueError as exc:
+                print(f"  {exc}", file=sys.stderr)
+    if reply.kind == "report":
+        print()
+        print(reply.text)
+        missing = reply.payload.get("not_established") or []
+        if missing and not args.quiet:
+            print("\n  What this study does not establish:", file=sys.stderr)
+            for line in missing:
+                print(f"   · {line}", file=sys.stderr)
+        paths = studio.export(out_dir)
+        print(f"\n  Bundle written to {out_dir}: {', '.join(sorted(paths))}")
+        if interactive:
+            while True:
+                text = ask("Follow-up (or 'done'): ")
+                if text is None or text.strip().lower() in ("", "done", "quit", "exit"):
+                    break
+                more = studio.follow_up(text)
+                print(more.text)
+                if more.kind == "report":
+                    studio.export(out_dir)
+                    print(f"  Bundle updated in {out_dir}")
+    elif reply.kind != "plan":
+        print(reply.text)
+    checkpoint()
+
+
 def cmd_forecast(args: argparse.Namespace) -> None:
     """Run a predictive model on a time-series data file."""
     import pandas as pd
@@ -2332,6 +2487,29 @@ def main() -> None:
     p_solve.add_argument("--quiet", "-q", action="store_true", help="Do not print the timeline as it happens")
     p_solve.add_argument("--file", default=None, help="Legacy agent: a data file (JSON/CSV) instead of fetching")
 
+    # ── studio ────────────────────────────────────────────────────────
+    p_studio = sub.add_parser(
+        "studio",
+        help="A complete study at a place by a crew of roles: the brief you agree, the plan you approve, the "
+        "run with gates, the report and the bundle (keyless by default)",
+    )
+    p_studio.add_argument("query", nargs="?", default=None, help="The problem in plain language")
+    p_studio.add_argument("--lat", type=float, default=None, help="Latitude of the site")
+    p_studio.add_argument("--lon", type=float, default=None, help="Longitude of the site")
+    p_studio.add_argument("--data", action="append", default=[], metavar="FILE",
+                          help="A table of your own (CSV, Excel, JSON) the crew may use (repeatable)")
+    p_studio.add_argument("--intake", action="append", default=[], metavar="KEY=VALUE",
+                          help="An intake field, e.g. --intake return_period=200 (repeatable)")
+    p_studio.add_argument("--provider", choices=provider_ids(), default=None,
+                          help="Use a model for the brief, the methodology and the prose (keyless otherwise)")
+    p_studio.add_argument("--model", default=None, help="Model name")
+    p_studio.add_argument("--api-key", default=None)
+    p_studio.add_argument("--base-url", default=None, help="Any OpenAI-compatible endpoint (or Anthropic's)")
+    p_studio.add_argument("--out", "-o", default=None, help="The bundle's directory (default ./studio-<id>/)")
+    p_studio.add_argument("--yes", "-y", action="store_true", help="Answer the defaults, approve the plan, export")
+    p_studio.add_argument("--resume", default=None, metavar="WORKSPACE.JSON", help="Resume a saved workspace")
+    p_studio.add_argument("--quiet", "-q", action="store_true", help="Do not print the timeline as it happens")
+
     # ── forecast ──────────────────────────────────────────────────────
     p_forecast = sub.add_parser("forecast", help="Run a predictive model on time-series data")
     p_forecast.add_argument("--model", required=True, help="Model ID (prophet, arima, random_forest, xgboost, lstm)")
@@ -2522,6 +2700,7 @@ def main() -> None:
         "run": cmd_run,
         "ingest": cmd_ingest,
         "solve": cmd_solve,
+        "studio": cmd_studio,
         "playbooks": cmd_playbooks,
         "forecast": cmd_forecast,
         "plot": cmd_plot,

@@ -331,12 +331,19 @@ def _target_values(target: dict[str, Any]) -> dict[str, float | None]:
 
 
 def similar_for_point(
-    lat: float, lon: float, *, k: int = 10, method: str = "combined", **kw: Any
+    lat: float, lon: float, *, k: int = 10, method: str = "combined", desc: dict[str, Any] | None = None,
+    **kw: Any
 ) -> dict[str, Any]:
-    """Describe the catchment of a point (BasinATLAS) and rank the gauged basins most like it."""
-    from aquascope.archive.basins import describe_catchment
+    """Describe the catchment of a point (BasinATLAS) and rank the gauged basins most like it.
 
-    desc = describe_catchment(lat, lon, upstream=False)
+    ``desc`` is a ``describe_catchment`` result already in hand (the browser builds one from the sub-basin
+    row it read itself, where BasinATLAS cannot be opened); with it, and ``table`` / ``catalog`` in ``kw``,
+    nothing here touches a file.
+    """
+    if desc is None:
+        from aquascope.archive.basins import describe_catchment
+
+        desc = describe_catchment(lat, lon, upstream=False)
     if desc.get("error"):
         return {"latitude": lat, "longitude": lon, "error": desc["error"]}
     target = {"latitude": lat, "longitude": lon, "attributes": desc.get("attributes", {}),

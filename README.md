@@ -48,6 +48,11 @@ flood frequency with confidence limits, flow duration and trend, computed in you
 The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
 Press **Ask ✨** to type a question in plain language (bring your own key, Groq and Hugging Face are free): the model picks the
 tools, aquascope runs them in your browser, and the answer ends with the data used and the methods with citations.
+Press **Study** (or "Study this place" on any gauge or point) to hand a whole problem to a crew of roles: it writes the
+brief with you, inventories the data in reach and the table you drop in, proposes a methodology you approve, runs it with
+a check after every step, and hands back a zip with a Word report, an Excel workbook, PNG and SVG figures, a notebook that
+re-runs the study and the study.yaml. Keyless it still does all of that from the playbooks; your own key puts a model
+behind every role ([docs](docs/studio.md)).
 Not a Python user? The same files open in [R, QGIS, DuckDB and Julia](docs/readers.md) in place; `integrations/qgis/` has a
 drag-and-drop layer definition.
 
@@ -61,6 +66,7 @@ MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_freq
 - 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 22 hydrological signatures.
 - 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 23 crops, irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
+- 🧑‍🔬 **Hand a study to the crew** — `aquascope studio "PROBLEM" --lat --lon`: a Consultant, a Scout, a Methodologist, Analysts, a Critic and an Author over one workspace, the plan shown before it runs, every step gated, and the bundle (Word, Excel, figures, notebook, study.yaml) at the end. Also in the Explorer and over MCP.
 - 📊 **Visualise + report** — 16 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
 - 🗺️ **Spatial hydrology** — DEM processing, D8 flow direction, watershed delineation, Strahler ordering.
 
@@ -263,7 +269,7 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 27-command CLI (`agri`, `basins`, `caravan`, `gym` and `playbooks` carry subcommands) for the most common workflows:
+AquaScope ships a 28-command CLI (`agri`, `basins`, `caravan`, `gym` and `playbooks` carry subcommands) for the most common workflows:
 
 ```bash
 # Find stations, then collect data
@@ -291,6 +297,7 @@ aquascope agri plan --crop maize --planting-date 2026-04-01 --lat 30.0 --lon 31.
 # AI recommendation + natural-language problem solving
 aquascope recommend --parameters DO,BOD5,COD --goal "pollution trend detection" -o recommendations.json
 aquascope solve "Design flow for a road crossing, 100-year return period" --lat 51.415 --lon -0.308
+aquascope studio "Design flow for a road crossing, 100-year, and how sure can we be" --lat 51.415 --lon -0.308 --out kingston/   # the crew: brief, plan, run, bundle
 
 # Interactive Streamlit dashboard — multipage workspace with 21 live sources,
 # smart auto-insights, and fully interactive Plotly charts

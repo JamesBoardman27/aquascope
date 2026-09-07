@@ -213,7 +213,8 @@ def water_quality_samples(
 
 
 def analyze_station(
-    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False, variable: str | None = None
+    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False, variable: str | None = None,
+    return_periods: list[float] | None = None,
 ) -> dict[str, Any]:
     """Fetch and analyse one station: record summary, annual maxima, flood frequency (GEV L-moments and
     Log-Pearson III with 90 % CI; optional bootstrap GEV band), flow-duration percentiles, Mann-Kendall
@@ -231,13 +232,14 @@ def analyze_station(
     if variable and variable not in VARIABLES:
         return {"error": f"unknown variable {variable!r}; allowed: {list(VARIABLES)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable)
+    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable,
+                   return_periods=return_periods)
     res.pop("series", None)
     if "fdc" in res:
         res["fdc"] = {k: res["fdc"][k] for k in ("q95", "q50", "q10")}
     if bootstrap_ci and res.get("ffa") and store.get("series") is not None:
         try:
-            ci = flood_ci(store["series"])
+            ci = flood_ci(store["series"], return_periods=return_periods)
             res["ffa"]["fits"]["gev_bootstrap"] = {
                 k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded") if k in ci
             }
@@ -248,12 +250,14 @@ def analyze_station(
 
 
 def flood_frequency(
-    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False
+    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False,
+    return_periods: list[float] | None = None,
 ) -> dict[str, Any]:
-    """Return levels for T = 2, 5, 10, 25, 50, 100 years at a station (subset of analyze_station).
-    years caps the record to the last N years; by default the full record is requested.
+    """Return levels for T = 2, 5, 10, 25, 50, 100 years at a station (subset of analyze_station); pass
+    return_periods to add others (a 200-year design). years caps the record to the last N years; by default the
+    full record is requested.
     """
-    res = analyze_station(source, station_id, years=years, bootstrap_ci=bootstrap_ci)
+    res = analyze_station(source, station_id, years=years, bootstrap_ci=bootstrap_ci, return_periods=return_periods)
     if "error" in res:
         return res
     keep = {k: res.get(k) for k in ("source", "station_id", "agency", "license", "attribution", "unit",
@@ -649,6 +653,98 @@ _WIDGET_CSS = (
 )
 
 
+# ── Studio over MCP: a crew of roles does a complete study at a place; the workspace dict in and out ──
+
+
+def _studio(workspace: dict[str, Any] | None, *, lat: float | None = None, lon: float | None = None,
+            intake: dict[str, Any] | None = None, provider: str | None = None, model: str | None = None,
+            api_key: str | None = None, base_url: str | None = None) -> Any:
+    from aquascope.studio import Studio
+
+    return Studio(lat, lon, provider=provider, model=model, api_key=api_key, base_url=base_url,
+                  workspace=workspace, intake=intake)
+
+
+def _studio_reply(studio: Any, reply: Any) -> dict[str, Any]:
+    return {"reply": reply.to_dict(), "status": studio.workspace.status, "summary": studio.workspace.summary(),
+            "workspace": studio.to_dict()}
+
+
+def studio_start(
+    problem: str, lat: float, lon: float, intake: dict[str, Any] | None = None, provider: str | None = None,
+    model: str | None = None, api_key: str | None = None, base_url: str | None = None,
+) -> dict[str, Any]:
+    """Open a study at a point with the Studio crew (Consultant, Scout, Methodologist, Analysts, Critic, Author).
+    The Consultant takes the brief from the problem text; the reply is either `questions` (answer them with
+    studio_say, or say "just go") or, when nothing needs asking, the `plan` to review (approve it with
+    studio_approve) or `declined` with the reason. Keyless unless a provider/model is given. Keep the returned
+    `workspace` dict and pass it to the next studio_* call: the tools are stateless.
+    intake: playbook intake fields, for example {"return_period": 100}.
+    """
+    try:
+        studio = _studio(None, lat=float(lat), lon=float(lon), intake=intake, provider=provider, model=model,
+                         api_key=api_key, base_url=base_url)
+        return _studio_reply(studio, studio.say(problem))
+    except Exception as exc:  # noqa: BLE001 - an MCP tool answers with an error, not a traceback
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def studio_say(
+    workspace: dict[str, Any], text: str, provider: str | None = None, model: str | None = None,
+    api_key: str | None = None, base_url: str | None = None,
+) -> dict[str, Any]:
+    """Continue the conversation with the Studio crew: answer the Consultant's questions (in order, or "just go"
+    for the defaults), change the brief at review, or ask a follow-up after the report. Returns the next reply
+    (questions, plan, report, answer or declined) and the updated workspace to pass on.
+    """
+    try:
+        studio = _studio(workspace, provider=provider, model=model, api_key=api_key, base_url=base_url)
+        return _studio_reply(studio, studio.say(text))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def studio_approve(
+    workspace: dict[str, Any], edits: dict[str, Any] | None = None, provider: str | None = None,
+    model: str | None = None, api_key: str | None = None, base_url: str | None = None,
+) -> dict[str, Any]:
+    """Approve the plan in the workspace (optionally with edits: {"s3": {"arguments": {"k": 8}}} or a
+    replacement {"steps": [...]}, revalidated) and run the crew to the report: the Analysts with their gates,
+    the Critic, the Author. The reply is `report` (answer, key numbers, sections, what is not established)
+    with the artifacts listed; the workspace carries their bytes.
+    """
+    try:
+        studio = _studio(workspace, provider=provider, model=model, api_key=api_key, base_url=base_url)
+        return _studio_reply(studio, studio.approve(edits=edits))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def studio_follow_up(
+    workspace: dict[str, Any], text: str, provider: str | None = None, model: str | None = None,
+    api_key: str | None = None, base_url: str | None = None,
+) -> dict[str, Any]:
+    """A follow-up after the report: a question is answered from the workspace (reply `answer`); a change
+    (another return period, another statistic) is planned, run and re-authored (reply `report`).
+    """
+    try:
+        studio = _studio(workspace, provider=provider, model=model, api_key=api_key, base_url=base_url)
+        return _studio_reply(studio, studio.follow_up(text))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def studio_export(workspace: dict[str, Any], out_dir: str) -> dict[str, Any]:
+    """Write the study's bundle (report, study.yaml, workspace.json, figures and documents when made) into
+    out_dir; returns the paths by file name.
+    """
+    try:
+        studio = _studio(workspace)
+        return {"paths": studio.export(out_dir), "out_dir": str(out_dir)}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def _sparkline(values: list[float], width: int = 560, height: int = 120) -> str:
     """A dependency-free hydrograph: the shape of a record, in an inline SVG."""
     clean = [v for v in values if isinstance(v, (int, float))]
@@ -740,6 +836,11 @@ def build_server():
     server.tool()(describe_playbook)
     server.tool()(solve_plan)
     server.tool()(solve_run)
+    server.tool()(studio_start)
+    server.tool()(studio_say)
+    server.tool()(studio_approve)
+    server.tool()(studio_follow_up)
+    server.tool()(studio_export)
 
     @server.resource("aquascope://sources")
     def sources_resource() -> str:

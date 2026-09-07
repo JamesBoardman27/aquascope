@@ -559,8 +559,14 @@ def _annual_max(s: pd.Series) -> pd.Series:
     return am[counts >= 292].dropna()
 
 
-def analyze_series(s: pd.Series, variable: str, unit: str) -> dict[str, Any]:
-    """Compute Phase-0 analytics for a series. Pure function, JSON-safe output."""
+def analyze_series(s: pd.Series, variable: str, unit: str, *,
+                   return_periods: list[float] | None = None) -> dict[str, Any]:
+    """Compute Phase-0 analytics for a series. Pure function, JSON-safe output.
+
+    ``return_periods`` picks the T the fits report (default 2, 5, 10, 25, 50 and 100 years); a study that
+    asks for a 200-year flow passes the list with 200 in it.
+    """
+    rps = _return_periods(return_periods)
     from aquascope.hydrology.flood_frequency import fit_gev_lmoments, fit_lp3
     from aquascope.hydrology.flow_duration import flow_duration_curve
 
@@ -606,22 +612,22 @@ def analyze_series(s: pd.Series, variable: str, unit: str) -> dict[str, Any]:
         out["methods"].append(METHODS["fdc"])
 
         if len(am) >= MIN_YEARS_FOR_FFA:
-            ffa: dict[str, Any] = {"n_years": int(len(am)), "return_periods": RETURN_PERIODS, "fits": {}}
+            ffa: dict[str, Any] = {"n_years": int(len(am)), "return_periods": rps, "fits": {}}
             try:
-                g = fit_gev_lmoments(am, return_periods=RETURN_PERIODS)
+                g = fit_gev_lmoments(am, return_periods=rps)
                 ffa["fits"]["gev_lmoments"] = {
-                    "q": [_clean(float(g.return_periods[rp])) for rp in RETURN_PERIODS],
+                    "q": [_clean(float(g.return_periods[rp])) for rp in rps],
                     "params": [_clean(float(p)) for p in g.params],
                 }
                 out["methods"].append(METHODS["gev_lmoments"])
             except Exception as exc:  # noqa: BLE001
                 ffa["fits"]["gev_lmoments"] = {"error": str(exc)}
             try:
-                lp3 = fit_lp3(am, return_periods=RETURN_PERIODS, ci_level=0.90)
+                lp3 = fit_lp3(am, return_periods=rps, ci_level=0.90)
                 ffa["fits"]["lp3"] = {
-                    "q": [_clean(float(lp3.return_periods[rp])) for rp in RETURN_PERIODS],
+                    "q": [_clean(float(lp3.return_periods[rp])) for rp in rps],
                     "ci": [[_clean(float(a)), _clean(float(b))] for a, b in
-                           (lp3.confidence_intervals.get(rp, (float("nan"), float("nan"))) for rp in RETURN_PERIODS)],
+                           (lp3.confidence_intervals.get(rp, (float("nan"), float("nan"))) for rp in rps)],
                     "params": [_clean(float(p)) for p in lp3.params],
                 }
                 out["methods"].append(METHODS["lp3"])
@@ -661,16 +667,33 @@ def analyze_series(s: pd.Series, variable: str, unit: str) -> dict[str, Any]:
     return out
 
 
-def flood_ci(s: pd.Series) -> dict[str, Any]:
+def _return_periods(return_periods: Any) -> list[Any]:
+    """The T list a fit reports: the default, or the caller's, always with the defaults it names, sorted."""
+    if not return_periods:
+        return list(RETURN_PERIODS)
+    out: list[float] = []
+    for x in list(return_periods):
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            continue
+        if v >= 1.01 and v not in out:
+            out.append(v)
+    out = sorted(out) or list(RETURN_PERIODS)
+    return [int(v) if float(v).is_integer() else v for v in out]
+
+
+def flood_ci(s: pd.Series, *, return_periods: list[float] | None = None) -> dict[str, Any]:
     """The slow part: bootstrap GEV confidence bands (called on demand)."""
     from aquascope.hydrology.flood_frequency import fit_gev
 
+    rps = _return_periods(return_periods)
     am = _annual_max(s.dropna())
-    r = fit_gev(am, return_periods=RETURN_PERIODS, ci_level=0.90)
+    r = fit_gev(am, return_periods=rps, ci_level=0.90)
     return {
-        "q": [_clean(float(r.return_periods[rp])) for rp in RETURN_PERIODS],
+        "q": [_clean(float(r.return_periods[rp])) for rp in rps],
         "ci": [[_clean(float(a)), _clean(float(b))] for a, b in
-               (r.confidence_intervals.get(rp, (float("nan"), float("nan"))) for rp in RETURN_PERIODS)],
+               (r.confidence_intervals.get(rp, (float("nan"), float("nan"))) for rp in rps)],
         "params": [_clean(float(p)) for p in r.params],
         "n_bootstrap": r.n_bootstrap,
         "n_bootstrap_discarded": r.n_bootstrap_discarded,
@@ -686,6 +709,7 @@ def analyze_station(
     store: dict[str, Any] | None = None,
     variable: str | None = None,
     period_start: Any = None,
+    return_periods: list[float] | None = None,
 ) -> dict[str, Any]:
     """Fetch + analyse one station. The entry point the browser worker calls.
 
@@ -716,7 +740,7 @@ def analyze_station(
     if s is None or s.empty:
         result.update({"n": 0, "error": "The source returned no observations for this station."})
         return result
-    result.update(analyze_series(s, fetched["variable"], fetched["unit"]))
+    result.update(analyze_series(s, fetched["variable"], fetched["unit"], return_periods=return_periods))
     return result
 
 

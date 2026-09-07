@@ -24,6 +24,15 @@ Run it keyless at the Thames at Kingston::
 Drop ``--yes`` to be asked ``y/N`` at the review interrupt. The same four
 functions map onto CrewAI-style roles just as directly: scout, planner,
 reviewer and runner agents whose tools are these functions, in that order.
+
+The Studio crew (``aquascope studio``) maps the same way, with two
+interrupts, one at the brief and one at the plan (``--studio``)::
+
+    START -> consult -> [brief] -> scout_plan -> [plan] -> run_report -> END
+
+``build_studio_graph`` wires it; the nodes are the Coordinator's own methods
+over a workspace dict carried in the state, so the graph can pause anywhere
+and resume from the checkpoint.
 """
 
 from __future__ import annotations
@@ -166,6 +175,92 @@ def build_graph(*, checkpointer: Any | None = None, tools: dict[str, Callable[..
     return g.compile(checkpointer=checkpointer or InMemorySaver())
 
 
+# ── the Studio crew: the same idea with the brief as a second interrupt ─────
+
+
+class StudioState(TypedDict, total=False):
+    """The workspace dict is the blackboard; the nodes are the Coordinator's methods over it."""
+
+    problem: str
+    lat: float
+    lon: float
+    intake: dict[str, Any]
+    model: dict[str, Any]          # provider, model, api_key, base_url (optional)
+    workspace: dict[str, Any]      # Studio.to_dict()
+    reply: dict[str, Any]          # the last Reply as a dict
+    report: str
+
+
+def _studio(state: StudioState) -> Any:
+    from aquascope.studio import Studio
+
+    kwargs = dict(state.get("model") or {})
+    if state.get("workspace"):
+        return Studio.from_dict(state["workspace"], **kwargs)
+    return Studio(float(state["lat"]), float(state["lon"]), intake=state.get("intake"), **kwargs)
+
+
+def studio_consult_node(state: StudioState) -> dict[str, Any]:
+    """Consultant: the brief from the problem; the questions, when any, are the first interrupt."""
+    s = _studio(state)
+    reply = s.say(state.get("problem") or "")
+    while reply.kind == "questions":
+        answer: Any = None
+        if HAVE_LANGGRAPH and interrupt is not None:
+            try:
+                answer = interrupt({"question": reply.text, "questions": reply.questions})
+            except RuntimeError:
+                answer = None
+        reply = s.say(str(answer) if answer else "just go")
+    return {"workspace": s.to_dict(), "reply": reply.to_dict()}
+
+
+def studio_review_node(state: StudioState) -> dict[str, Any]:
+    """You: the plan, as the second interrupt. Resume with True, an edits dict, or None to decline."""
+    reply = state.get("reply") or {}
+    if reply.get("kind") != "plan":
+        return {}
+    decision: Any = True
+    if HAVE_LANGGRAPH and interrupt is not None:
+        try:
+            decision = interrupt({"question": "Run this plan?", "plan": reply.get("text"),
+                                  "study": (reply.get("payload") or {}).get("study")})
+        except RuntimeError:
+            decision = REVIEW((reply.get("payload") or {}).get("study") or {})
+    if decision is None or decision is False:
+        return {"reply": {"kind": "declined", "text": "The plan was declined at review.", "payload": {}}}
+    return {"reply": {**reply, "edits": decision if isinstance(decision, dict) else None}}
+
+
+def studio_run_node(state: StudioState) -> dict[str, Any]:
+    """Analysts, Critic and Author through the Coordinator: approve, run with gates, critique, author."""
+    reply = state.get("reply") or {}
+    if reply.get("kind") != "plan":
+        return {"report": f"Declined: {reply.get('text')}"}
+    s = _studio(state)
+    out = s.approve(edits=reply.get("edits"))
+    text = out.text
+    missing = (out.payload or {}).get("not_established") or []
+    if missing:
+        text += "\n\nWhat this study does not establish:\n" + "\n".join(f"- {m}" for m in missing)
+    return {"workspace": s.to_dict(), "reply": out.to_dict(), "report": text}
+
+
+def build_studio_graph(*, checkpointer: Any | None = None) -> Any:
+    """START -> consult -> review -> run -> END, with the interrupts inside consult and review."""
+    if not HAVE_LANGGRAPH:
+        raise ImportError(LANGGRAPH_MISSING)
+    g = StateGraph(StudioState)
+    g.add_node("consult", studio_consult_node)
+    g.add_node("review", studio_review_node)
+    g.add_node("run", studio_run_node)
+    g.add_edge(START, "consult")
+    g.add_edge("consult", "review")
+    g.add_edge("review", "run")
+    g.add_edge("run", END)
+    return g.compile(checkpointer=checkpointer or InMemorySaver())
+
+
 def plan_text(study: dict[str, Any]) -> str:
     """The plan as the CLI prints it: branch, rationale, a numbered step list with gates."""
     plan = study.get("plan") or {}
@@ -192,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--intake", action="append", default=[], metavar="KEY=VALUE")
     ap.add_argument("--yes", action="store_true", help="approve the plan without asking")
     ap.add_argument("--thread", default="kingston", help="the checkpoint thread id")
+    ap.add_argument("--studio", action="store_true", help="run the Studio crew (brief and plan interrupts)")
     args = ap.parse_args(argv)
     if not HAVE_LANGGRAPH:
         print(LANGGRAPH_MISSING, file=sys.stderr)
@@ -205,8 +301,24 @@ def main(argv: list[str] | None = None) -> int:
         except json.JSONDecodeError:
             intake[key] = value
 
-    graph = build_graph()
     config = {"configurable": {"thread_id": args.thread}}
+    if args.studio:
+        graph = build_studio_graph()
+        state = graph.invoke({"problem": args.problem, "lat": args.lat, "lon": args.lon, "intake": intake},
+                             config=config)
+        while state.get("__interrupt__"):
+            payload = state["__interrupt__"][0].value
+            print(payload.get("plan") or payload.get("question"))
+            if "questions" in payload:
+                answer = "just go" if args.yes else (input("> ").strip() or "just go")
+                state = graph.invoke(Command(resume=answer), config=config)
+                continue
+            ok = args.yes or (input("Run this plan? [y/N] ").strip().lower() == "y")
+            state = graph.invoke(Command(resume=True if ok else None), config=config)
+        print()
+        print(state.get("report") or "no report")
+        return 0
+    graph = build_graph()
     state = graph.invoke({"problem": args.problem, "lat": args.lat, "lon": args.lon,
                           "playbook": args.playbook, "intake": intake}, config=config)
     pauses = state.get("__interrupt__") or []
