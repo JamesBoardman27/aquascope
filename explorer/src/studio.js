@@ -351,15 +351,34 @@ function questionsHtml(m, live) {
   return qs.map((q) => {
     const opts = first && first.id === q.id ? (q.options || []).slice(0, 8) : [];
     const chips = opts.length
-      ? `<div class="study-chips">${opts.map((o) => `<button type="button" class="chip" data-answer="${escapeHtml(String(o))}">${escapeHtml(String(o))}</button>`).join("")}</div>`
+      ? `<div class="study-chips">${opts.map((o) => `<button type="button" class="chip" data-answer="${escapeHtml(String(o))}">${escapeHtml(String(o).replace(/_/g, " "))}</button>`).join("")}</div>`
       : "";
-    return `<div class="study-q">${escapeHtml(q.text)}${chips}</div>`;
+    // With the options as chips and Just go beside Send, the question is the question: the sentence that
+    // lists the options and says how to proceed is not repeated in prose.
+    const text = opts.length && /\?/.test(q.text) ? q.text.slice(0, q.text.indexOf("?") + 1) : q.text;
+    return `<div class="study-q">${escapeHtml(text)}${chips}</div>`;
   }).join("");
+}
+
+// The Consultant's brief, from its payload rather than its sentence: the decision, the playbook, the intake
+// in words, and what was assumed on a second line.
+function briefHtml(m) {
+  const b = (m.payload || {}).brief || {};
+  const bits = [b.decision || b.problem || ""];
+  if (b.playbook) bits.push(String(b.playbook).replace(/_/g, " "));
+  for (const [k, v] of Object.entries(b.intake || {})) {
+    if (v !== null && v !== undefined && v !== "") bits.push(`${argWord(k)} ${argValue(v)}`);
+  }
+  const assumed = (b.assumptions || []).slice(-3);
+  return `Brief: ${escapeHtml(bits.filter(Boolean).join(" · "))}` +
+    (assumed.length ? `<div class="msg-sub muted">assumed: ${escapeHtml(assumed.join("; "))}</div>` : "");
 }
 
 function msgHtml(m, live) {
   let body;
-  if (m.kind === "plan") {
+  if (m.kind === "brief" && m.payload && m.payload.brief) {
+    body = briefHtml(m);
+  } else if (m.kind === "plan") {
     const n = (((m.payload || {}).study || {}).steps || []).length;
     body = `Plan: ${n} step${n === 1 ? "" : "s"}`;
   } else if (m.kind === "report") {

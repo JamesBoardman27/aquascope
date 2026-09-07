@@ -747,10 +747,12 @@ body.workbench-mode .drawer { right: auto; left: 50%; transform: translateX(-50%
    quiet and small; the board above the input is the one thing that is current
    (where and what to bring, the plan, the run, the answer, a decline). */
 .study-thread { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-direction: column; gap: .45rem; }
-.study-thread .msg { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: .5rem; font-size: .82rem; line-height: 1.5; }
-.study-thread .msg-role { font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 640; color: var(--muted); padding-top: .2rem; }
+.study-thread .msg { display: grid; grid-template-columns: 98px minmax(0, 1fr); gap: .5rem; font-size: .82rem; line-height: 1.5; }
+/* "methodologist" is the longest name and has to fit the column on one line. */
+.study-thread .msg-role { font-size: .62rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 640; color: var(--muted); padding-top: .2rem; white-space: nowrap; }
 .study-thread .msg-body { min-width: 0; color: var(--ink-2); overflow-wrap: anywhere; }
 .study-thread .msg.user .msg-body { color: var(--ink); }
+.study-thread .msg-sub { font-size: .74rem; line-height: 1.45; margin-top: .1rem; }
 .study-q { margin-bottom: .3rem; }
 .study-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem 0 .1rem; }
 
@@ -877,7 +879,8 @@ body.workbench-mode .drawer { right: auto; left: 50%; transform: translateX(-50%
   .basin .kv { grid-template-columns: 1fr; }
   .study-timeline li { grid-template-columns: 80px minmax(0, 1fr); }
   .study-timeline .tl-role { font-size: .58rem; }
-  .study-thread .msg { grid-template-columns: 74px minmax(0, 1fr); }
+  .study-thread .msg { grid-template-columns: 88px minmax(0, 1fr); }
+  .study-thread .msg-role { font-size: .56rem; }
   .study-args { grid-template-columns: 1fr; }
   .basemap-grid { grid-template-columns: 1fr 1fr; }
   body.workbench-mode .panel { height: auto; max-height: none; top: var(--gap); border-radius: var(--radius); }

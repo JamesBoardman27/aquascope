@@ -650,6 +650,8 @@ def test_the_worker_studio_message_keeps_the_contract() -> None:
     # the solve messages stay for the faces that mirror them
     for needed in ("solve_plan", "solve_run", "coerce_intake"):
         assert needed in worker, needed
+    # one call at a time: an abandoned run must not hand its arguments to the message queued behind it
+    assert "studioChain" in worker and 'm.type === "studio") return await studioSerial(m)' in worker
     client = (EXPLORER / "src" / "worker-client.js").read_text(encoding="utf-8")
     assert "onStudioProgress" in client and "onStudioArtifact" in client
     assert 'm.type === "studio_progress"' in client and 'm.type === "studio_artifact"' in client

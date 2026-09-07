@@ -463,6 +463,18 @@ async function ensureDocs(id) {
   docsLoaded = true;
 }
 
+// One studio call at a time. The arguments travel through a global the Python
+// reads at its start, and runPythonAsync yields before it runs (it scans the
+// code for imports), so two calls in flight read each other's: seen when a
+// follow-up was stopped on the page (abandoned here, still running) and the
+// next message arrived behind it with JsNull for its arguments.
+let studioChain = Promise.resolve();
+function studioSerial(m) {
+  const run = studioChain.then(() => studio(m));
+  studioChain = run.catch(() => {});
+  return run;
+}
+
 async function studio(m) {
   const { id, type: _type, ...args } = m;
   await ensureStudioPython();
@@ -633,7 +645,7 @@ self.onmessage = async (e) => {
     if (m.type === "solve_plan") return await solvePlan(m);
     if (m.type === "coerce_intake") return await coerceIntake(m);
     if (m.type === "solve_run") return await solveRun(m);
-    if (m.type === "studio") return await studio(m);
+    if (m.type === "studio") return await studioSerial(m);
     if (m.type === "ingest") return await ingestText(m);
     if (m.type === "load_table") return await loadTable(m);
     if (m.type === "workbench") return await workbench(m);
