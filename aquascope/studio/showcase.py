@@ -281,7 +281,8 @@ def headline(text: str | None, *, limit: int = 240) -> str:
     """The first sentence of an answer, without Markdown emphasis, for the index."""
     if not text:
         return ""
-    clean = re.sub(r"[*_`#]+", "", str(text)).strip()
+    # Emphasis markers go; an underscore inside a word (uk_ea, hubeau_hydrometrie) stays.
+    clean = re.sub(r"\*+|`+|^#+\s*|(?<!\w)_+|_+(?!\w)", "", str(text).strip())
     clean = clean.split("\n", 1)[0].strip()
     m = re.search(r"^(.+?[.!?])(?:\s+[A-Z(\"']|$)", clean)
     first = m.group(1) if m else clean

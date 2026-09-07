@@ -210,6 +210,8 @@ def test_helpers():
     assert usd_for({"a": {"prompt_tokens": 1_000_000, "completion_tokens": 0}}, "claude-sonnet-5") == 3.0
     assert usd_for({"a": {"prompt_tokens": 0, "completion_tokens": 1_000_000}}, "unknown", (1.0, 2.0)) == 2.0
     assert headline("") == "" and headline("## No stop here") == "No stop here"
+    assert headline("_The_ **uk_ea** gauge (`hubeau_hydrometrie`) is long. Next.") == \
+        "The uk_ea gauge (hubeau_hydrometrie) is long."
     assert headline("First. second lower-case continues. Third") == "First. second lower-case continues."
     assert headline("x" * 300).endswith("...") and len(headline("x" * 300)) == 240
     df = synthetic_flows(years=2)
