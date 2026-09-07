@@ -58,7 +58,7 @@ def test_interactive_answers_edits_and_follows_up(monkeypatch, capsys, tmp_path,
     monkeypatch.setattr(sys, "argv", ["aquascope", "studio", "Can the river supply the town reliably?", "--lat",
                                       "51.415", "--lon", "-0.308", "-q", "--out", str(out)])
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
-    answers = iter(["2 m3/s", "e", "s2.years=20", "how reliable is it?", "done"])
+    answers = iter(["2 m3/s, a licence", "e", "s2.years=20", "how reliable is it?", "done"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
     with patched():
         cli.main()

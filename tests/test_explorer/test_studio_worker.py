@@ -135,7 +135,8 @@ def test_questions_say_and_the_device_brief(face) -> None:
                       "text": "Can the river supply the town with 3 ML/day reliably?",
                       "brief": {"decision": "renew the abstraction licence", "quantities": ["the reliability"]}},
                tools=tools)
-    assert out["reply"]["kind"] == "questions" and out["status"] == "intake"
+    # the device brief names the decision and the text the demand: the keyless Consultant has nothing to ask
+    assert out["reply"]["kind"] == "plan" and out["status"] == "review"
     ws = out["workspace"]
     assert ws["brief"]["decision"] == "renew the abstraction licence"
     assert ws["brief"]["quantities"] == ["the reliability"]
@@ -228,3 +229,141 @@ def test_the_donor_tools_run_on_the_pages_tables(face) -> None:
         tools["regionalize_signatures"](lat=51.4, lon=-0.3, k=99)
     assert seen["similar"] == {"k": 7, "desc": 2120000010, "rows": 1}
     assert seen["regionalize"] == {"k": 50, "sig": 1, "skill": True}
+
+
+# ── a model on the crew: the ops the page uses, guarded on the engine ───────
+#
+# The page runs the device model as the Methodologist and the Author through
+# these ops. They are built against the bring-your-own-model contract
+# (Studio.say(proposed=), approve(plan=), narrate(), *_context(), prompts.as_json)
+# and guarded on the engine having each method, so what is checked here holds
+# on both sides of that merge: with the method, the engine's answer comes
+# through; without it, {error} or the keyless result with a note, never an
+# exception.
+
+
+def _has(name: str) -> bool:
+    import inspect
+
+    from aquascope.studio import Studio
+
+    if name in ("proposed", "plan"):
+        fn = Studio.say if name == "proposed" else Studio.approve
+        return name in inspect.signature(fn).parameters
+    return hasattr(Studio, name)
+
+
+def test_a_proposed_brief_reaches_the_engine_or_the_fields(face) -> None:
+    tools = fake_tools([])
+    out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308,
+                      "text": "Can the river supply the town with 3 ML/day reliably?",
+                      "proposed": {"brief": {"decision": "renew the abstraction licence",
+                                             "quantities": ["the reliability"]}, "source": "device"}}, tools=tools)
+    ws = out["workspace"]
+    assert ws["brief"]["decision"] == "renew the abstraction licence"
+    assert ws["brief"]["quantities"] == ["the reliability"]
+    assert ws["brief"]["source"] == "device"
+
+
+def test_the_prompts_op_answers_the_export_or_null(face) -> None:
+    out = _run(face, {"op": "prompts"}, tools=fake_tools([]))
+    try:
+        from aquascope.studio import prompts as mod
+    except ImportError:  # pragma: no cover
+        mod = None
+    if mod is not None and hasattr(mod, "as_json"):
+        assert isinstance(out, dict) and "schemas" in out and "methodologist" in out and "author" in out
+    else:
+        assert out is None
+
+
+def test_the_context_op_is_the_roles_context_or_an_error(face) -> None:
+    tools = fake_tools([])
+    out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)
+    ws = out["workspace"]
+    for role in ("methodologist", "author"):
+        ctx = _run(face, {"op": "context", "role": role, "workspace": ws}, tools=tools)
+        if _has(f"{role}_context"):
+            assert "error" not in ctx and isinstance(ctx.get("system"), str) and ctx["system"], role
+            assert json.dumps(ctx)
+        else:
+            assert ctx == {"error": f"no {role} context in this engine"}
+    consult = _run(face, {"op": "context", "role": "consultant", "text": PROBLEM, "workspace": ws}, tools=tools)
+    assert ("error" not in consult) == _has("consultant_context")
+    assert _run(face, {"op": "context", "role": "critic", "workspace": ws}, tools=tools) == {
+        "error": "no critic context in this engine"}
+
+
+def test_check_plan_is_the_validators_verdict(face) -> None:
+    tools = fake_tools([])
+    out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)
+    ws = out["workspace"]
+    good = {"objective": "the design flow", "steps": [
+        {"id": "s1", "tool": "analyze_station", "arguments": {"source": "uk_ea", "station_id": "3400TH"}}]}
+    bad = {"steps": [{"id": "s1", "tool": "no_such_tool", "arguments": {}}]}
+    ok = _run(face, {"op": "check_plan", "workspace": ws, "plan": good}, tools=tools)
+    nope = _run(face, {"op": "check_plan", "workspace": ws, "plan": bad}, tools=tools)
+    assert ok["ok"] is True and ok["errors"] == [] and ok["steps"][0]["tool"] == "analyze_station"
+    assert nope["ok"] is False and nope["errors"] and "no_such_tool" in nope["errors"][0]
+    assert _run(face, {"op": "check_plan", "workspace": ws, "plan": {}}, tools=tools)["ok"] is False
+
+
+def test_approve_with_a_plan_runs_it_or_the_tree_and_says_which(face) -> None:
+    calls: list = []
+    tools = fake_tools(calls)
+    out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)
+    ws = out["workspace"]
+    plan = {"objective": "the design flow", "source": "device", "steps": [
+        {"id": "s1", "tool": "analyze_station", "arguments": {"source": "uk_ea", "station_id": "3400TH"}},
+        {"id": "s2", "tool": "flood_frequency", "arguments": {"source": "uk_ea", "station_id": "3400TH",
+                                                              "return_period": 100}}]}
+    out2 = _run(face, {"op": "approve", "workspace": ws, "plan": plan}, tools=tools)
+    assert out2["reply"]["kind"] == "report" and out2["status"] == "done"
+    payload = out2["reply"]["payload"]
+    assert payload.get("plan_used") in ("proposed", "tree")
+    if _has("plan"):
+        assert payload["plan_used"] == "proposed", payload.get("plan_errors")
+        assert [s["tool"] for s in out2["workspace"]["study"]["steps"]] == ["analyze_station", "flood_frequency"]
+    else:
+        assert payload["plan_errors"] == ["this engine does not take a proposed plan"]
+        assert [c[0] for c in calls] == ["describe_catchment", "analyze_station", "flood_frequency"]
+
+    # an invalid plan never runs: the tree does, and the errors say why
+    calls.clear()
+    fresh = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)["workspace"]
+    out3 = _run(face, {"op": "approve", "workspace": fresh,
+                       "plan": {"steps": [{"id": "s1", "tool": "no_such_tool", "arguments": {}}]}}, tools=tools)
+    assert out3["reply"]["kind"] == "report"
+    assert out3["reply"]["payload"]["plan_used"] == "tree" and out3["reply"]["payload"]["plan_errors"]
+    assert "no_such_tool" not in [c[0] for c in calls]
+
+
+def test_narrate_keeps_the_checks_or_says_it_is_absent(face) -> None:
+    tools = fake_tools([])
+    out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)
+    out2 = _run(face, {"op": "approve", "workspace": out["workspace"]}, tools=tools)
+    ws = out2["workspace"]
+    sections = {"summary": "The 100-year flow at Kingston (uk_ea 3400TH) is 512 m3/s. The moon is 384400 km away.",
+                "recommendations": "Use the fitted value with its interval.", "": "dropped", "nope": 3}
+    res = _run(face, {"op": "narrate", "workspace": ws, "sections": sections, "source": "device"}, tools=tools)
+    if not _has("narrate"):
+        assert res == {"error": "narrate is not available in this engine"}
+        return
+    assert res["reply"]["kind"] == "report" and res["status"] == "done"
+    payload = res["reply"]["payload"]
+    assert "dropped" in payload and "written_by" in payload
+    assert json.dumps(res)
+    assert all("data" not in a for a in res["workspace"]["artifacts"]), "no bytes cross to the page"
+
+
+def test_a_file_without_bytes_says_so(face) -> None:
+    """A study resumed from the page's copy has artifacts but no bytes: the file op says it, in words."""
+    tools = fake_tools([])
+    out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)
+    out2 = _run(face, {"op": "approve", "workspace": out["workspace"]}, tools=tools)
+    ws = out2["workspace"]
+    ids = [a["id"] for a in ws["artifacts"]]
+    assert ids, "the run made artifacts"
+    face["_STUDIO"].clear()   # the worker was restarted: the page's copy is all there is
+    got = _run(face, {"op": "file", "workspace": ws, "artifact_id": ids[0]}, tools=tools)
+    assert "error" in got and "not in this session" in got["error"]

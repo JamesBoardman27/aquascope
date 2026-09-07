@@ -1,0 +1,27 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A flash drought is a matter of weeks and needs a sub-monthly soil-moisture or evaporative-demand index the
+# playbook does not compute: it declines.
+id: drought_flash_declined_tetbury
+playbook: drought_status
+title: A flash drought asked of monthly indices (declined)
+brief: >-
+  Is a flash drought setting in around Tetbury this week? The grass has gone brown in ten days. I need to know
+  by the weekend.
+intake:
+  timescales: [1, 3, 12]
+  drought_concern: agriculture
+  flash_drought: true
+site:
+  name: Tetbury, Gloucestershire (rain gauge; Tetbury Slads Farm gauge 0.7 km; Brokenborough borehole 3.9 km)
+  lat: 51.633147
+  lon: -2.153993
+  source: uk_ea
+  station_id: 02bd4687-2b55-4f42-b1cf-77066f01cc70
+  years: 34.9
+  recon: tetbury
+decline: true
+decline_kind: declined
+rationale: >-
+  SPI, SPEI and the SGI are monthly indices; a drying of ten days is below their resolution, and a flash drought
+  needs a weekly soil-moisture or evaporative-demand index aquascope does not compute. The right plan is to decline
+  and offer the monthly status.

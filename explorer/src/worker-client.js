@@ -12,6 +12,7 @@ const askListeners = new Set();
 const solveListeners = new Set();
 const studioListeners = new Set();
 const artifactListeners = new Set();
+const restartListeners = new Set();
 
 export function onAskProgress(fn) { askListeners.add(fn); return () => askListeners.delete(fn); }
 // Solve's timeline events ({role, step, event, detail}) with the id of the call they belong to.
@@ -21,6 +22,9 @@ export function onSolveProgress(fn) { solveListeners.add(fn); return () => solve
 // the id of the call they belong to.
 export function onStudioProgress(fn) { studioListeners.add(fn); return () => studioListeners.delete(fn); }
 export function onStudioArtifact(fn) { artifactListeners.add(fn); return () => artifactListeners.delete(fn); }
+// The worker was terminated and a fresh one is booting: a module that had handed it state (a table, a
+// study's bytes) re-sends what it can, or marks what is gone.
+export function onWorkerRestart(fn) { restartListeners.add(fn); return () => restartListeners.delete(fn); }
 
 export function ensureWorker() {
   if (worker) return worker;
@@ -51,6 +55,32 @@ export function ensureWorker() {
 
 export class Cancelled extends Error {
   constructor() { super("cancelled"); this.name = "Cancelled"; }
+}
+
+// Stop that means stop. Python cannot be interrupted mid-call (a study's run
+// is one synchronous call that keeps going after the page abandons it, and
+// the next message queues behind it), so the worker is terminated and a fresh
+// one boots, with the progress bar as at first load. Every call in flight is
+// rejected as Cancelled. The listeners above are this module's and carry
+// over; the pending map is the page's and is emptied here; what the old
+// worker held (the catalog, a table, a study's bytes) is gone, and the owners
+// re-send it on the restart event.
+export function restartWorker() {
+  if (worker) {
+    try { worker.terminate(); } catch (err) { console.warn("terminate:", err && err.message); }
+  }
+  worker = null;
+  state.workerReady = false;
+  state.ask.catalogSent = false;
+  state.workerEpoch = (state.workerEpoch || 0) + 1;
+  const pending = [...state.pending.values()];
+  state.pending.clear();
+  for (const p of pending) p.reject(new Cancelled());
+  ensureWorker();
+  for (const fn of restartListeners) {
+    try { fn(); } catch (err) { console.warn("on restart:", err && err.message); }
+  }
+  return worker;
 }
 
 // Returns a promise plus a cancel() that rejects it and forgets the reply.

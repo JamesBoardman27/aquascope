@@ -204,3 +204,45 @@ def test_the_requested_return_period_reaches_the_flood_steps() -> None:
     ws.brief.intake["return_period"] = 100
     _ask_for_the_return_period(ws, study)
     assert study.steps[1].arguments["return_periods"] == [2, 5, 10, 25, 50, 100, 200]
+
+
+def test_the_station_wrapper_and_the_gate_take_the_requested_return_period(monkeypatch) -> None:
+    from aquascope import explore, gates
+    from aquascope.studio.roles import analysts
+    from aquascope.studio.workspace import Workspace
+    from aquascope.study import Step, Study
+
+    seen: dict = {}
+
+    def fake_analyze(source, station_id, *, years=None, store=None, variable=None, period_start=None,
+                     return_periods=None):
+        seen["return_periods"] = return_periods
+        return {"years": 40.0, "unit": "m3/s", "ffa": {"return_periods": return_periods or [2, 100]}}
+
+    monkeypatch.setattr(explore, "analyze_station", fake_analyze)
+    out = analysts.analyze_station_full("uk_ea", "x", return_periods=[2, 200])
+    assert seen["return_periods"] == [2, 200] and out["years"] == 40.0
+    ws = Workspace(site={"lat": 51.4, "lon": -0.3})
+    ws.brief.intake["return_period"] = 200
+    study = Study(question="q", version=3, steps=[
+        Step(tool="flood_frequency", id="s1", arguments={"source": "uk_ea", "station_id": "x"},
+             expects=[{"check": "max_return_period_factor", "value": 3, "path": "years"}]),
+    ])
+    analysts._ask_for_the_return_period(ws, study)
+    assert study.steps[0].expects[0]["return_period"] == 200
+    ok = gates.evaluate([{"check": "max_return_period_factor", "value": 3, "path": "years"}], {"years": 40.0})[0]
+    assert ok["passed"], "a gate with no return period named is not applicable, not failed"
+
+
+def test_a_method_argument_the_tool_rejects_is_repaired() -> None:
+    from aquascope.studio import catalogue
+
+    steps = [{"id": "s1", "tool": "similar_basins", "arguments": {"lat": 51.4, "lon": -0.3, "k": 5,
+                                                                    "method": "physio_climatic"}},
+             {"id": "s2", "tool": "regionalize_signatures", "arguments": {"lat": 51.4, "lon": -0.3, "k": 5,
+                                                                           "method": "regionalization"}}]
+    assert catalogue.validate_plan(steps) == []
+    assert steps[0]["arguments"]["method"] == "similarity" and steps[1]["arguments"]["method"] == "similarity"
+    assert any("physio_climatic" in n for n in steps[0]["notes"])
+    bad = [{"id": "s1", "tool": "similar_basins", "arguments": {"lat": 1, "lon": 2, "method": "nope"}}]
+    assert catalogue.validate_plan(bad, repair=False)

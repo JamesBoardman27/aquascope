@@ -122,7 +122,8 @@ def test_a_drought_report_quotes_the_indices(no_deliverables):
     assert [s["tool"] for s in ws.study["steps"]] == ["drought_indices", "low_flow_context", "drought_propagation"]
     report = author.author_report(ws, None)
     labels = {k["label"]: k["value"] for k in report["key_numbers"]}
-    assert labels["SPEI at 12 months, 2026-08"] == DROUGHT["current"]["spei"]["12"] and labels["Q95"] == 12.3
+    assert labels["SPEI at 12 months, 2026-08 (moderately dry)"] == DROUGHT["current"]["spei"]["12"]
+    assert labels["Q95"] == 12.3
     assert "SPI -0.42 at 1 month" in report["answer"] or "SPEI" in report["answer"]
     out = critic.critique(ws, None)
     assert all(c["passed"] for c in out["checks"]), out["checks"]

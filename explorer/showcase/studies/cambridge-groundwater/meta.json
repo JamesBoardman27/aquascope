@@ -1,0 +1,133 @@
+{
+ "id": "cambridge-groundwater",
+ "title": "Groundwater decline in the Chalk near Cambridge",
+ "kind": "groundwater_decline",
+ "shows": "A 48-year borehole record: trend, the SGI and a recharge estimate.",
+ "site": {
+  "lat": 52.2,
+  "lon": 0.12,
+  "name": "Chalk boreholes near Cambridge, UK"
+ },
+ "problem": "Are groundwater levels in the Chalk near Cambridge declining over the last ten years compared with the full record? Public supply depends on the boreholes.",
+ "intake": {
+  "horizon": 10,
+  "concern": "supply",
+  "attribute_cause": false
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T13:48:10+00:00",
+ "seconds": 279.9,
+ "tokens": {
+  "prompt": 37780,
+  "completion": 20565,
+  "calls": 6,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3245,
+    "completion_tokens": 943
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 9461,
+    "completion_tokens": 6253
+   },
+   "analyst": {
+    "calls": 1,
+    "prompt_tokens": 3255,
+    "completion_tokens": 190
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 16807,
+    "completion_tokens": 7342
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 5012,
+    "completion_tokens": 5837
+   }
+  },
+  "total": 58345
+ },
+ "usd": 0.4218,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "groundwater_decline",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 4,
+ "gates": {
+  "passed": 5,
+  "total": 8
+ },
+ "checks": {
+  "passed": 6,
+  "total": 6
+ },
+ "replans": 1,
+ "stop_reason": "gate failed: min_years (9.7 years of record, 10 needed: too short); not_empty (nothing at 'trend'); the fallback analyze_station did not pass its own gates",
+ "headline": "The full 48.7-year record at Haggis Farm (uk_ea, station b3272d5b-f4fd-48eb-8bc7-67c102d65943, 1977-09-29 to 2026-06-08) shows a statistically significant increasing trend by Mann-Kendall test (tau = 0.86, p = 0.0) with a Sen's slope of...",
+ "not_established": [
+  "Step s2, gate min_years: 9.7 years of record, 10 needed: too short",
+  "Step s2, gate not_empty: nothing at 'trend'",
+  "Step s2.fallback, gate min_years: no record length at 'years'",
+  "The study stopped at s2: gate failed: min_years (9.7 years of record, 10 needed: too short); not_empty (nothing at 'trend'); the fallback analyze_station did not pass its own gates"
+ ],
+ "figures": [
+  {
+   "name": "s1_series.png",
+   "id": "fig-s1-series",
+   "step": "s1",
+   "caption": "Groundwater level at Haggis Farm (uk_ea b3272d5b-f4fd-48eb-8bc7-67c102d65943), 1977 to 2026.",
+   "bytes": 83127
+  },
+  {
+   "name": "s1_trend.png",
+   "id": "fig-s1-trend",
+   "step": "s1",
+   "caption": "Annual mean groundwater level at Haggis Farm (uk_ea b3272d5b-f4fd-48eb-8bc7-67c102d65943) with the Sen slope line; the Mann-Kendall test finds increasing (p = 0.000, 40 years).",
+   "bytes": 79491
+  },
+  {
+   "name": "s2_series.png",
+   "id": "fig-s2-series",
+   "step": "s2",
+   "caption": "Groundwater level at Haggis Farm (uk_ea b3272d5b-f4fd-48eb-8bc7-67c102d65943), 2016 to 2026.",
+   "bytes": 86122
+  },
+  {
+   "name": "s2.fallback_series.png",
+   "id": "fig-s2.fallback-series",
+   "step": "s2.fallback",
+   "caption": "Groundwater level at Haggis Farm (uk_ea b3272d5b-f4fd-48eb-8bc7-67c102d65943), 1978 to 2026.",
+   "bytes": 82859
+  },
+  {
+   "name": "s2.fallback_trend.png",
+   "id": "fig-s2.fallback-trend",
+   "step": "s2.fallback",
+   "caption": "Annual mean groundwater level at Haggis Farm (uk_ea b3272d5b-f4fd-48eb-8bc7-67c102d65943) with the Sen slope line; the Mann-Kendall test finds increasing (p = 0.000, 39 years).",
+   "bytes": 82275
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_series.png",
+  "figures/s1_trend.png",
+  "figures/s2_series.png",
+  "figures/s2.fallback_series.png",
+  "figures/s2.fallback_trend.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}

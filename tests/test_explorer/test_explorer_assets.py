@@ -156,6 +156,27 @@ def test_the_recorded_showcase_traces_are_part_of_the_build(tmp_path: Path, monk
     assert Path("showcase/kingston.json") in files
 
 
+def test_the_recorded_studies_are_part_of_the_build(tmp_path: Path, monkeypatch) -> None:
+    """The recorded studies (#366) are directories under explorer/showcase/studies/: the index, one meta,
+    workspace, report and study file per case as text, and the figures as bytes."""
+    build = _build_module()
+    src = tmp_path / "explorer"
+    case = src / "showcase" / "studies" / "kingston-flood"
+    (case / "figures").mkdir(parents=True)
+    (src / "index.html").write_text("<!-- page -->", encoding="utf-8")
+    (src / "showcase" / "studies" / "index.json").write_text('{"studies": []}', encoding="utf-8")
+    for name, text in (("meta.json", "{}"), ("workspace.json", "{}"), ("report.md", "# r"), ("study.yaml", "a: 1")):
+        (case / name).write_text(text, encoding="utf-8")
+    (case / "figures" / "s3_frequency_curve.png").write_bytes(b"\x89PNG")
+    monkeypatch.setattr(build, "SRC", src)
+
+    files = build.text_files()
+    for rel in ("index.json", "kingston-flood/meta.json", "kingston-flood/workspace.json", "kingston-flood/report.md",
+                "kingston-flood/study.yaml"):
+        assert Path("showcase/studies") / rel in files, rel
+    assert Path("showcase/studies/kingston-flood/figures/s3_frequency_curve.png") in build.binary_files()
+
+
 pytestmark_node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 
 
@@ -613,15 +634,22 @@ def test_the_study_drawer_is_wired_end_to_end() -> None:
     assert 'id="solve-pane"' not in html and 'id="btn-solve"' not in html, "Study replaces Solve in the drawer"
     assert not (EXPLORER / "src" / "solve.js").exists()
     app = (EXPLORER / "app.js").read_text(encoding="utf-8")
-    assert "initStudy" in app and "url.study" in app
+    assert "url.study" in app
+    # Study is loaded on first use: app.js wires the button synchronously (before the boot awaits anything)
+    # and the click imports the module; studio.js no longer imports at boot.
+    assert 'import("./src/studio.js?v=__BUILD__")' in app, "the Study modules load on first use"
+    assert 'from "./src/studio.js' not in app, "studio.js must not be a static import of app.js"
+    boot = app[app.index("(async function boot()"):]
+    assert "initStudyLoader()" in boot[:boot.index("await ")], "the Study button is wired before any await"
+    loader = app[app.index("function initStudyLoader()"):]
+    assert '$("btn-study").addEventListener' in loader[:300], "the Study button is wired in the loader"
     studio = (EXPLORER / "src" / "studio.js").read_text(encoding="utf-8")
-    body = studio[studio.index("export function initStudy()"):]
-    assert '$("btn-study").addEventListener' in body[:400], "the Study button is wired first"
-    assert "\n  await " not in body[:body.index('$("btn-study").addEventListener')]
+    assert "export function initStudy()" in studio and "export function toggleStudy()" in studio
     shell = (EXPLORER / "src" / "shell.js").read_text(encoding="utf-8")
     assert 'const MODES = ["ask", "study"]' in shell
     url = (EXPLORER / "src" / "url.js").read_text(encoding="utf-8")
-    assert 'q.set("study", "1")' in url and 'q.has("study") || q.has("solve")' in url, "old Solve links open Study"
+    assert 'q.set("study", state.study.recorded || "1")' in url and 'q.has("study") || q.has("solve")' in url, (
+        "old Solve links open Study; a recording on the board is in the link")
 
 
 def test_the_worker_studio_message_keeps_the_contract() -> None:
@@ -665,3 +693,20 @@ def test_the_study_surface_writes_with_plain_hyphens() -> None:
     html = _html()
     pane = html[html.index('id="study-pane"'):html.index("</aside>", html.index('id="study-pane"'))]
     assert "—" not in pane and "–" not in pane
+
+
+@pytestmark_node
+def test_the_node_tests_of_the_pure_modules_pass() -> None:
+    """explorer/tests/*.test.mjs are node:test suites over the pure modules (studio-showcase.js, #366)."""
+    # The files themselves, not the directory: Node 22 reads a directory argument as a pattern and finds nothing.
+    files = sorted(str(f) for f in (EXPLORER / "tests").glob("*.test.mjs"))
+    assert files, "no node suites under explorer/tests"
+    out = subprocess.run(
+        ["node", "--test", *files],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=str(EXPLORER.parent),
+    )
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert re.search(r"^# fail 0$", out.stdout, re.M), out.stdout

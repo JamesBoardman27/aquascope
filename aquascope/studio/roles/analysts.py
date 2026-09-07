@@ -49,7 +49,7 @@ _BULK_KEYS = ("series",)
 
 
 def analyze_station_full(source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False,
-                         variable: str | None = None) -> dict[str, Any]:
+                         variable: str | None = None, return_periods: list[float] | None = None) -> dict[str, Any]:
     """``aquascope.explore.analyze_station`` with the daily series and the full flow-duration curve kept in the
     payload (the runner's own ``analyze_station`` drops them, so the hydrograph, trend and FDC figures never
     drew); the bootstrap band as the runner adds it. The Analysts strip the series before the payload is stored."""
@@ -64,10 +64,11 @@ def analyze_station_full(source: str, station_id: str, years: int | None = None,
     if variable and variables is not None and variable not in variables:
         return {"error": f"unknown variable {variable!r}; allowed: {list(variables)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable)
+    extra = {"return_periods": return_periods} if return_periods else {}
+    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable, **extra)
     if bootstrap_ci and res.get("ffa") and store.get("series") is not None:
         try:
-            ci = flood_ci(store["series"])
+            ci = flood_ci(store["series"], **extra)
             res["ffa"]["fits"]["gev_bootstrap"] = {
                 k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded") if k in ci
             }
@@ -121,6 +122,11 @@ def _ask_for_the_return_period(ws: Workspace, study: Study) -> None:
             continue
         periods.append(rp_f)
         step.arguments["return_periods"] = [int(v) if float(v).is_integer() else v for v in sorted(set(periods))]
+    for step in study.steps:
+        for gate in step.expects or []:
+            if isinstance(gate, dict) and gate.get("check") == "max_return_period_factor" \
+                    and gate.get("return_period") is None:
+                gate["return_period"] = int(rp_f) if rp_f.is_integer() else rp_f
 
 
 def _inherit_units(ws: Workspace, run: StudyRun, study: Study) -> None:
@@ -188,7 +194,9 @@ def load_table(ws: Workspace, table: str, value_column: str | None = None,
         if value_column:
             if value_column not in df.columns:
                 return {"error": f"no column {value_column!r} in {table}; the columns are {columns}", **out}
-            mapping.value_column = value_column
+            from aquascope.studio.roles.scout import choose_column
+
+            mapping = choose_column(df, mapping, value_column)
         if datetime_column:
             if datetime_column not in df.columns:
                 return {"error": f"no column {datetime_column!r} in {table}; the columns are {columns}", **out}

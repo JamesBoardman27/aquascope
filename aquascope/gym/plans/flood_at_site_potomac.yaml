@@ -1,0 +1,56 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A 96-year daily record at the point: the at-site fit stands, with the trend pre-test and the spread between two
+# distributions quoted, as the flood_risk playbook's at_site branch has it.
+id: flood_at_site_potomac
+playbook: flood_risk
+title: Design flow for a road bridge at a century-long gauge, T = 100 years
+brief: >-
+  We are sizing a new road bridge on the Potomac a few hundred metres below the Little Falls gauge. Give me the
+  100-year design flow with its uncertainty band.
+intake:
+  return_period: 100
+  decision: design flow
+site:
+  name: Potomac River near Washington, DC (Little Falls pump station)
+  lat: 38.94978
+  lon: -77.12764
+  source: usgs
+  station_id: USGS-01646500
+  years: 96.5
+  recon: potomac_little_falls
+expected_branch: at_site
+steps:
+  - tool: describe_catchment
+    optional: true
+    note: 30,000 km2 with upstream regulation; frames the estimate, not an analysis on its own.
+  - tool: analyze_station
+    method: trend_mann_kendall
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: trend}
+      - {check: unit_present, path: unit}
+  - tool: flood_frequency
+    method: at_site_flood_frequency
+    gates:
+      - {check: max_return_period_factor, path: years}
+      - {check: ci_finite, path: ffa.fits.gev_bootstrap.ci}
+      - {check: spread_within, path: "ffa.fits.gev_lmoments.q, ffa.fits.lp3.q"}
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+  - tool: similar_basins
+    method: similar_basins
+    optional: true
+    note: A donor cross-check is tolerated at a gauged site; it is not needed with 96 years.
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    optional: true
+forbidden:
+  tools: [load_table, return_periods]
+  methods: [gr4j_calibration, spi, spei, groundwater_trend, sgi]
+rationale: >-
+  Ninety-six years of daily discharge at the point make the at-site frequency fit defensible for T = 100 (the
+  registry caps T at three times the record). The plan tests the record for a trend first, fits GEV by L-moments
+  and Log-Pearson III with a bootstrap band, and quotes the spread; the estimate is stationary and climate change
+  is a caveat. A lumped rainfall-runoff model is not defensible on a 30,000 km2 catchment, and there is no rain
+  gauge or well in the catalog within reach.

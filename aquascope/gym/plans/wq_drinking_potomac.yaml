@@ -1,0 +1,41 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# The Little Falls gauge is the intake of Washington's water supply and carries sampled water quality: the
+# samples, the WHO screen and the CCME index against the drinking guidelines, as the water_quality drinking branch.
+id: wq_drinking_potomac
+playbook: water_quality
+title: Water quality index for drinking at the Little Falls intake
+brief: >-
+  How does the river water at the Little Falls intake on the Potomac rate against the drinking-water guidelines
+  over the last five years? Give me an index over what was actually sampled.
+intake:
+  use: drinking
+  years: 5
+site:
+  name: Potomac River near Washington, DC (Little Falls pump station)
+  lat: 38.94978
+  lon: -77.12764
+  source: usgs
+  station_id: USGS-01646500
+  years: 96.5
+  recon: potomac_little_falls
+expected_branch: drinking
+steps:
+  - tool: water_quality_samples
+    gates:
+      - {check: not_empty, path: samples}
+  - tool: who_screen
+  - tool: wqi
+    method: water_quality_index
+    gates:
+      - {check: not_empty, path: ccme.score}
+      - {check: min_samples, path: ccme.sample_counts}
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [load_table, eda, quality]
+  methods: [spi, spei, groundwater_trend, sgi]
+rationale: >-
+  The station lists sampled water quality, so the last five years of samples are fetched as tidy rows with counts
+  per parameter, each parameter is screened against the WHO (2022) guideline, and the CCME WQI 1.0 indexes the
+  exceedances (scope, frequency, amplitude) with the sample-count gate CCME asks for. The index covers the sampled
+  parameters and is not a verdict that the water is safe, which the brief does not ask.

@@ -1,0 +1,60 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# Off-tree: a drought question that names the well and the river. The propagation to the water table, the well's
+# trend and the river's low-flow context are required steps, not the optional additions the tree makes them.
+id: offtree_drought_well_river_tetbury
+playbook: drought_status
+title: Drought at Tetbury and whether it has reached the borehole and the river
+brief: >-
+  Is the Tetbury area in drought, has the rainfall deficit reached the Brokenborough borehole yet and how long
+  does that take, is the water table lower than it used to be over the years, and where does the flow at Tetbury
+  Slads Farm sit in its record?
+intake:
+  timescales: [1, 3, 12]
+  drought_concern: groundwater
+site:
+  name: Tetbury, Gloucestershire (rain gauge; Tetbury Slads Farm gauge 0.7 km; Brokenborough borehole 3.9 km)
+  lat: 51.633147
+  lon: -2.153993
+  source: uk_ea
+  station_id: 02bd4687-2b55-4f42-b1cf-77066f01cc70
+  years: 34.9
+  recon: tetbury
+expected_branch: gauge_indices
+tags: [off_tree]
+steps:
+  - tool: drought_indices
+    method: spei
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: indices}
+      - {check: not_empty, path: current.spei}
+  - tool: drought_propagation
+    method: sgi
+    gates:
+      - {check: not_empty, path: sgi}
+  - tool: analyze_station
+    method: groundwater_trend
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: trend}
+    note: "Required: the brief asks whether the water table is lower than it used to be over the years."
+  - tool: low_flow_context
+    method: low_flow_frequency
+    alternatives:
+      - {tool: low_flow_context, method: flow_duration}
+      - {tool: low_flow_context, method: baseflow_separation}
+      - {tool: analyze_station, method: flow_duration}
+    gates:
+      - {check: min_years, path: years}
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [load_table, spei, sgi_drought]
+  methods: [spei_reanalysis]
+rationale: >-
+  Four questions, four records within a few kilometres. SPI and SPEI on the 35-year rain gauge say whether the area
+  is in drought; the Standardised Groundwater Index at the 50-year borehole and the SPI-to-SGI lag say whether and
+  when the deficit reached the water table; the Sen's slope on the borehole's annual means says whether the table
+  is lower than it used to be, which the drought index does not; and the flow-duration context at the 48-year
+  gauge says where the river sits. With a rain gauge that passes the 30-year floor, the ERA5 reanalysis indices
+  are the wrong record.

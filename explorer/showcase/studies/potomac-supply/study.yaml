@@ -1,0 +1,111 @@
+# An AquaScope study (version 3): the plan behind an answer, its gates, and what happened.
+#   aquascope run study.yaml
+version: 3
+title: "Determine whether an 8 m3/s run-of-river abstraction at Litt: 38.95, -77.13"
+question: "Can the Potomac at Little Falls reliably supply 8 m3/s to the city's water works, run of river, in a dry year?"
+created: "2026-09-07T13:31:13+00:00"
+aquascope_version: "0.14.0"
+author: "methodologist"
+model: "claude-sonnet-5"
+problem:
+  kind: "supply_reliability"
+  site: {"lat": 38.95, "lon": -77.13}
+  params: {"demand_m3s": 8.0, "use": "municipal", "share": 0.1, "storage": false, "demand_ml_day": null}
+  text: "Can the Potomac at Little Falls reliably supply 8 m3/s to the city's water works, run of river, in a dry year?"
+plan:
+  author: "methodologist"
+  playbook: "supply_reliability"
+  objective: "Determine whether an 8 m3/s run-of-river abstraction at Little Falls on the Potomac River can be reliably met in a dry year without unacceptable shortfall."
+  decision: "whether an 8 m3/s run-of-river abstraction at Little Falls can be reliably met in a dry year without unacceptable shortfall"
+  methodology: ["Characterize the catchment upstream of the Little Falls point to frame drainage area, climate and the degree of regulation by dams.", "Analyze the primary gauge record (USGS-01646500, 96.5 years of daily discharge, 0.2 km from the site) to obtain the flow-duration curve percentiles and long-term trend.", "Compute low-flow context statistics at the same gauge (Q95, Q50, Q10, baseflow index, 7Q10) to describe how the river behaves in dry spells.", "Run the supply-reliability screening at the primary gauge with the stated 8 m3/s demand, a Q95 in-river reserve and the 0.1 share cap, to get the exceedance probability, demand share and days-per-year of shortfall.", "Repeat the flow-duration analysis on the adjusted record (USGS-01646502, 95.7 years, same location) as a cross-check on the discharge series.", "Repeat the supply-reliability screening on the adjusted record to confirm the primary result is not an artifact of the particular record used."]
+  assumptions: ["primary record is USGS-01646500 (Potomac River near Washington, DC, Little Falls Pump Station), 96.5 years of daily discharge, 0.2 km from the site", "USGS-01646502 (adjusted record, same location) can serve as a cross-check", "daily resolution assumed for the discharge record as the catalog does not state it", "no storage or upstream reservoir operation is invoked (run-of-river as stated), so reliability is judged purely against natural daily flow", "the 0.1 share screening default is used only as a secondary sanity check, not as the primary reliability criterion, since the demand is already specified in absolute terms", "USGS-01646502 (adjusted record, same location) serves as a cross-check on the flow-duration and reliability results", "daily resolution is assumed for the discharge record as the catalog does not state it", "the 0.1 share screening default is used only as a secondary sanity check alongside the absolute 8 m3/s demand, since demand is already specified in absolute terms", "demand is held fixed at 8 m3/s year-round as stated in the brief"]
+  alternatives: [{"method": "similar_basins", "why_not": "marginal for this site: it is meant for an ungauged point, but a 96.5-year gauge sits 0.2 km away"}, {"method": "regionalize_signatures", "why_not": "not needed given a long, nearby gauged record; regionalization is an ungauged-point substitute"}, {"method": "gr4j_calibration", "why_not": "not_defensible: catchment area of 30,091 km2 is above the 10,000 km2 ceiling for a lumped model"}, {"method": "recharge_wtf", "why_not": "not_defensible: no groundwater level record exists at this site"}]
+  limitations_expected: ["the supply-reliability screening is a screening rule, not a licence assessment: Q95 kept in the river and at most 0.1 of flow taken are assumptions in the tradition of flow-duration-curve environmental-flow practice, and do not account for the regulator's flow standard, return flows, upstream abstractions or storage", "reliability read off the historical record describes the years on record; a changing climate, new upstream abstraction, or a drier decade than any recorded would move the result"]
+  citations: ["Vogel, R. M. and Fennessey, N. M. (1994). Flow-duration curves I: new interpretation and confidence intervals. J. Water Resour. Plann. Manage. 120, 485-504.", "Smakhtin, V., & Eriyagama, N. (2008). Developing a software package for global desktop assessment of environmental flows. Environ. Model. Softw. 23, 1396-1406. doi:10.1016/j.envsoft.2008.04.002", "Acreman, M., & Dunbar, M. J. (2004). Defining environmental river flow requirements: a review. Hydrol. Earth Syst. Sci. 8, 861-876.", "Smakhtin, V. U. (2001). Low flow hydrology: a review. J. Hydrol. 240, 147-186.", "Lyne, V., & Hollick, M. (1979). Stochastic time-variable rainfall-runoff modelling. Inst. Eng. Aust. Natl. Conf. Publ. 79/10, 89-93.", "Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.", "National-scale validation of donor regionalisation: Hydrol. Earth Syst. Sci. 28 (2024), doi:10.5194/hess-28-3367-2024", "Smakhtin and Eriyagama 2008", "Acreman and Dunbar 2004"]
+  caveats: ["A screening rule, not a licence assessment: Q95 kept in the river and at most the stated share of the flow taken are assumptions in the tradition of flow-duration-curve environmental-flow practice (Smakhtin and Eriyagama 2008; Acreman and Dunbar 2004); the regulator's flow standard, return flows, upstream abstractions and storage are not in the number.", "Reliability read off the record describes the years on record; a changing climate, new upstream abstraction or a drier decade than any recorded moves it."]
+  rationale: "Determine whether an 8 m3/s run-of-river abstraction at Little Falls on the Potomac River can be reliably met in a dry year without unacceptable shortfall."
+  recon_notes: ["Record resolution is not in the catalog; daily is assumed for every variable.", "10 donor gauges from a pool of 37,071 gauged catchments.", "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.", "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted."]
+  replans: [{"step": "s1", "reason": "gate failed: max_area_km2 (no area at 'sub_basin.up_area')", "fallback": {"tool": "supply_reliability", "arguments": {"demand_m3s": 8, "source": "usgs", "station_id": "USGS-01646500", "lat": 38.95, "lon": -77.13}, "rationale": "Catchment area lookup failed but the co-located Little Falls Pump Sta gauge (USGS-01646500, 96.5 years of discharge) directly supports a run-of-river supply reliability check for the 8 m3/s demand.", "expects": [{"check": "not_empty", "path": "reliability"}, {"check": "not_empty", "path": "fdc"}, {"check": "min_years", "path": "years"}, {"check": "unit_present", "path": "unit"}]}}]
+steps:
+  - tool: "describe_catchment"
+    id: "s1"
+    rationale: "Catchment size, climate and regulation by dams frame the supply and say whether the low flows are natural."
+    arguments:
+      lat: 38.95
+      lon: -77.13
+    expects:
+      - {"check": "not_empty", "path": "sub_basin"}
+      - {"check": "max_area_km2", "path": "sub_basin.up_area", "value": null}
+    fallback: {"step": {"tool": "supply_reliability", "arguments": {"demand_m3s": 8, "source": "usgs", "station_id": "USGS-01646500", "lat": 38.95, "lon": -77.13}, "rationale": "Catchment area lookup failed but the co-located Little Falls Pump Sta gauge (USGS-01646500, 96.5 years of discharge) directly supports a run-of-river supply reliability check for the 8 m3/s demand.", "expects": [{"check": "not_empty", "path": "reliability"}, {"check": "not_empty", "path": "fdc"}, {"check": "min_years", "path": "years"}, {"check": "unit_present", "path": "unit"}]}}
+    outputs: [{"kind": "figure", "id": "s1_site_map", "caption": "site map from describe_catchment"}, {"kind": "table", "id": "s1_catchment_attributes", "caption": "catchment attributes from describe_catchment"}]
+  - tool: "analyze_station"
+    id: "s2"
+    rationale: "The record summary, flow-duration percentiles and trend on the primary 96.5-year gauge underpin the reliability screening."
+    method: "flow_duration"
+    arguments:
+      source: "usgs"
+      station_id: "USGS-01646500"
+    expects:
+      - {"check": "min_years", "path": "years", "value": 10}
+      - {"check": "not_empty", "path": "trend", "repaired_from": "fdc"}
+      - {"check": "unit_present", "path": "unit"}
+    outputs: [{"kind": "figure", "id": "s2_fdc", "caption": "fdc from analyze_station"}, {"kind": "figure", "id": "s2_trend", "caption": "trend from analyze_station"}, {"kind": "table", "id": "s2_fdc_percentiles", "caption": "fdc percentiles from analyze_station"}, {"kind": "table", "id": "s2_summary", "caption": "summary from analyze_station"}]
+  - tool: "low_flow_context"
+    id: "s3"
+    rationale: "Q95/Q50/Q10, baseflow index and 7Q10 quantify how low the river runs in a dry year."
+    method: "low_flow_frequency"
+    arguments:
+      source: "usgs"
+      station_id: "USGS-01646500"
+    expects:
+      - {"check": "min_years", "path": "years", "value": 10}
+      - {"check": "not_empty", "path": "low_flow"}
+    depends_on: ["s2"]
+    outputs: [{"kind": "table", "id": "s3_low_flow", "caption": "low flow statistics (Q95, Q50, Q10, baseflow index, 7Q10) from low_flow_context"}]
+  - tool: "supply_reliability"
+    id: "s4"
+    rationale: "Screens the fixed 8 m3/s demand against the daily record while keeping Q95 in the river and capping abstraction at 0.1 of flow, giving the days, years and volume on which the demand is met."
+    method: "supply_reliability"
+    arguments:
+      source: "usgs"
+      station_id: "USGS-01646500"
+      demand_m3s: 8.0
+      share: 0.1
+      reserve: "q95"
+    expects:
+      - {"check": "min_years", "path": "years", "value": 10}
+      - {"check": "not_empty", "path": "reliability"}
+      - {"check": "not_empty", "path": "fdc"}
+      - {"check": "unit_present", "path": "unit"}
+    depends_on: ["s2", "s3"]
+    outputs: [{"kind": "figure", "id": "s4_reliability_curve", "caption": "reliability curve from supply_reliability"}, {"kind": "table", "id": "s4_reliability", "caption": "reliability table (exceedance probability, demand share, shortfall days) from supply_reliability"}]
+  - tool: "analyze_station"
+    id: "s5"
+    rationale: "The adjusted record at the same location cross-checks the flow-duration percentiles used in the primary analysis."
+    method: "flow_duration"
+    arguments:
+      source: "usgs"
+      station_id: "USGS-01646502"
+    expects:
+      - {"check": "min_years", "path": "years", "value": 10}
+      - {"check": "not_empty", "path": "trend", "repaired_from": "fdc"}
+      - {"check": "unit_present", "path": "unit"}
+    outputs: [{"kind": "table", "id": "s5_fdc_percentiles", "caption": "fdc percentiles from analyze_station (adjusted record)"}]
+  - tool: "supply_reliability"
+    id: "s6"
+    rationale: "Repeating the screening on the adjusted record confirms whether the reliability result at the primary gauge is sensitive to record choice."
+    method: "supply_reliability"
+    arguments:
+      source: "usgs"
+      station_id: "USGS-01646502"
+      demand_m3s: 8.0
+      share: 0.1
+      reserve: "q95"
+    expects:
+      - {"check": "min_years", "path": "years", "value": 10}
+      - {"check": "not_empty", "path": "reliability"}
+      - {"check": "not_empty", "path": "fdc"}
+    depends_on: ["s5", "s4"]
+    outputs: [{"kind": "table", "id": "s6_reliability", "caption": "reliability table from supply_reliability (adjusted record cross-check)"}]
+results:
+  s1: {"ok": true, "gates": [{"check": "not_empty", "passed": true, "detail": "'sub_basin' is present"}, {"check": "max_area_km2", "passed": false, "detail": "no area at 'sub_basin.up_area'"}], "summary": "latitude=38.95, longitude=-77.13, license=CC-BY-4.0, attribution=HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-bas", "fallback_used": true, "sha256": "c2dfc5b37399373f", "fallback": {"tool": "supply_reliability", "arguments": {"demand_m3s": 8, "source": "usgs", "station_id": "USGS-01646500", "lat": 38.95, "lon": -77.13}, "ok": true, "gates": [{"check": "not_empty", "passed": true, "detail": "'reliability' is present"}, {"check": "not_empty", "passed": true, "detail": "'fdc' is present"}, {"check": "min_years", "passed": false, "detail": "no record length at 'years'"}, {"check": "unit_present", "passed": true, "detail": "unit m3/s"}], "summary": "source=usgs, station_id=USGS-01646500, variable=discharge, unit=m3/s, years=96.5, start=1930-03-01, end=2026-09-06"}}

@@ -1,0 +1,83 @@
+# An AquaScope study (version 3): the plan behind an answer, its gates, and what happened.
+#   aquascope run study.yaml
+version: 3
+title: "Estimate the 100-year flood discharge (Q100) for the Thames : 51.415, -0.308"
+question: "Design flow for a new road bridge over the Thames at Kingston: the 100-year flood with its uncertainty band."
+created: "2026-09-07T13:25:08+00:00"
+aquascope_version: "0.14.0"
+author: "methodologist"
+model: "claude-sonnet-5"
+problem:
+  kind: "flood_risk"
+  site: {"lat": 51.415, "lon": -0.308}
+  params: {"return_period": 100, "decision": "design flow"}
+  text: "Design flow for a new road bridge over the Thames at Kingston: the 100-year flood with its uncertainty band."
+plan:
+  author: "methodologist"
+  playbook: "flood_risk"
+  objective: "Estimate the 100-year flood discharge (Q100) for the Thames at Kingston, with an uncertainty band, to size the new road bridge waterway and freeboard."
+  decision: "set the 100-year design flood discharge for the new road bridge over the Thames at Kingston, with its uncertainty band, to size the bridge waterway and freeboard"
+  methodology: ["Characterize the catchment at the bridge point to confirm it is unregulated and to frame the scale of the estimate.", "Test the Kingston gauge annual series for a monotonic trend before treating it as stationary.", "Fit at-site flood frequency (GEV by L-moments and Log-Pearson III, with a bootstrap band) to the Kingston gauge and extract the T=100 year quantile with its interval and inter-method spread.", "Cross-check the at-site Q100 against GloFAS reanalysis discharge at the same point."]
+  assumptions: ["daily resolution is assumed for the Kingston discharge record since resolution is not stated in the catalog", "the Kingston gauge (0.1 km away, 142.9 years) is treated as effectively at-site for the bridge location", "at-site flood frequency analysis is the primary method, with GloFAS cross-check and Mann-Kendall trend check as supporting diagnostics; regionalization/similar-basins methods are not needed given the long local record", "no flow regulation or dam effect is assumed upstream (recon shows 0 dams in the catchment)", "Daily resolution is assumed for the Kingston discharge record since resolution is not stated explicitly in the catalog metadata beyond 'daily'.", "The Kingston gauge (uk_ea 8496ce69-482c-406a-a2f0-ac418ef8f099, 0.1 km away, 142.9 years) is treated as effectively at-site for the bridge location.", "At-site flood frequency analysis is the primary method; GloFAS cross-check and Mann-Kendall trend check are supporting diagnostics; regionalization and similar-basins methods are not used given the long local record and marginal status of similar_basins here.", "No upstream flow regulation or dam effect is assumed, consistent with 0 dams reported in the catchment recon.", "The 100-year quantile is estimated as a stationary statistic; any trend found is reported as a caveat rather than used to build a nonstationary model."]
+  alternatives: [{"method": "similar_basins", "why_not": "Sufficiency table marks this marginal for a gauged point like Kingston; it is meant for ungauged sites and is only kept as a fallback if the at-site fit fails its gates."}, {"method": "regionalize_signatures", "why_not": "142.9 years of local daily discharge already supports a direct at-site fit, making a regionalized ungauged-point estimate unnecessary as a primary method."}]
+  limitations_expected: ["Rare quantiles move with the distribution and the estimator; the GEV (L-moments) and Log-Pearson III fits are both quoted with their intervals and the spread between them, and a spread above 25 percent is reported as disagreement rather than averaged away.", "Design-flood guidance under climate change is immature; the Q100 estimate here is stationary and any climate scenario is an overlay caveat, not a nonstationary fit.", "GloFAS is a large-scale reanalysis product and may disagree with the at-site gauge estimate at a local bridge site; such disagreement is reported, not resolved by blending the two."]
+  citations: ["England, J. F. et al. (2019). Guidelines for determining flood flow frequency, Bulletin 17C. USGS Techniques and Methods 4-B5.", "Hosking, J. R. M. (1990). L-moments: analysis and estimation of distributions using linear combinations of order statistics. J. R. Stat. Soc. B 52, 105-124.", "Wasko, C. et al. (2024). A systematic review of climate change science for flood and design guidance. Hydrol. Earth Syst. Sci. 28, 1251-1285. doi:10.5194/hess-28-1251-2024", "Nonstationary flood frequency estimates are parameter-fragile: Stoch. Environ. Res. Risk Assess. (2024), doi:10.1007/s00477-024-02680-9", "Multi-approach cross-checks in infrastructure flood practice: J. Hydrol. (2024), doi:10.1016/j.jhydrol.2024.130698", "Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.", "Harrigan, S. et al. (2020). GloFAS-ERA5 operational global river discharge reanalysis 1979-present. Earth Syst. Sci. Data 12, 2043-2060.", "Wasko et al. 2024, HESS"]
+  caveats: ["Design-flood guidance under climate change is immature (Wasko et al. 2024, HESS): the estimate here is stationary, and any climate scenario is an overlay on it, not a nonstationary fit.", "Rare quantiles move with the distribution and the estimator. Two fits (GEV by L-moments and Log-Pearson III) are quoted with their intervals and the spread between them; a spread above 25 percent is reported as disagreement, not averaged away."]
+  rationale: "Estimate the 100-year flood discharge (Q100) for the Thames at Kingston, with an uncertainty band, to size the new road bridge waterway and freeboard."
+  recon_notes: ["Record resolution is not in the catalog; daily is assumed for every variable.", "10 donor gauges from a pool of 37,071 gauged catchments.", "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.", "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted."]
+  replans: [{"step": "s4", "reason": "gate failed: not_empty (nothing at 'climate')", "fallback": {"tool": "regionalize_signatures", "arguments": {"lat": 51.415, "lon": -0.308, "k": 10, "method": "regionalization"}, "rationale": "With GloFAS and ERA5 both unreachable, transferring a regionalized mean annual maximum flood from nearby donor catchments provides an independent cross-check on the at-site Q100 estimate.", "expects": [{"check": "not_empty", "path": "estimates"}, {"check": "not_empty", "path": "skill"}]}}]
+steps:
+  - tool: "describe_catchment"
+    id: "s1"
+    rationale: "Catchment size, elevation and regulation by dams frame the estimate and confirm the maxima are natural (0 dams upstream)."
+    arguments:
+      lat: 51.415
+      lon: -0.308
+      upstream: true
+    outputs: [{"kind": "figure", "id": "s1_site_map", "caption": "site map from describe_catchment"}, {"kind": "table", "id": "s1_catchment_attributes", "caption": "catchment attributes from describe_catchment"}]
+  - tool: "analyze_station"
+    id: "s2"
+    rationale: "Mann-Kendall with Sen's slope on the annual maxima says whether the 142.9-year Kingston record is stationary enough for a stationary fit; a significant trend is flagged as a caveat, not folded into a nonstationary model."
+    method: "trend_mann_kendall"
+    arguments:
+      source: "uk_ea"
+      station_id: "8496ce69-482c-406a-a2f0-ac418ef8f099"
+    expects:
+      - {"check": "min_years", "value": 20, "path": "years"}
+      - {"check": "not_empty", "path": "trend"}
+      - {"check": "unit_present", "path": "unit"}
+    outputs: [{"kind": "figure", "id": "s2_series", "caption": "series from analyze_station"}, {"kind": "figure", "id": "s2_annual_maxima", "caption": "annual maxima from analyze_station"}, {"kind": "figure", "id": "s2_trend", "caption": "trend from analyze_station"}, {"kind": "table", "id": "s2_summary", "caption": "summary from analyze_station"}, {"kind": "table", "id": "s2_trend", "caption": "trend from analyze_station"}]
+  - tool: "flood_frequency"
+    id: "s3"
+    rationale: "Return levels from GEV (L-moments) and Log-Pearson III (Bulletin 17C), with a bootstrap band on the GEV, give the T=100 year design discharge and its uncertainty from two independent fits."
+    method: "at_site_flood_frequency"
+    arguments:
+      source: "uk_ea"
+      station_id: "8496ce69-482c-406a-a2f0-ac418ef8f099"
+      bootstrap_ci: true
+      return_periods: [2, 5, 10, 25, 50, 100]
+    expects:
+      - {"check": "max_return_period_factor", "value": 3, "path": "years", "return_period": 100}
+      - {"check": "ci_finite", "path": "ffa.fits.gev_bootstrap.ci", "return_period": 100}
+      - {"check": "spread_within", "value": 0.25, "paths": ["ffa.fits.gev_lmoments.q", "ffa.fits.lp3.q"], "return_period": 100, "repaired_from": null, "path": "ffa.fits.gev_lmoments.q, ffa.fits.lp3.q"}
+    fallback: {"step": {"tool": "similar_basins", "arguments": {"source": "uk_ea", "station_id": "8496ce69-482c-406a-a2f0-ac418ef8f099", "k": 5}, "rationale": "If the at-site fit fails its gates, donor gauges from similar catchments give a regional cross-check to quote alongside it.", "expects": []}}
+    depends_on: ["s2"]
+    outputs: [{"kind": "figure", "id": "s3_frequency_curve", "caption": "frequency curve from flood_frequency"}, {"kind": "table", "id": "s3_return_levels", "caption": "return levels from flood_frequency"}, {"kind": "table", "id": "s3_fit_spread", "caption": "fit spread from flood_frequency"}]
+  - tool: "anywhere"
+    id: "s4"
+    rationale: "GloFAS reanalysis discharge at the same point is an independent model-based cross-check on the at-site Q100 estimate, as required by the brief."
+    method: "glofas_cross_check"
+    arguments:
+      lat: 51.415
+      lon: -0.308
+      years: 100
+    expects:
+      - {"check": "not_empty", "path": "climate"}
+    fallback: {"step": {"tool": "regionalize_signatures", "arguments": {"lat": 51.415, "lon": -0.308, "k": 10, "method": "regionalization"}, "rationale": "With GloFAS and ERA5 both unreachable, transferring a regionalized mean annual maximum flood from nearby donor catchments provides an independent cross-check on the at-site Q100 estimate.", "expects": [{"check": "not_empty", "path": "estimates"}, {"check": "not_empty", "path": "skill"}]}}
+    depends_on: ["s3"]
+    outputs: [{"kind": "figure", "id": "s4_glofas_series", "caption": "GloFAS reanalysis discharge series from anywhere"}, {"kind": "table", "id": "s4_glofas_summary", "caption": "GloFAS discharge summary from anywhere"}]
+results:
+  s1: {"ok": true, "gates": [], "summary": "latitude=51.415, longitude=-0.308, license=CC-BY-4.0, attribution=HydroATLAS v1.0 (BasinATLAS), CC BY 4.0. Linke, S., Lehner, B., Ouellet Dallaire, C., et al. (2019). Global hydro-environmental sub-ba", "fallback_used": false, "sha256": "2bcacbbfd6fa6878"}
+  s2: {"ok": true, "gates": [{"check": "min_years", "passed": true, "detail": "142.9 years of record, 20 needed"}, {"check": "not_empty", "passed": true, "detail": "'trend' is present"}, {"check": "unit_present", "passed": true, "detail": "unit m3/s"}], "summary": "source=uk_ea, station_id=8496ce69-482c-406a-a2f0-ac418ef8f099, name=Kingston, variable=discharge, unit=m3/s, years=142.9, start=1883-10-01, end=2026-09-05", "fallback_used": false, "sha256": "ac6d2e8d22c556a1"}
+  s3: {"ok": true, "gates": [{"check": "max_return_period_factor", "passed": true, "detail": "T = 100 years against a cap of about 429 years (3 times 142.9 years of record)"}, {"check": "ci_finite", "passed": true, "detail": "finite interval [565.4, 723.1] at T = 100 years"}, {"check": "spread_within", "passed": true, "detail": "spread 4% between 652.5, 624 (25% allowed) at T = 100 years"}], "summary": "source=uk_ea, station_id=8496ce69-482c-406a-a2f0-ac418ef8f099, name=Kingston, unit=m3/s, years=142.9, start=1883-10-01, end=2026-09-05", "fallback_used": false, "sha256": "47638d2960b72a2e"}
+  s4: {"ok": true, "gates": [{"check": "not_empty", "passed": false, "detail": "nothing at 'climate'"}], "summary": "years=100, start=1926-08-31, end=2026-08-31", "fallback_used": true, "sha256": "e531a3743835a3ed", "fallback": {"tool": "regionalize_signatures", "arguments": {"lat": 51.415, "lon": -0.308, "k": 10, "method": "regionalization"}, "ok": false, "gates": [{"check": "not_empty", "passed": false, "detail": "the step returned an error: regionalisation failed: ValueError: method must be similarity, regression or both"}, {"check": "not_empty", "passed": false, "detail": "the step returned an error: regionalisation failed: ValueError: method must be similarity, regression or both"}], "summary": "error: regionalisation failed: ValueError: method must be similarity, regression or both"}}

@@ -1,0 +1,47 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# No gauge within reach: the supply is regionalised from donors, the reliability read off the transferred Q95,
+# median and Q05 as a band; the catchment area is required to turn mm/d into m3/s.
+id: supply_regional_nevada
+playbook: supply_reliability
+title: Run-of-river supply of 50 L/s at an ungauged desert wash
+brief: >-
+  A mine camp in the Big Smoky Valley wants to take 0.05 m3/s from this wash. How often could a run-of-river
+  intake meet that? There is no gauge on it.
+intake:
+  demand_m3s: 0.05
+  use: industrial
+site:
+  name: A bare point in the Big Smoky Valley, Nevada (no gauge within 50 km)
+  lat: 38.0
+  lon: -117.0
+  recon: nevada_point
+expected_branch: regional
+steps:
+  - tool: describe_catchment
+    gates:
+      - {check: not_empty, path: sub_basin}
+    note: "Required: the upstream area turns the transferred mm/d into m3/s."
+  - tool: similar_basins
+    method: similar_basins
+    gates:
+      - {check: min_donors, path: k}
+  - tool: supply_reliability
+    method: regionalize_signatures
+    gates:
+      - {check: not_empty, path: reliability}
+    note: The screening from Q95, median and Q05 transferred from the donors, a band not a number.
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    optional: true
+    note: The full signature set for the point, tolerated beside the supply screening.
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+forbidden:
+  tools: [analyze_station, low_flow_context, get_timeseries, load_table, flow_duration]
+  methods: [supply_reliability, flow_duration, low_flow_frequency, baseflow_separation, at_site_flood_frequency]
+rationale: >-
+  With no gauge within 50 km the flow-duration screening on a record is not defensible; the playbook's regional
+  branch transfers Q95, the median and Q05 from donor catchments (ten found), converts them to m3/s over the
+  upstream area, and reads the reliability of 50 L/s off those three points as a band. The catchment description is
+  required for the area. An arid wash makes the answer likely to be poor, which is the answer.

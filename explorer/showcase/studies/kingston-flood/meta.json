@@ -1,0 +1,124 @@
+{
+ "id": "kingston-flood",
+ "title": "Design flood of the Thames at Kingston",
+ "kind": "flood_risk",
+ "shows": "A gauge with 140 years of daily discharge: two frequency fits, the spread between them, the band.",
+ "site": {
+  "lat": 51.415,
+  "lon": -0.308,
+  "name": "Thames at Kingston, London, UK"
+ },
+ "problem": "Design flow for a new road bridge over the Thames at Kingston: the 100-year flood with its uncertainty band.",
+ "intake": {
+  "return_period": 100,
+  "decision": "design flow"
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T13:29:15+00:00",
+ "seconds": 342.6,
+ "tokens": {
+  "prompt": 54773,
+  "completion": 18832,
+  "calls": 6,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3299,
+    "completion_tokens": 1190
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 9865,
+    "completion_tokens": 3271
+   },
+   "analyst": {
+    "calls": 1,
+    "prompt_tokens": 3192,
+    "completion_tokens": 384
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 27094,
+    "completion_tokens": 8250
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 11323,
+    "completion_tokens": 5737
+   }
+  },
+  "total": 73605
+ },
+ "usd": 0.4468,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "flood_risk",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 4,
+ "gates": {
+  "passed": 6,
+  "total": 9
+ },
+ "checks": {
+  "passed": 7,
+  "total": 7
+ },
+ "replans": 1,
+ "stop_reason": "gate failed: not_empty (nothing at 'climate'); the fallback regionalize_signatures failed too: regionalisation failed: ValueError: method must be similarity, regression or both",
+ "headline": "At the Environment Agency Kingston gauge (uk_ea, station 8496ce69-482c-406a-a2f0-ac418ef8f099, 142.9 years of daily discharge, 1883-2026), the 100-year flood discharge (Q100) is estimated at 652.5 m3/s by GEV (L-moments) and 624.0 m3/s b...",
+ "not_established": [
+  "Step s4, gate not_empty: nothing at 'climate'",
+  "Step s4.fallback, gate not_empty: the step returned an error: regionalisation failed: ValueError: method must be similarity, regression or both",
+  "Step s4.fallback, gate not_empty: the step returned an error: regionalisation failed: ValueError: method must be similarity, regression or both",
+  "The study stopped at s4: gate failed: not_empty (nothing at 'climate'); the fallback regionalize_signatures failed too: regionalisation failed: ValueError: method must be similarity, regression or both"
+ ],
+ "figures": [
+  {
+   "name": "s1_site_map.png",
+   "id": "fig-s1-site_map",
+   "step": "s1",
+   "caption": "The site, in longitude and latitude (no basemap); no catalogue station was listed with it.",
+   "bytes": 26344
+  },
+  {
+   "name": "s2_series.png",
+   "id": "fig-s2-series",
+   "step": "s2",
+   "caption": "Discharge at Kingston (uk_ea 8496ce69-482c-406a-a2f0-ac418ef8f099), 1883 to 2026, with the annual maxima marked.",
+   "bytes": 100768
+  },
+  {
+   "name": "s2_trend.png",
+   "id": "fig-s2-trend",
+   "step": "s2",
+   "caption": "Annual mean discharge at Kingston (uk_ea 8496ce69-482c-406a-a2f0-ac418ef8f099) with the Sen slope line; the Mann-Kendall test finds no trend (p = 0.941, 140 years).",
+   "bytes": 115389
+  },
+  {
+   "name": "s3_frequency_curve.png",
+   "id": "fig-s3-frequency_curve",
+   "step": "s3",
+   "caption": "Return levels of annual maximum discharge at Kingston (uk_ea 8496ce69-482c-406a-a2f0-ac418ef8f099): GEV (L-moments) and Log-Pearson III fits with the GEV bootstrap 90 % band.",
+   "bytes": 83320
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_site_map.png",
+  "figures/s2_series.png",
+  "figures/s2_trend.png",
+  "figures/s3_frequency_curve.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}

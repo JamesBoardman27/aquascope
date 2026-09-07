@@ -103,7 +103,9 @@ def test_a_valid_model_plan_is_accepted_with_the_playbooks_caveats_attached():
     assert ctx["exemplar"]["branch"] == "at_site" and ctx["gates"]["min_years"] and ctx["brief"]["playbook"]
     assert {e["tool"] for e in ctx["catalogue"]} >= {"analyze_station", "flood_frequency", "similar_basins",
                                                       "describe_catchment"}
-    assert "eda" not in {e["tool"] for e in ctx["catalogue"]}, "table tools are listed only with an upload"
+    listed = {e["tool"] for e in ctx["catalogue"]}
+    assert "eda" not in listed, "a table's descriptive tools are listed only with an upload"
+    assert {"wqi", "who_screen", "return_periods"} <= listed, "the analytic table tools are listed: a step feeds them"
     assert len(__import__("json").dumps(ctx)) < 20_000
 
 
@@ -238,3 +240,36 @@ def test_a_guessed_gate_path_is_repaired_to_the_one_the_tool_has() -> None:
     # the model reads the paths it should copy
     entry = next(e for e in catalogue.compact("flood_risk") if e["tool"] == "similar_basins")
     assert {"check": "min_donors", "path": "k"} in entry["gates"]
+
+
+def test_a_model_that_declines_is_final_and_the_tree_does_not_run(monkeypatch) -> None:
+    from aquascope.studio.model import Model
+    from aquascope.studio.roles import methodologist, scout
+    from aquascope.studio.workspace import Workspace
+    from tests.test_studio.conftest import RECON, FakeModel
+
+    ws = Workspace(site={"lat": 51.415, "lon": -0.308})
+    ws.brief.problem = "Map the inundation extent for the 100-year flood"
+    ws.brief.kind = ws.brief.playbook = "flood_risk"
+    ws.brief.intake = {"return_period": 100}
+
+    monkeypatch.setattr("aquascope.explore.assess_site", lambda *a, **k: RECON, raising=False)
+    scout.scout(ws)
+    reason = "No tool in the catalogue maps an inundation extent; the flood tools give a flow, not a depth."
+    client = FakeModel({"methodologist": [{"decline": True, "reason": reason}]})
+    model = Model.resolve(ws, client=client, model="fake", provider="custom")
+    study = methodologist.plan(ws, model)
+    assert study is None and ws.status == "declined" and "inundation" in (ws.declined_reason or "")
+    assert not any(e["event"] == "fallback" for e in ws.events), "a model's decline is final; the tree does not run"
+
+
+def test_a_station_the_inventory_does_not_know_is_an_error() -> None:
+    from aquascope.studio import catalogue
+
+    steps = [{"id": "s1", "tool": "analyze_station", "arguments": {"source": "usgs", "station_id": "01646500"}}]
+    assert catalogue.validate_plan(steps, stations={("uk_ea", "3400TH")}) == [
+        "step s1: station usgs 01646500 is not in the inventory of this site"]
+    assert catalogue.validate_plan(steps, stations={("usgs", "01646500")}) == []
+    assert catalogue.validate_plan(steps, stations=None) == [], "no inventory, no check"
+    entry = catalogue.get("supply_reliability")
+    assert "regionalize_signatures" in entry.methods, "the ungauged mode of the supply screening is reachable"
