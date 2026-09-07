@@ -275,8 +275,17 @@ every table sits in the workspace the same way and round-trips through the
 bundle. The Scout lists it with its QA next to the gauges, and keyless the
 plan runs on it (`load_table`, then the workbench tools).
 
+**Recorded studies.** The intake board offers the recorded studies as chips
+("See a recorded study"): one opens as its finished board, the thread, the
+answer, the key numbers and the figures as recorded, with one line saying
+who recorded it and that the numbers were computed then. **Re-run live**
+starts the same study at the recorded site in your browser and approves the
+recorded plan, which runs keyless through the validator and the gates
+(the template narrator writes, or the device model when it is there), and
+`#study=<id>` opens a recording directly.
+
 The Study modules (`studio.js`, `intake.js`, `studio-device.js`,
-`study-store.js`) load on first use of the Study button, the drawer's
+`studio-recorded.js`, `study-store.js`) load on first use of the Study button, the drawer's
 radio, **Study this place** or a `#study=1` link, not on a first visit that
 runs no study.
 
