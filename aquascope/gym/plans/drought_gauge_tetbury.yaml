@@ -27,8 +27,12 @@ steps:
       - {check: not_empty, path: indices}
       - {check: not_empty, path: current.spei}
   - tool: low_flow_context
-    method: flow_duration
+    method: low_flow_frequency
     optional: true
+    alternatives:
+      - {tool: low_flow_context, method: flow_duration}
+      - {tool: low_flow_context, method: baseflow_separation}
+      - {tool: analyze_station, method: flow_duration}
     note: The river's side of the drought at the gauge 0.7 km away.
   - tool: drought_propagation
     method: sgi

@@ -30,13 +30,16 @@
 #      not defensible, and every such method a planner for this problem might reach for is listed as forbidden.
 #   2. The playbook branch is the starting point: its required steps and gates are the reference's unless the brief
 #      asks for more or the site says otherwise. Framing steps (describe_catchment) are optional.
-#   3. Gates are the ones that protect the number quoted: record length before a fit, the return-period cap and the
+#   3. A step's tool and method are the ones the catalogue lists for that tool (the Studio rewrites a method the
+#      tool does not apply to the tool's first method that serves the problem); where the catalogue offers two
+#      routes to the same quantity, the reference names one and lists the other as an alternative.
+#   4. Gates are the ones that protect the number quoted: record length before a fit, the return-period cap and the
 #      spread between fits before a return level, donors before a transfer, a non-empty payload before an index.
-#   4. Off-tree briefs go beyond the branch: a comparison needs both estimates, a supply question that names a crop
+#   5. Off-tree briefs go beyond the branch: a comparison needs both estimates, a supply question that names a crop
 #      needs the demand before the screening, a drought question that names the well and the river needs the
 #      propagation and the low-flow context as required steps, not optional ones.
-#   5. A decline is a case: the right plan is none, and a plan of any length scores zero.
-#   6. The reconnaissance is saved once per site (recon/<name>.json) and never edited by hand: a case is only as
+#   6. A decline is a case: the right plan is none, and a plan of any length scores zero.
+#   7. The reconnaissance is saved once per site (recon/<name>.json) and never edited by hand: a case is only as
 #      real as its snapshot. Capture it with aquascope.explore.assess_site(lat, lon) and record the date.
-#   7. `aquascope gym plans validate` must pass before a case is committed.
+#   8. `aquascope gym plans validate` must pass before a case is committed.
 schema_version: 1

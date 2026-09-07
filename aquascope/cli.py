@@ -1112,6 +1112,16 @@ def cmd_gym(args: argparse.Namespace) -> None:
             if bad:
                 sys.exit(1)
             return
+        if args.plans_cmd == "rescore":
+            for path in args.results:
+                rows = gp.load_plan_results([path], latest=False)
+                rows = gp.rescore_plans(rows, plans_dir=args.plans)
+                target = Path(args.out) if args.out and len(args.results) == 1 else Path(path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("".join(json.dumps(r.to_dict(), ensure_ascii=False, default=str) + "\n"
+                                          for r in rows), encoding="utf-8")
+                print(f"  {len(rows)} rows re-scored -> {target}")
+            return
         if args.plans_cmd == "score":
             ref = gp.load_reference(args.id, args.plans)
             if args.candidate:
@@ -2492,12 +2502,16 @@ def main() -> None:
     gp_sub = p_gp.add_subparsers(dest="plans_cmd", required=True)
     for name, help_ in (("list", "List the cases"), ("show", "Print one case"),
                         ("validate", "Check every case against the catalogue, the registry and its recon"),
-                        ("score", "Score a plan (the tree's, or a JSON file) against one case")):
+                        ("score", "Score a plan (the tree's, or a JSON file) against one case"),
+                        ("rescore", "Score stored result rows again from the plans they carry (no model run)")):
         p_gpc = gp_sub.add_parser(name, help=help_)
         if name in ("show", "score"):
             p_gpc.add_argument("id", help="The case id")
         if name == "score":
             p_gpc.add_argument("--candidate", default=None, help="A plan JSON (a study, a workspace or a decline)")
+        if name == "rescore":
+            p_gpc.add_argument("results", nargs="+", metavar="RESULTS.jsonl", help="Result files, rewritten in place")
+            p_gpc.add_argument("--out", default=None, help="Write the re-scored rows here instead (one file only)")
         p_gpc.add_argument("--plans", default=None, help="A folder of reference plans (default: the package's)")
         p_gpc.add_argument("--json", action="store_true")
     p_gbench = gym_sub.add_parser("bench", help="Play an agent on the tasks (Phase 1) or on the reference plans "

@@ -24,8 +24,10 @@ expected_branch: with_gauge
 steps:
   - tool: anywhere
     method: fao56_et0
+    optional: true
     gates:
       - {check: not_empty, path: climate}
+    note: The climate frame; the crop demand step computes the FAO-56 ET0 itself, so this is context, not a requirement.
   - tool: crop_water_demand
     method: crop_water_requirement
     gates:

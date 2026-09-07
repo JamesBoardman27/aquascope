@@ -27,11 +27,15 @@ steps:
       - {check: not_empty, path: trend}
       - {check: unit_present, path: unit}
   - tool: get_timeseries
+    optional: true
     gates:
       - {check: not_empty, path: points}
-    note: The monthly level series the drought index is computed on.
+    note: The monthly level series the table route to the drought index is computed on.
   - tool: sgi_drought
     method: sgi
+    alternatives:
+      - {tool: drought_propagation, method: sgi}
+    note: The Standardised Groundwater Index on the monthly levels, by the table tool on a fetched series or by the propagation tool at the station.
   - tool: recharge
     method: recharge_wtf
     optional: true
@@ -47,7 +51,7 @@ forbidden:
   methods: []
 rationale: >-
   Fifty years of monthly levels at a borehole within reach make a Sen's slope with a Mann-Kendall test defensible;
-  the Standardised Groundwater Index on the monthly series gives the drought status and a water-table-fluctuation
+  the Standardised Groundwater Index on the monthly series (by either route the catalogue offers) gives the drought status and a water-table-fluctuation
   recharge with a stated specific yield is a reasonable optional addition. The plan reports the rate and its
   confidence, never the cause. A Theis drawdown needs transmissivity, storativity and a pumping rate nobody has
   supplied, so the drawdown tool has no input here.

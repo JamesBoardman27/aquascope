@@ -42,6 +42,9 @@ steps:
     method: similar_basins
     optional: true
     note: A donor cross-check is tolerated at a gauged site; it is not needed with 96 years.
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    optional: true
 forbidden:
   tools: [load_table, return_periods]
   methods: [gr4j_calibration, spi, spei, groundwater_trend, sgi]

@@ -330,3 +330,54 @@ def test_the_cli_plans_verbs_and_the_bench(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(sys, "argv", ["aquascope", "gym", "bench", "--agent", "team"])
     with pytest.raises(SystemExit):
         cli.main()
+
+
+# ── alternatives and re-scoring ──
+
+
+def test_an_alternative_step_covers_the_tool_the_method_and_the_check():
+    ref = BY_ID["gw_well_tetbury"]
+    sgi = next(s for s in ref.required_steps if s.tool == "sgi_drought")
+    assert sgi.tools == {"sgi_drought", "drought_propagation"} and sgi.methods == {"sgi"}
+    plan = {"steps": [
+        {"id": "s1", "tool": "analyze_station", "method": "groundwater_trend",
+         "expects": [{"check": "min_years", "path": "years"}, {"check": "not_empty", "path": "trend"},
+                     {"check": "unit_present", "path": "unit"}]},
+        {"id": "s2", "tool": "drought_propagation", "method": "sgi",
+         "expects": [{"check": "not_empty", "path": "sgi"}]},
+    ]}
+    scored = gp.score_plan(ref, plan)
+    assert scored["coverage_tools"] == 1.0 and scored["coverage_methods"] == 1.0 and scored["score"] == 1.0
+    plan["steps"][1] = {"id": "s2", "tool": "get_timeseries", "expects": [{"check": "not_empty", "path": "points"}]}
+    scored = gp.score_plan(ref, plan)
+    assert scored["coverage_tools"] == 0.5 and "missing tool drought_propagation (or sgi_drought)" in scored["explain"]
+    assert "missing method sgi" in scored["explain"]
+    low = BY_ID["drought_reanalysis_snake_plain"]
+    plan = _perfect(low)
+    for st in plan["steps"]:
+        if st["tool"] == "low_flow_context":
+            st["method"] = "baseflow_separation"
+    assert gp.score_plan(low, plan)["score"] == 1.0, "the alternative method counts"
+    bad = gp.Reference.from_dict({**ref.to_dict(), "steps": [
+        {"tool": "sgi_drought", "method": "sgi",
+         "alternatives": [{"tool": "nope"}, {"tool": "wqi", "method": "spi"}]}]})
+    errors = gp.validate_reference(bad)
+    assert any("alternative tool 'nope'" in e for e in errors) and any("wqi does not apply" in e for e in errors)
+
+
+def test_rescore_reads_the_stored_plans_again_without_running_the_agent(tmp_path, monkeypatch):
+    out = tmp_path / "tree.jsonl"
+    rows = gp.run_plan_bench(None, "tree", out=out, case_ids=["offtree_atsite_vs_regional_potomac",
+                                                              "flood_inundation_declined_potomac"])
+    assert sorted(r.score for r in rows) == [0.65, 1.0]
+    easier = gp.Reference.from_dict({**BY_ID["offtree_atsite_vs_regional_potomac"].to_dict(), "steps": [
+        {"tool": "analyze_station", "method": "trend_mann_kendall"},
+        {"tool": "flood_frequency", "method": "at_site_flood_frequency"}]})
+    stored = gp.load_plan_results([out], latest=False)
+    again = gp.rescore_plans(stored, [easier, BY_ID["flood_inundation_declined_potomac"]])
+    assert {r.case_id: r.score for r in again} == {"offtree_atsite_vs_regional_potomac": 1.0,
+                                                   "flood_inundation_declined_potomac": 1.0}
+    assert again[0].explain and all(r.decline_correct for r in again)
+    monkeypatch.setattr(sys, "argv", ["aquascope", "gym", "plans", "rescore", str(out)])
+    cli.main()
+    assert sorted(r.score for r in gp.load_plan_results([out])) == [0.65, 1.0], "the package references again"

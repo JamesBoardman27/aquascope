@@ -301,7 +301,79 @@ starting point, the brief decides what goes beyond it; then
 `aquascope gym plans validate` and `aquascope gym plans score <id>` for the
 tree's score and its explanation. The rules are in `_authoring.yaml`.
 
-<!-- PHASE2-LEADERBOARD -->
+### 2026-09-07: the 25-case suite
+
+The tree and the Studio Methodologist on Claude Sonnet 5 and Claude Haiku 4.5,
+two repeats each, played on 2026-09-07 from the saved reconnaissance with a
+300 s timeout per case, no errors and no timeouts. The rows (with every plan's
+steps and the explanation of its score), this table, a
+[discussion](../aquascope/gym/results/2026-09-07/discussion.md) with the
+per-case scores and the deposit package for a DOI (`deposit/`: the cases with
+their reconnaissance, a README on the format, the scoring and the licences,
+`zenodo.json`) are under `aquascope/gym/results/2026-09-07/`.
+
+```bash
+R=aquascope/gym/results/2026-09-07
+aquascope gym bench --agent tree --out $R/plans-tree.jsonl
+aquascope gym bench --agent methodologist --provider anthropic --model claude-sonnet-5 \
+    --repeats 2 --timeout 300 --resume --out $R/plans-methodologist-claude-sonnet-5.jsonl
+aquascope gym bench --agent methodologist --provider anthropic --model claude-haiku-4-5 \
+    --repeats 2 --timeout 300 --resume --out $R/plans-methodologist-claude-haiku-4-5.jsonl
+aquascope gym plans rescore $R/plans-*.jsonl     # after the three reference revisions, see the discussion
+aquascope gym leaderboard $R/plans-*.jsonl --out $R/leaderboard.md
+```
+
+The two model runs cost 4.76 USD at list prices (Sonnet 3.58 for 50 plans,
+Haiku 1.18).
+
+| agent | model | cases (solvable + decline) | score | solvable | off-tree | spread | declined | false declines | tools | methods | gates | extraneous | forbidden | valid first try | tree fallback | tokens/case | s/case | cost USD | errors |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| methodologist | claude-haiku-4-5 | 25 (18 + 7) x2 | 0.66 | 0.92 | 0.96 | 0.66 to 0.67 | 0 % | 0 % | 95 % | 87 % | 94 % | 8 % | 6 % | 86 % | 0 % | 10,580 | 33.7 | 1.176 | 0 |
+| methodologist | claude-sonnet-5 | 25 (18 + 7) x2 | 0.64 | 0.89 | 0.98 | 0.63 to 0.66 | 0 % | 0 % | 87 % | 90 % | 85 % | 8 % | 0 % | 92 % | 0 % | 14,073 | 52.8 | 3.582 | 0 |
+| tree | none | 25 (18 + 7) | 0.97 | 0.95 | 0.73 | - | 100 % | 0 % | 94 % | 94 % | 93 % | 0 % | 0 % | 100 % | 0 % | 0 | 0.0 | 0.000 | 0 |
+
+Mean score by playbook:
+
+| agent | model | drought_status | flood_risk | groundwater_decline | irrigation_feasibility | supply_reliability | ungauged_flow | water_quality |
+|---|---|---|---|---|---|---|---|---|
+| methodologist | claude-haiku-4-5 | 0.73 | 0.73 | 0.53 | 0.75 | 0.53 | 0.93 | 0.50 |
+| methodologist | claude-sonnet-5 | 0.74 | 0.80 | 0.42 | 0.74 | 0.61 | 1.00 | 0.25 |
+| tree | none | 0.93 | 0.93 | 1.00 | 0.94 | 1.00 | 1.00 | 1.00 |
+
+**What the numbers say.** The tree scores 1.00 on the 22 cases a playbook
+branch covers, by construction, and 0.65 to 0.78 on the three off-tree
+briefs it cannot reach. The models earn their place exactly there: Sonnet
+0.98 and Haiku 0.96 on the off-tree cases (the donor transfer added next to
+the at-site fit for the comparison, the crop demand before the screening
+and the gauge's record in its own right, the borehole's trend in the
+drought question), and 0.89 and 0.92 on the solvable cases, with 92 and 86
+percent of their plans passing the Studio's validator at the first attempt
+and none falling back to the tree. Their overall scores of 0.64 and 0.66
+are set by one behaviour: the Methodologist with a model never declines,
+0 of 7 declining cases for both models and both repeats, because the Studio
+passes the tree's decline to the model as an exemplar but neither offers a
+decline as a reply nor honours the tree's; every out-of-scope brief got a 4
+to 7 step plan, including a samples fetch at a station that has no samples.
+Three more gaps are the Studio's rather than the models': the catalogue
+hides the table tools (`wqi`, `who_screen`, `iwqi`) when no table is
+attached, so Sonnet cannot plan the water-quality index the playbook itself
+uses (0.30 to 0.38; Haiku copies the exemplar and scores 1.00); the
+catalogue lists `supply_reliability` without its ungauged-mode method, so
+the regional supply branch is pruned by the validator (Sonnet 0.83, Haiku
+0.58 to 0.64); and the validator does not check that a station exists,
+which is how Haiku plans station tools at a point with none (6 percent of
+its plans use a forbidden tool; Sonnet none). One error is the models' own:
+a Mann-Kendall trend on the Potomac's discharge, twice, in place of the
+regional water balance when asked about the water table with no well within
+reach (Sonnet 0.25 to 0.28). Sonnet spends 14,100 tokens and 53 s per plan,
+Haiku 10,600 and 34 s; on plan quality the two are within the repeat spread
+of each other. The discussion has the per-case table, the first-try
+validator errors, the three reference revisions made after the run (the
+stored plans were re-scored, the models were not run again; the means were
+0.60 and 0.62 before them) and what the suite does not establish: one
+hydrologist's references, the classification not measured, two repeats, no
+data-driven decline reachable at a real site, and the small-model row
+pending for want of a key.
 
 ## Leaderboard
 

@@ -27,10 +27,14 @@ steps:
       - {check: not_empty, path: indices}
       - {check: not_empty, path: current.spei}
   - tool: low_flow_context
-    method: flow_duration
+    method: low_flow_frequency
+    alternatives:
+      - {tool: low_flow_context, method: flow_duration}
+      - {tool: low_flow_context, method: baseflow_separation}
+      - {tool: analyze_station, method: flow_duration}
     gates:
       - {check: min_years, path: years}
-    note: "Required: the brief asks where the river sits in its record."
+    note: "Required: the brief asks where the river sits in its record; 7Q10, the flow-duration percentiles or the baseflow index all read it."
   - tool: describe_catchment
     optional: true
 forbidden:

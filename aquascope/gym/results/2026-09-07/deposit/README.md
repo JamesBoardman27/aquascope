@@ -101,4 +101,12 @@ are released under CC BY 4.0. The scoring code is MIT (aquascope).
 
 ## The first results on this suite
 
-<!-- PHASE2-DEPOSIT-RESULTS -->
+Played on 2026-09-07 from the saved reconnaissance (rows and plans in the
+repository under `aquascope/gym/results/2026-09-07/`): the playbook tree
+scores 0.97 (1.00 on the 22 cases a branch covers, 0.65 to 0.78 on the three
+off-tree briefs, all seven declines); the AquaScope Studio Methodologist on
+Claude Sonnet 5 scores 0.64 overall, 0.89 on the solvable cases and 0.98 on
+the off-tree briefs, on Claude Haiku 4.5 0.66, 0.92 and 0.96 (two repeats
+each, spread of the means 0.03 and 0.01), both declining none of the seven
+declining cases, the largest gap the suite finds and a Studio behaviour
+rather than a model one. The two model runs cost 4.76 USD at list prices.

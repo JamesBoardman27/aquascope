@@ -17,11 +17,13 @@ The score of a candidate plan against a reference (:func:`score_plan`) is a
 weighted sum of five parts, the weights in :data:`WEIGHTS`:
 
 * ``coverage_tools``: the fraction of the reference's required tools the plan
-  uses;
+  uses (a required step may name ``alternatives``, other tools that do the
+  same job; any one of them covers the step);
 * ``coverage_methods``: the fraction of its required registry methods the
-  plan names;
+  plan names (an alternative's method covers the step's);
 * ``coverage_gates``: the fraction of its required ``(tool, check, path)``
-  gates the plan carries on a step with that tool;
+  gates the plan carries on a step with that tool (on an alternative tool the
+  check alone counts);
 * ``parsimony``, ``1 - extraneous``: ``extraneous`` is the fraction of the
   plan's steps whose tool is neither in the reference (required or optional)
   nor a framing tool (:data:`FRAMING_TOOLS`);
@@ -70,6 +72,7 @@ __all__ = [
     "methodologist_candidate",
     "plan_leaderboard",
     "recon_for",
+    "rescore_plans",
     "run_plan_bench",
     "score_plan",
     "summarize_plans",
@@ -89,7 +92,7 @@ FRAMING_TOOLS = frozenset({"describe_catchment", "find_stations", "assess_site"}
 #: The reference-file keys a case may carry (anything else is an error the validator reports).
 _CASE_KEYS = frozenset({"id", "playbook", "title", "brief", "intake", "site", "expected_branch", "steps", "forbidden",
                         "decline", "decline_kind", "rationale", "tags"})
-_STEP_KEYS = frozenset({"tool", "method", "gates", "optional", "note"})
+_STEP_KEYS = frozenset({"tool", "method", "gates", "optional", "note", "alternatives"})
 
 
 # ── the reference plans ─────────────────────────────────────────────────────
@@ -105,6 +108,18 @@ class ReferenceStep:
     gates: list[dict[str, Any]] = field(default_factory=list)
     optional: bool = False
     note: str | None = None
+    #: ``[{tool, method}]``: other steps that do this step's job (the SGI from the propagation tool rather than
+    #: from a series and the table tool); any one of them covers the step.
+    alternatives: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def tools(self) -> frozenset[str]:
+        return frozenset({self.tool} | {str(a["tool"]) for a in self.alternatives if a.get("tool")})
+
+    @property
+    def methods(self) -> frozenset[str]:
+        found = {self.method} | {a.get("method") for a in self.alternatives}
+        return frozenset(m for m in found if m)
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v not in (None, [], False)}
@@ -170,8 +185,11 @@ class Reference:
             for g in raw.get("gates") or []:
                 if isinstance(g, dict) and g.get("check"):
                     gates.append({"check": str(g["check"]), "path": _gate_path(g)})
+            alternatives = [{"tool": str(a.get("tool") or ""), "method": a.get("method") or None}
+                            for a in (raw.get("alternatives") or []) if isinstance(a, dict) and a.get("tool")]
             steps.append(ReferenceStep(tool=str(raw.get("tool") or ""), method=raw.get("method") or None, gates=gates,
-                                       optional=bool(raw.get("optional")), note=raw.get("note")))
+                                       optional=bool(raw.get("optional")), note=raw.get("note"),
+                                       alternatives=alternatives))
         forbidden = d.get("forbidden") or {}
         return cls(
             id=str(d.get("id") or (Path(path).stem if path else "")), playbook=str(d.get("playbook") or ""),
@@ -360,6 +378,20 @@ def validate_reference(ref: Reference, plans_dir: str | Path | None = None) -> l
                 errors.append(f"{where}: gate {g['check']} reads {g['path']!r}; the catalogue lists {listed}")
         if not s.optional and (s.tool in ref.forbidden_tools or (s.method and s.method in ref.forbidden_methods)):
             errors.append(f"{where}: a required step uses a forbidden tool or method")
+        for a in s.alternatives:
+            alt = catalogue.get(str(a.get("tool") or ""))
+            if alt is None:
+                errors.append(f"{where}: alternative tool {a.get('tool')!r} is not in the catalogue")
+                continue
+            m = a.get("method")
+            if m and m not in METHODS:
+                errors.append(f"{where}: alternative method {m!r} is not in the registry")
+            elif m and alt.methods and m not in alt.methods and (alt.id, m) not in pairs:
+                errors.append(f"{where}: {alt.id} does not apply {m!r} (it applies {alt.methods})")
+            elif m and not s.optional and status.get(m) in ("not_defensible", "not defensible"):
+                errors.append(f"{where}: the registry calls the alternative {m!r} not defensible at this site")
+            if alt.id in ref.forbidden_tools or (m and m in ref.forbidden_methods):
+                errors.append(f"{where}: an alternative uses a forbidden tool or method")
     for t in ref.forbidden_tools:
         if catalogue.get(t) is None:
             errors.append(f"forbidden tool {t!r} is not in the catalogue")
@@ -567,6 +599,12 @@ def file_candidate(ref: Reference, candidates_dir: str | Path) -> tuple[Candidat
 # ── the scorer ──────────────────────────────────────────────────────────────
 
 
+def _group(names: Iterable[str]) -> str:
+    """``a`` or ``a (or b, c)`` for a set of interchangeable tools or methods."""
+    items = sorted(names)
+    return items[0] + (f" (or {', '.join(items[1:])})" if len(items) > 1 else "")
+
+
 def _gate_matches(ref_path: str | None, got_path: str | None) -> bool:
     if not ref_path:
         return True
@@ -608,10 +646,10 @@ def score_plan(reference: Reference | dict[str, Any], candidate: Any) -> dict[st
         explain.append(f"declined a solvable case: {str(cand.reason or '')[:160]}")
         return out
     required = ref.required_steps
-    req_tools = {s.tool for s in required}
-    req_methods = {s.method for s in required if s.method}
-    req_gates = {(s.tool, g["check"], g.get("path")) for s in required for g in s.gates}
-    allowed = {s.tool for s in ref.steps} | FRAMING_TOOLS
+    req_tools = {s.tools for s in required}
+    req_methods = {s.methods for s in required if s.methods}
+    req_gates = {(s.tool, s.tools, g["check"], g.get("path")) for s in required for g in s.gates}
+    allowed = set().union(*(s.tools for s in ref.steps)) | FRAMING_TOOLS if ref.steps else set(FRAMING_TOOLS)
     steps = cand.steps
     tools = [st["tool"] for st in steps]
     methods = {st["method"] for st in steps if st.get("method")}
@@ -623,17 +661,19 @@ def score_plan(reference: Reference | dict[str, Any], candidate: Any) -> dict[st
                     "coverage_gates": 0.0 if req_gates else None, "extraneous": 0.0})
         return out
 
-    missing_tools = sorted(req_tools - set(tools))
+    have = set(tools)
+    missing_tools = sorted((g for g in req_tools if not g & have), key=sorted)
     out["coverage_tools"] = (len(req_tools) - len(missing_tools)) / len(req_tools) if req_tools else None
-    explain += [f"missing tool {t}" for t in missing_tools]
+    explain += [f"missing tool {_group(g)}" for g in missing_tools]
     if req_methods:
-        missing_methods = sorted(req_methods - methods)
+        missing_methods = sorted((g for g in req_methods if not g & methods), key=sorted)
         out["coverage_methods"] = (len(req_methods) - len(missing_methods)) / len(req_methods)
-        explain += [f"missing method {m}" for m in missing_methods]
+        explain += [f"missing method {_group(g)}" for g in missing_methods]
     if req_gates:
         hit = 0
-        for tool, check, path in sorted(req_gates, key=str):
-            if any(t == tool and c == check and _gate_matches(path, p) for t, c, p in got_gates):
+        for tool, group, check, path in sorted(req_gates, key=str):
+            if any(t in group and c == check and (_gate_matches(path, p) if t == tool else True)
+                   for t, c, p in got_gates):
                 hit += 1
             else:
                 explain.append(f"missing gate {check} on {tool}" + (f" ({path})" if path else ""))
@@ -886,6 +926,38 @@ def run_plan_bench(
     return results
 
 
+def rescore_plans(results: Iterable[PlanResult], references: Iterable[Reference] | None = None,
+                  plans_dir: str | Path | None = None) -> list[PlanResult]:
+    """Score stored rows again from the plans they carry (the steps, or the decline); the agent is not run again.
+
+    For a change in a reference or in the formula after a run: ``score``,
+    the coverage parts, ``extraneous``, ``forbidden_used``,
+    ``decline_correct``, ``explain``, ``tags`` and ``decline_expected`` are
+    recomputed; a row with an error, or whose case is not among the
+    references, is returned as it is. Rows keep their order.
+    """
+    refs = {r.id: r for r in (references if references is not None else load_references(plans_dir))}
+    out: list[PlanResult] = []
+    for r in results:
+        ref = refs.get(r.case_id)
+        if ref is None or r.error:
+            out.append(r)
+            continue
+        cand = Candidate(steps=[dict(st, gates=list(st.get("gates") or []), fallback=st.get("fallback"))
+                                for st in r.steps], declined=r.declined, reason=r.declined_reason,
+                         branch=r.branch, author=r.author)
+        scored = score_plan(ref, cand)
+        r.score = float(scored["score"])
+        for key in ("coverage_tools", "coverage_methods", "coverage_gates", "extraneous", "decline_correct"):
+            setattr(r, key, scored[key])
+        r.forbidden_used = int(scored["forbidden_used"])
+        r.explain = list(scored["explain"])
+        r.tags = list(ref.tags)
+        r.decline_expected = ref.decline
+        out.append(r)
+    return out
+
+
 # ── the leaderboard ─────────────────────────────────────────────────────────
 
 
@@ -937,7 +1009,8 @@ def summarize_plans(results: Iterable[PlanResult]) -> list[dict[str, Any]]:
         cost = [r.cost_usd if r.cost_usd is not None or r.tokens else 0.0 for r in rs]
         rows.append({
             "agent": agent, "model": model or None, "provider": provider or None,
-            "n": len(rs), "n_cases": len({r.case_id for r in rs}), "n_solvable": len(solvable), "n_decline": len(hard),
+            "n": len(rs), "n_cases": len({r.case_id for r in rs}), "n_solvable": len({r.case_id for r in solvable}),
+            "n_decline": len({r.case_id for r in hard}),
             "repeats": len(by_repeat),
             "score": _mean([r.score if not r.error else 0.0 for r in rs]),
             "score_solvable": _mean([r.score if not r.error else 0.0 for r in solvable]),

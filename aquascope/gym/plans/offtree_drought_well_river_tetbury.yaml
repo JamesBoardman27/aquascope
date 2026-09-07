@@ -39,7 +39,11 @@ steps:
       - {check: not_empty, path: trend}
     note: "Required: the brief asks whether the water table is lower than it used to be over the years."
   - tool: low_flow_context
-    method: flow_duration
+    method: low_flow_frequency
+    alternatives:
+      - {tool: low_flow_context, method: flow_duration}
+      - {tool: low_flow_context, method: baseflow_separation}
+      - {tool: analyze_station, method: flow_duration}
     gates:
       - {check: min_years, path: years}
   - tool: describe_catchment
