@@ -228,6 +228,27 @@
         "code",
         "test"
       ]
+    },
+    {
+      "login": "mikemikimike",
+      "name": "mikemikimike",
+      "avatar_url": "https://avatars.githubusercontent.com/u/186855910?v=4",
+      "profile": "https://github.com/mikemikimike",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "jddrtn",
+      "name": "Jade",
+      "avatar_url": "https://avatars.githubusercontent.com/u/202679891?v=4",
+      "profile": "https://github.com/jddrtn",
+      "contributions": [
+        "code",
+        "test",
+        "data"
+      ]
     }
   ],
   "commitType": "docs"
