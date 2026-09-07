@@ -327,7 +327,7 @@ def _studio_tools(catchment):
 
 
 def _with_recon_context(a, fn):
-    """Run ``fn`` with the Scout's assess_site carrying the catchment area and donor count only the page can
+    """Run fn with the Scout's assess_site carrying the catchment area and donor count only the page can
     read (BasinATLAS and the donor table are DuckDB-WASM reads on the main thread); restored afterwards."""
     import aquascope.explore as _ex
 
@@ -374,7 +374,7 @@ def _studio_file(art):
 
 
 def studio_call(a, on_event=None, on_artifact=None, store=None):
-    """One message from the page. ``op`` is start, say, approve, follow_up, file or export."""
+    """One message from the page. op is start, say, approve, follow_up, file or export."""
     return _with_recon_context(a, lambda: _studio_dispatch(a, on_event, on_artifact, store))
 
 

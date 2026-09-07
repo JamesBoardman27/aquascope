@@ -636,6 +636,11 @@ def test_the_worker_studio_message_keeps_the_contract() -> None:
     assert "with_artifacts=False" in worker, "the page gets the workspace without the bytes"
     assert "bundle_bytes" in worker and "describe_catchment_from_row" in worker
     assert 'post("studio_progress"' in worker and 'post("studio_artifact"' in worker
+    # the Python lives in a JS template literal: a backtick or a ${ inside it ends the string (node --check
+    # still passes, the tail parses as a tagged template) and the worker dies before Pyodide loads
+    opening = "const STUDIO_PY = `"
+    block = worker[worker.index(opening) + len(opening):worker.index("# --- end studio face ---")]
+    assert "`" not in block and "${" not in block, "no backticks or ${ inside the STUDIO_PY template literal"
     assert 'with_data=art.media_type == "image/png"' in worker, "PNG figures travel with bytes, SVG and CSV without"
     # nothing loads until a study runs: matplotlib before the first run, the document libraries before the bundle
     assert 'loadPackage("matplotlib")' in worker and 'install(["openpyxl", "python-docx"])' in worker
