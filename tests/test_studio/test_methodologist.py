@@ -215,3 +215,26 @@ def test_plan_text_is_a_numbered_checklist():
     assert "2. [s2] analyze_station(source='uk_ea', station_id='3400TH')  method trend_mann_kendall" in text
     assert "gate max_return_period_factor 3 on years" in text and "fallback: similar_basins" in text
     assert "caveat(s) will be printed verbatim" in text
+
+
+def test_a_guessed_gate_path_is_repaired_to_the_one_the_tool_has() -> None:
+    from aquascope.studio import catalogue
+
+    steps = [
+        {"id": "s1", "tool": "describe_catchment", "arguments": {"lat": 51.4, "lon": -0.3},
+         "expects": [{"check": "not_empty", "path": "catchment"},
+                     {"check": "max_area_km2", "value": 20000, "path": "catchment.upstream_area_km2"}]},
+        {"id": "s2", "tool": "similar_basins", "arguments": {"lat": 51.4, "lon": -0.3, "k": 10},
+         "expects": [{"check": "min_donors", "value": 5, "path": "donors"}]},
+        {"id": "s3", "tool": "flood_frequency", "arguments": {"source": "uk_ea", "station_id": "x"},
+         "expects": [{"check": "spread_within", "value": 0.25, "path": "ffa.fits.gev_lmoments.q, ffa.fits.lp3.q"},
+                     {"check": "ci_finite", "path": "ffa.fits.gev_bootstrap.ci"}]},
+    ]
+    assert catalogue.validate_plan(steps) == []
+    assert steps[0]["expects"][0]["path"] == "sub_basin" and steps[0]["expects"][0]["repaired_from"] == "catchment"
+    assert steps[0]["expects"][1]["path"] == "sub_basin.up_area"
+    assert steps[1]["expects"][0]["path"] == "k"
+    assert "repaired_from" not in steps[2]["expects"][0] and "repaired_from" not in steps[2]["expects"][1]
+    # the model reads the paths it should copy
+    entry = next(e for e in catalogue.compact("flood_risk") if e["tool"] == "similar_basins")
+    assert {"check": "min_donors", "path": "k"} in entry["gates"]

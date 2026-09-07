@@ -69,7 +69,8 @@ class Entry:
             "tool": self.id, "about": self.about[:160], "kind": self.kind,
             "arguments": {k: (v.get("type") or "any") for k, v in self.arguments.items()},
             "required": self.required, "yields": self.yields, "methods": self.methods,
-            "gates": [g["check"] for g in self.gates],
+            # The paths are the ones the payload really has; a plan should copy them.
+            "gates": [{"check": g["check"], "path": g.get("path")} for g in self.gates],
         }
 
 
@@ -83,7 +84,7 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     },
     "describe_catchment": {
         "kind": "site", "yields": ["catchment"], "tables": ["catchment_attributes"], "figures": ["site_map"],
-        "gates": [{"check": "not_empty", "path": "sub_basin"}, {"check": "max_area_km2", "path": "area_km2"}],
+        "gates": [{"check": "not_empty", "path": "sub_basin"}, {"check": "max_area_km2", "path": "sub_basin.up_area"}],
     },
     "find_stations": {
         "kind": "site", "yields": ["stations"], "tables": ["stations"],
@@ -91,7 +92,7 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     },
     "get_timeseries": {
         "kind": "station", "yields": ["series"], "tables": ["series"], "figures": ["series"],
-        "gates": [{"check": "not_empty", "path": "series"}, {"check": "min_years", "path": "years"},
+        "gates": [{"check": "not_empty", "path": "points"}, {"check": "min_years", "path": "years"},
                   {"check": "unit_present", "path": "unit"}],
     },
     "analyze_station": {
@@ -126,18 +127,19 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     "similar_basins": {
         "kind": "site", "yields": ["donors"], "methods": ["similar_basins"],
         "tables": ["donors"], "figures": ["donors_map"],
-        "gates": [{"check": "min_donors", "path": "donors"}],
+        "gates": [{"check": "min_donors", "path": "k"}, {"check": "not_empty", "path": "stations"}],
     },
     "regionalize_signatures": {
         "kind": "site", "yields": ["signatures", "donors"], "methods": ["regionalize_signatures"],
         "tables": ["signatures", "donors"], "figures": ["signatures_band"],
-        "gates": [{"check": "min_donors", "path": "donors"}, {"check": "not_empty", "path": "signatures"}],
+        "gates": [{"check": "not_empty", "path": "estimates"}, {"check": "not_empty", "path": "skill"}],
     },
     "drought_indices": {
         "kind": "site", "yields": ["spi", "spei", "drought_events", "temperature_trend"],
         "methods": ["spi", "spei", "spei_reanalysis"],
         "tables": ["indices_monthly", "drought_events", "index_divergence"], "figures": ["drought_strip"],
-        "gates": [{"check": "not_empty", "path": "spi"}, {"check": "min_years", "path": "years"}],
+        "gates": [{"check": "not_empty", "path": "indices"}, {"check": "not_empty", "path": "current.spi"},
+                  {"check": "not_empty", "path": "current.spei"}, {"check": "min_years", "path": "years"}],
     },
     "drought_propagation": {
         "kind": "station", "yields": ["sgi", "lag"], "methods": ["sgi"],
@@ -152,12 +154,15 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     "supply_reliability": {
         "kind": "site", "yields": ["reliability", "fdc"], "methods": ["supply_reliability"],
         "tables": ["reliability", "fdc_percentiles"], "figures": ["reliability_curve"],
-        "gates": [{"check": "status_is", "path": "status"}, {"check": "not_empty", "path": "reliability"}],
+        "gates": [{"check": "not_empty", "path": "reliability"}, {"check": "not_empty", "path": "fdc"},
+                  {"check": "min_years", "path": "years"}, {"check": "unit_present", "path": "unit"}],
     },
     "crop_water_demand": {
         "kind": "site", "yields": ["demand", "et0"], "methods": ["crop_water_requirement", "fao56_et0"],
         "tables": ["demand_monthly", "et0_monthly"], "figures": ["demand_monthly"],
-        "gates": [{"check": "not_empty", "path": "demand"}],
+        "gates": [{"check": "not_empty", "path": "demand.gross_irrigation_mm"},
+                  {"check": "not_empty", "path": "demand.peak_month_m3s"},
+                  {"check": "not_empty", "path": "season.months"}],
     },
     # workbench analyses over a table (from_step or a load_table step)
     "eda": {"yields": ["summary"], "tables": ["summary"]},
@@ -166,7 +171,8 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     "insights": {"yields": ["insights"], "tables": ["insights"]},
     "who_screen": {"yields": ["screen"], "tables": ["who_screen"], "figures": ["who_exceedances"]},
     "wqi": {"yields": ["wqi"], "methods": ["water_quality_index"], "tables": ["wqi"], "figures": ["wqi_bars"],
-            "gates": [{"check": "not_empty", "path": "ccme"}]},
+            "gates": [{"check": "not_empty", "path": "ccme.score"},
+                      {"check": "min_samples", "path": "ccme.sample_counts"}]},
     "iwqi": {"yields": ["iwqi"], "methods": ["iwqi"], "tables": ["iwqi"]},
     "flow_duration": {"yields": ["fdc"], "methods": ["flow_duration"], "tables": ["fdc_percentiles"],
                       "figures": ["fdc"], "gates": [{"check": "not_empty", "path": "percentiles"}]},
@@ -348,8 +354,26 @@ def figure_kinds() -> list[str]:
 # ── validation of a model-written step ─────────────────────────────────────
 
 
+def repair_gate_path(gate: dict[str, Any], entry: Entry) -> bool:
+    """A model-written gate often guesses a payload path the tool does not have (``donors`` where the payload
+    says ``k``, ``catchment.area`` where it says ``sub_basin.up_area``). When the catalogue knows the path this
+    check reads on this tool and the gate names another, the known one is put in its place; returns True when
+    the path was changed. A gate whose check the catalogue does not list for the tool is left alone."""
+    known = [g for g in entry.gates if g.get("check") == gate.get("check") and g.get("path")]
+    if not known:
+        return False
+    path = gate.get("path")
+    if path and any(path == g["path"] or str(path).startswith(str(g["path"]) + ".") for g in known):
+        return False
+    if gate.get("check") == "spread_within" and path and "," in str(path):
+        return False
+    gate["repaired_from"] = path
+    gate["path"] = known[0]["path"]
+    return True
+
+
 def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
-                  sufficiency: list[dict[str, Any]] | None = None) -> list[str]:
+                  sufficiency: list[dict[str, Any]] | None = None, repair: bool = True) -> list[str]:
     """Errors in one plan step, in plain words. Empty means the step is acceptable.
 
     Checks: the tool exists; the arguments are the tool's (``from_step`` allowed
@@ -397,6 +421,9 @@ def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
     for g in step.get("expects") or []:
         if not isinstance(g, dict) or g.get("check") not in CHECKS:
             errors.append(f"step {sid}: gate {g!r} is not one of {sorted(CHECKS)}")
+            continue
+        if repair:
+            repair_gate_path(g, entry)
     method = step.get("method")
     if method:
         from aquascope.methods import METHODS
@@ -412,12 +439,15 @@ def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
                 errors.append(f"step {sid}: the registry calls {method!r} not defensible here: {row.get('reason')}")
     fb = step.get("fallback")
     if isinstance(fb, dict) and isinstance(fb.get("step"), dict):
-        errors += [f"fallback of {e}" for e in validate_step(fb["step"], known_ids=ids, sufficiency=sufficiency)]
+        errors += [f"fallback of {e}" for e in validate_step(fb["step"], known_ids=ids, sufficiency=sufficiency,
+                                                             repair=repair)]
     return errors
 
 
-def validate_plan(steps: list[dict[str, Any]], *, sufficiency: list[dict[str, Any]] | None = None) -> list[str]:
-    """Every error over an ordered list of steps (ids must be unique; references may only point backwards)."""
+def validate_plan(steps: list[dict[str, Any]], *, sufficiency: list[dict[str, Any]] | None = None,
+                  repair: bool = True) -> list[str]:
+    """Every error over an ordered list of steps (ids must be unique; references may only point backwards).
+    With ``repair`` (the default) a gate path the tool does not have is replaced by the one it has, in place."""
     errors: list[str] = []
     seen: set[str] = set()
     for i, step in enumerate(steps, 1):
@@ -427,6 +457,6 @@ def validate_plan(steps: list[dict[str, Any]], *, sufficiency: list[dict[str, An
             sid = f"s{i}"
         elif sid in seen:
             errors.append(f"step {sid}: duplicate id")
-        errors += validate_step(step, known_ids=set(seen), sufficiency=sufficiency)
+        errors += validate_step(step, known_ids=set(seen), sufficiency=sufficiency, repair=repair)
         seen.add(str(sid))
     return errors
