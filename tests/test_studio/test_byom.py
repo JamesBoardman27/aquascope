@@ -286,7 +286,7 @@ def test_explorer_prompts_json_matches_the_module():
     assert set(data["schemas"]) == {"brief", "plan", "sections"}
     assert data["schemas"]["plan"]["properties"]["steps"]["items"]["required"] == ["id", "tool", "arguments",
                                                                                      "rationale"]
-    assert "—" not in shipped and "–" not in shipped, "no dashes in what the page reads"
+    assert "\u2014" not in shipped and "\u2013" not in shipped, "no dashes in what the page reads"
 
 
 def test_the_prompts_command_writes_a_file(tmp_path):
