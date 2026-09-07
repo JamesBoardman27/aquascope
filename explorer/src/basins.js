@@ -305,6 +305,19 @@ const plain = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ty
 // row, for aquascope.archive.basins.describe_catchment_from_row. The outlet
 // row's upstream fields already describe the whole catchment, so the upstream
 // walk (a topology download on a fresh page) is not repeated here.
+// The donor tables a Study run needs in the worker for similar_basins and
+// regionalize_signatures (pyarrow does not run there): the station catchments
+// and signatures the page already reads with DuckDB for its own cards, plus
+// the published leave-one-out skill. Read once, then reused.
+let donorTables = null;
+export async function donorTablesForWorker() {
+  if (donorTables) return donorTables;
+  const { rows } = await ensureSimilarTable();
+  const { sig, skill } = await ensureRegimeData();
+  donorTables = { catchments: rows.map(plain), signatures: [...sig.values()].map(plain), skill };
+  return donorTables;
+}
+
 export async function catchmentForWorker(lat, lon) {
   const sb = await subBasinAtCached(lat, lon);
   if (!sb || sb.hybas_id === null) return null;

@@ -313,16 +313,48 @@ from aquascope.studio import Studio as _Studio
 _STUDIO = {}      # workspace id -> Studio, with the artifact bytes
 
 
-def _studio_tools(catchment):
+def _studio_tools(catchment, donors=None):
     """describe_catchment from the sub-basin row the page found (BasinATLAS is read by DuckDB-WASM on the
-    main thread; pyogrio does not run here)."""
+    main thread; pyogrio does not run here), and the donor tools (similar_basins, regionalize_signatures)
+    over the station catchments and signatures tables the page read the same way: nothing here opens a
+    parquet file."""
     tools = {}
     c = catchment or {}
-    if (c.get("sub_basin") or {}).get("hybas_id") is not None:
-        from aquascope.archive import basins as _basins
+    if (c.get("sub_basin") or {}).get("hybas_id") is None:
+        return tools
+    from aquascope.archive import basins as _basins
 
-        tools["describe_catchment"] = lambda lat=None, lon=None, **_kw: _basins.describe_catchment_from_row(
-            lat, lon, c["sub_basin"], c.get("row"), n_upstream=c.get("n_upstream"))
+    def describe(lat=None, lon=None, **_kw):
+        return _basins.describe_catchment_from_row(lat, lon, c["sub_basin"], c.get("row"),
+                                                   n_upstream=c.get("n_upstream"))
+
+    tools["describe_catchment"] = describe
+    d = donors or {}
+    if not d.get("catchments"):
+        return tools
+    import pandas as _pd
+    from aquascope.archive import regionalize as _rg
+    from aquascope.archive import similar as _similar
+
+    table = _pd.DataFrame(d["catchments"])
+    sig = _pd.DataFrame(d["signatures"]) if d.get("signatures") else None
+    skill = d.get("skill")
+
+    def similar_basins(lat=None, lon=None, source=None, station_id=None, k=10, method="combined", **_kw):
+        kk = max(1, min(int(k or 10), 50))
+        if source and station_id:
+            return _similar.similar_for_station(source, station_id, k=kk, method=method, table=table)
+        return _similar.similar_for_point(float(lat), float(lon), k=kk, method=method, desc=describe(lat, lon),
+                                          table=table)
+
+    tools["similar_basins"] = similar_basins
+    if sig is not None:
+        def regionalize_signatures(lat=None, lon=None, k=10, method="similarity", **_kw):
+            kk = max(1, min(int(k or 10), 50))
+            return _rg.regionalize_point(float(lat), float(lon), k=kk, method=method, desc=describe(lat, lon),
+                                         table=table, signatures=sig, skill=skill)
+
+        tools["regionalize_signatures"] = regionalize_signatures
     return tools
 
 
@@ -358,7 +390,7 @@ def _studio_open(a, on_event, on_artifact):
     ws = a.get("workspace") or {}
     kept = _STUDIO.get(ws.get("id"))
     d = kept.to_dict() if kept is not None else ws
-    s = _Studio.from_dict(d, tools=_studio_tools(a.get("catchment")), on_event=on_event, on_artifact=on_artifact,
+    s = _Studio.from_dict(d, tools=_studio_tools(a.get("catchment"), a.get("donors_tables")), on_event=on_event, on_artifact=on_artifact,
                           **_studio_model(a))
     _STUDIO[s.ws.id] = s
     return s
@@ -386,7 +418,7 @@ def _studio_dispatch(a, on_event, on_artifact, store):
         if a.get("use_frame") and frame is not None:
             tables[str(a.get("frame_label") or "my-data")] = frame.to_csv(index=False)
         s = _Studio(float(a["lat"]), float(a["lon"]), data=tables or None, intake=a.get("intake") or None,
-                    tools=_studio_tools(a.get("catchment")), on_event=on_event, on_artifact=on_artifact,
+                    tools=_studio_tools(a.get("catchment"), a.get("donors_tables")), on_event=on_event, on_artifact=on_artifact,
                     **_studio_model(a))
         brief = a.get("brief") or {}
         if isinstance(brief.get("decision"), str) and brief["decision"].strip():

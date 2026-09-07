@@ -318,12 +318,19 @@ def regionalize(
     return out
 
 
-def regionalize_point(lat: float, lon: float, *, k: int = 10, method: str = "similarity", **kw: Any) -> dict[str, Any]:
-    """Describe the catchment of a point (BasinATLAS) and regionalise the flow signatures onto it."""
-    from aquascope.archive.basins import describe_catchment
+def regionalize_point(lat: float, lon: float, *, k: int = 10, method: str = "similarity",
+                      desc: dict[str, Any] | None = None, **kw: Any) -> dict[str, Any]:
+    """Describe the catchment of a point (BasinATLAS) and regionalise the flow signatures onto it.
 
+    ``desc`` is a ``describe_catchment`` result already in hand (the browser's, built from the sub-basin row
+    it read itself); with ``table``, ``signatures``, ``catalog`` and ``skill`` in ``kw`` nothing here touches a
+    file, which is how the Explorer runs this step inside Pyodide.
+    """
     skill = kw.pop("skill") if "skill" in kw else load_skill()
-    desc = describe_catchment(lat, lon, upstream=False)
+    if desc is None:
+        from aquascope.archive.basins import describe_catchment
+
+        desc = describe_catchment(lat, lon, upstream=False)
     if desc.get("error"):
         return {"latitude": lat, "longitude": lon, "error": desc["error"]}
     target = {"latitude": lat, "longitude": lon, "attributes": desc.get("attributes", {}),

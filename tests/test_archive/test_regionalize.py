@@ -144,3 +144,24 @@ def test_regionalize_point_wraps_describe_catchment(monkeypatch, world):
 def test_urls():
     assert rg.signatures_url().endswith("basins/station_signatures.parquet")
     assert rg.skill_url("a/b") == "https://huggingface.co/datasets/a/b/resolve/main/basins/regionalization_skill.json"
+
+
+def test_the_point_paths_take_a_description_already_in_hand(world):
+    """The browser builds describe_catchment's result itself and hands the tables over: no file is opened."""
+    from unittest.mock import patch
+
+    from aquascope.archive import similar as sm
+
+    tab, cat, sig = world
+    row = tab.iloc[-1]  # the twin
+    desc = {"attributes": {k: {"value": float(row[k])} for k in (
+        "elevation_m", "slope_deg", "precipitation_mm_yr", "aridity_index", "temperature_c", "snow_cover_pct",
+        "forest_pct", "cropland_pct", "urban_pct", "clay_pct", "sand_pct", "population_density",
+        "degree_of_regulation_pct")}, "sub_basin": {"hybas_id": 999, "up_area": 1000.0}}
+    with patch("aquascope.archive.basins.describe_catchment", side_effect=AssertionError("must not be called")):
+        near = sm.similar_for_point(TARGET["latitude"], TARGET["longitude"], k=5, method="similarity", desc=desc,
+                                    table=tab, catalog=cat)
+        est = rg.regionalize_point(TARGET["latitude"], TARGET["longitude"], k=5, method="similarity", desc=desc,
+                                   table=tab, signatures=sig, catalog=cat, skill=None)
+    assert near["stations"] and near["sub_basin"]["hybas_id"] == 999 and near["k"] == 5
+    assert est["estimates"]["q_mean_mm"]["value"] > 0 and est["sub_basin"]["hybas_id"] == 999

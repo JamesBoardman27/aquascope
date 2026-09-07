@@ -196,3 +196,35 @@ def test_unknown_ops_are_errors_not_exceptions(face) -> None:
     out = _run(face, {"op": "start", "lat": 51.415, "lon": -0.308, "text": PROBLEM}, tools=tools)
     bad = _run(face, {"op": "dance", "workspace": out["workspace"]}, tools=tools)
     assert bad == {"error": "unknown op 'dance'"}
+
+
+def test_the_donor_tools_run_on_the_pages_tables(face) -> None:
+    """With the catchments and signatures the page read, similar_basins and regionalize_signatures are tools
+    that never open a parquet file: the description comes from the sub-basin row, the tables from the page."""
+    catchment = {"sub_basin": {"hybas_id": 2120000010, "up_area": 9948.0}, "row": None, "n_upstream": 3}
+    donors = {"catchments": [{"source": "uk_ea", "station_id": "A", "hybas_id": 1, "area_km2": 900.0}],
+              "signatures": [{"source": "uk_ea", "station_id": "A", "q_mean_mm": 1.0}], "skill": {"methods": {}}}
+    seen: dict = {}
+
+    def fake_row(lat, lon, sub_basin, row, n_upstream=None):
+        return {"attributes": {}, "sub_basin": {"hybas_id": sub_basin["hybas_id"]}}
+
+    def fake_similar(lat, lon, *, k, method, desc, table):
+        seen["similar"] = {"k": k, "desc": desc["sub_basin"]["hybas_id"], "rows": len(table)}
+        return {"stations": [], "k": k}
+
+    def fake_regionalize(lat, lon, *, k, method, desc, table, signatures, skill):
+        seen["regionalize"] = {"k": k, "sig": len(signatures), "skill": skill is not None}
+        return {"estimates": {}}
+
+    tools = face["_studio_tools"](catchment, donors)
+    assert {"describe_catchment", "similar_basins", "regionalize_signatures"} <= set(tools)
+    assert set(face["_studio_tools"](catchment, None)) == {"describe_catchment"}
+    assert face["_studio_tools"](None, donors) == {}
+    with patch("aquascope.archive.basins.describe_catchment_from_row", side_effect=fake_row, create=True), \
+         patch("aquascope.archive.similar.similar_for_point", side_effect=fake_similar), \
+         patch("aquascope.archive.regionalize.regionalize_point", side_effect=fake_regionalize):
+        tools["similar_basins"](lat=51.4, lon=-0.3, k=7)
+        tools["regionalize_signatures"](lat=51.4, lon=-0.3, k=99)
+    assert seen["similar"] == {"k": 7, "desc": 2120000010, "rows": 1}
+    assert seen["regionalize"] == {"k": 50, "sig": 1, "skill": True}

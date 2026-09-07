@@ -13,7 +13,7 @@
 import { $, actions, escapeHtml, fmt, sourceStyle, state, stationKey } from "./core.js?v=__BUILD__";
 import { shapeSvg } from "./shapes.js?v=__BUILD__";
 import { announce } from "./a11y.js?v=__BUILD__";
-import { catchmentAreaAt, catchmentForWorker, donorPoolSize, stationArea } from "./basins.js?v=__BUILD__";
+import { catchmentAreaAt, catchmentForWorker, donorPoolSize, donorTablesForWorker, stationArea } from "./basins.js?v=__BUILD__";
 import { askModelConfig, mdToHtml } from "./ask.js?v=__BUILD__";
 import { closeDrawer, drawerMode, drawerOpen, openDrawer, setStatusEl } from "./shell.js?v=__BUILD__";
 import {
@@ -522,6 +522,12 @@ async function callStudio(op, extra = {}) {
   S.declined = null;
   setBusy(true);
   try {
+    // A run may reach for donors (similar_basins, regionalize_signatures); the worker cannot read the
+    // parquet tables, so the page hands over the ones it holds, once.
+    if ((op === "approve" || op === "follow_up") && S.catchment && !("donors_tables" in extra)) {
+      extra = { ...extra, donors_tables: await donorTablesForWorker().catch(() => null) };
+      if (my !== S.run) return;
+    }
     const res = await job(op, extra);
     if (my !== S.run) return;
     applyReply(res);
