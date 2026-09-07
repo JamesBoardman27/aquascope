@@ -182,3 +182,25 @@ def test_prior_results_are_reused_unless_the_gates_changed(no_deliverables):
     assert [c[0] for c in calls] == ["describe_catchment", "analyze_station", "flood_frequency", "flood_frequency"]
     gate = next(g for g in ws.run["gates"] if g["check"] == "max_return_period_factor")
     assert "T = 50 years" in gate["detail"]
+
+
+def test_the_requested_return_period_reaches_the_flood_steps() -> None:
+    from aquascope.studio.roles.analysts import _ask_for_the_return_period
+    from aquascope.studio.workspace import Workspace
+    from aquascope.study import Step, Study
+
+    ws = Workspace(site={"lat": 51.4, "lon": -0.3})
+    ws.brief.intake["return_period"] = 200
+    study = Study(question="q", version=3, steps=[
+        Step(tool="describe_catchment", id="s1", arguments={"lat": 51.4, "lon": -0.3}),
+        Step(tool="flood_frequency", id="s2", arguments={"source": "uk_ea", "station_id": "x", "bootstrap_ci": True}),
+        Step(tool="analyze_station", id="s3", arguments={"source": "uk_ea", "station_id": "x",
+                                                         "return_periods": [10, 200]}),
+    ])
+    _ask_for_the_return_period(ws, study)
+    assert "return_periods" not in study.steps[0].arguments
+    assert study.steps[1].arguments["return_periods"] == [2, 5, 10, 25, 50, 100, 200]
+    assert study.steps[2].arguments["return_periods"] == [10, 200]
+    ws.brief.intake["return_period"] = 100
+    _ask_for_the_return_period(ws, study)
+    assert study.steps[1].arguments["return_periods"] == [2, 5, 10, 25, 50, 100, 200]

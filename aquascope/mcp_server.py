@@ -213,7 +213,8 @@ def water_quality_samples(
 
 
 def analyze_station(
-    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False, variable: str | None = None
+    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False, variable: str | None = None,
+    return_periods: list[float] | None = None,
 ) -> dict[str, Any]:
     """Fetch and analyse one station: record summary, annual maxima, flood frequency (GEV L-moments and
     Log-Pearson III with 90 % CI; optional bootstrap GEV band), flow-duration percentiles, Mann-Kendall
@@ -231,13 +232,14 @@ def analyze_station(
     if variable and variable not in VARIABLES:
         return {"error": f"unknown variable {variable!r}; allowed: {list(VARIABLES)}"}
     store: dict[str, Any] = {}
-    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable)
+    res = _analyze(source, station_id, years=int(years) if years else None, store=store, variable=variable,
+                   return_periods=return_periods)
     res.pop("series", None)
     if "fdc" in res:
         res["fdc"] = {k: res["fdc"][k] for k in ("q95", "q50", "q10")}
     if bootstrap_ci and res.get("ffa") and store.get("series") is not None:
         try:
-            ci = flood_ci(store["series"])
+            ci = flood_ci(store["series"], return_periods=return_periods)
             res["ffa"]["fits"]["gev_bootstrap"] = {
                 k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded") if k in ci
             }
@@ -248,12 +250,14 @@ def analyze_station(
 
 
 def flood_frequency(
-    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False
+    source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False,
+    return_periods: list[float] | None = None,
 ) -> dict[str, Any]:
-    """Return levels for T = 2, 5, 10, 25, 50, 100 years at a station (subset of analyze_station).
-    years caps the record to the last N years; by default the full record is requested.
+    """Return levels for T = 2, 5, 10, 25, 50, 100 years at a station (subset of analyze_station); pass
+    return_periods to add others (a 200-year design). years caps the record to the last N years; by default the
+    full record is requested.
     """
-    res = analyze_station(source, station_id, years=years, bootstrap_ci=bootstrap_ci)
+    res = analyze_station(source, station_id, years=years, bootstrap_ci=bootstrap_ci, return_periods=return_periods)
     if "error" in res:
         return res
     keep = {k: res.get(k) for k in ("source", "station_id", "agency", "license", "attribution", "unit",

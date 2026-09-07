@@ -100,6 +100,29 @@ def _name_stations(ws: Workspace, run: StudyRun) -> None:
                     p["name"] = name
 
 
+def _ask_for_the_return_period(ws: Workspace, study: Study) -> None:
+    """A flood step reports the fits at 2, 5, 10, 25, 50 and 100 years unless told otherwise; when the brief
+    asks for another T (200 years, 20 years) the step is told, so the gates and the prose find it."""
+    rp = (ws.brief.intake or {}).get("return_period")
+    try:
+        rp_f = float(rp)
+    except (TypeError, ValueError):
+        return
+    if rp_f < 1.01:
+        return
+    from aquascope.explore import RETURN_PERIODS
+
+    for step in study.steps:
+        if step.tool not in ("analyze_station", "flood_frequency"):
+            continue
+        given = step.arguments.get("return_periods")
+        periods = [float(x) for x in (given or RETURN_PERIODS) if isinstance(x, (int, float))]
+        if rp_f in periods:
+            continue
+        periods.append(rp_f)
+        step.arguments["return_periods"] = [int(v) if float(v).is_integer() else v for v in sorted(set(periods))]
+
+
 def _inherit_units(ws: Workspace, run: StudyRun, study: Study) -> None:
     """A workbench step that took its table from an earlier step (``from_step``) inherits that payload's unit
     and variable when it reports none, so "496.7" becomes "496.7 m3/s" in the prose, the tables and the figures."""
@@ -361,6 +384,7 @@ def run(ws: Workspace, model: Model | None, *, tools: dict[str, Any] | None = No
     drawn: set[str] = set()
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     ws.event("analyst", "start", f"{len(study.steps)} step(s)")
+    _ask_for_the_return_period(ws, study)
     run_ = run_study(study, on_event=say, prior=prior, tools=callables)
     _name_stations(ws, run_)
     _inherit_units(ws, run_, study)
