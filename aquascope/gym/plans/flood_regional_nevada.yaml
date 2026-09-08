@@ -1,0 +1,45 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# No gauge within 50 km: the estimate is regional, from donors chosen by catchment similarity, with GloFAS as the
+# cross-check. Every station tool is forbidden because there is no station.
+id: flood_regional_nevada
+playbook: flood_risk
+title: Flood screening at an ungauged desert wash, T = 100 years
+brief: >-
+  Screen the 100-year flood at this point in the Big Smoky Valley for a solar farm access road. There is no
+  gauge anywhere near it.
+intake:
+  return_period: 100
+  decision: risk screening
+site:
+  name: A bare point in the Big Smoky Valley, Nevada (no gauge within 50 km)
+  lat: 38.0
+  lon: -117.0
+  recon: nevada_point
+expected_branch: regional
+steps:
+  - tool: describe_catchment
+    gates:
+      - {check: not_empty, path: sub_basin}
+    note: "Required here: the catchment attributes are what the similarity search and the transfer run on."
+  - tool: similar_basins
+    method: similar_basins
+    gates:
+      - {check: min_donors, path: k}
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    gates:
+      - {check: not_empty, path: estimates}
+      - {check: not_empty, path: skill}
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+forbidden:
+  tools: [analyze_station, flood_frequency, get_timeseries, low_flow_context, supply_reliability, load_table,
+          return_periods]
+  methods: [at_site_flood_frequency, trend_mann_kendall, flow_duration, low_flow_frequency, baseflow_separation,
+            gr4j_calibration]
+rationale: >-
+  No gauge with a usable record lies within 50 km, so every at-site method is not defensible and every tool that
+  takes a station has nothing to read. The catchment is described first because the donor search and the transfer
+  run on its attributes; ten donors are available, above the floor of three; the transferred mean annual maximum
+  and the other signatures are quoted with their band and skill, GloFAS beside them as an indicative cross-check.

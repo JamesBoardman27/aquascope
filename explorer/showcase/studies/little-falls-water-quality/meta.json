@@ -1,0 +1,118 @@
+{
+ "id": "little-falls-water-quality",
+ "title": "Water quality of the Potomac at Little Falls",
+ "kind": "water_quality",
+ "shows": "WQP samples at a USGS station: the WHO screen and the water-quality index over what was sampled.",
+ "site": {
+  "lat": 38.95,
+  "lon": -77.13,
+  "name": "Potomac at Little Falls, Washington DC, USA"
+ },
+ "problem": "Screen the last five years of water-quality samples of the Potomac at Little Falls against the drinking-water guidelines: which parameters exceed, and what is the index?",
+ "intake": {
+  "use": "drinking",
+  "years": 5,
+  "health_verdict": false
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T14:21:50+00:00",
+ "seconds": 251.3,
+ "tokens": {
+  "prompt": 39339,
+  "completion": 21109,
+  "calls": 5,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3210,
+    "completion_tokens": 839
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 8344,
+    "completion_tokens": 7626
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 19811,
+    "completion_tokens": 8898
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 7974,
+    "completion_tokens": 3746
+   }
+  },
+  "total": 60448
+ },
+ "usd": 0.4347,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "water_quality",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 4,
+ "gates": {
+  "passed": 6,
+  "total": 6
+ },
+ "checks": {
+  "passed": 4,
+  "total": 5
+ },
+ "replans": 0,
+ "stop_reason": null,
+ "headline": "Over 2021-09-07 to 2026-09-06, USGS-01646500 (Potomac River near Wash DC, Little Falls Pump Sta) yielded 5,366 water-quality samples across three parameters.",
+ "not_established": [
+  "step s4: method 'iwqi' is not one wqi applies; 'water_quality_index' stands in",
+  "These numbers are not in any tool result: -10.0, -100.0."
+ ],
+ "figures": [
+  {
+   "name": "s1_samples_by_parameter.png",
+   "id": "fig-s1-samples_by_parameter",
+   "step": "s1",
+   "caption": "Distribution of the sampled values per parameter at POTOMAC RIVER NEAR WASH, DC LITTLE FALLS PUMP STA (usgs USGS-01646500) (5366 samples, 2021 to 2026): box is the interquartile range, the line the median, points beyond 1.5 IQR shown singly.",
+   "bytes": 46363
+  },
+  {
+   "name": "s2_who_exceedances.png",
+   "id": "fig-s2-who_exceedances",
+   "step": "s2",
+   "caption": "Share of samples outside the WHO drinking-water guideline per parameter; red is an alert (over 10 %), orange a warning (any exceedance), green within the guideline.",
+   "bytes": 24742
+  },
+  {
+   "name": "s3_wqi_bars.png",
+   "id": "fig-s3-wqi_bars",
+   "step": "s3",
+   "caption": "CCME WQI of 100 (Excellent) over 1788 samples against the drinking guidelines; the CCME factors are the scope, frequency and amplitude of the exceedances.",
+   "bytes": 37982
+  },
+  {
+   "name": "s4_wqi_bars.png",
+   "id": "fig-s4-wqi_bars",
+   "step": "s4",
+   "caption": "CCME WQI of 100 (Excellent) over 1778 samples against the irrigation guidelines; the CCME factors are the scope, frequency and amplitude of the exceedances.",
+   "bytes": 38218
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_samples_by_parameter.png",
+  "figures/s2_who_exceedances.png",
+  "figures/s3_wqi_bars.png",
+  "figures/s4_wqi_bars.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}

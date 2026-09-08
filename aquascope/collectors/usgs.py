@@ -26,6 +26,7 @@ from aquascope.schemas.water_data import (
     DataSource,
     GeoLocation,
     StreamflowReading,
+    WaterLevelReading,
     WaterQualitySample,
 )
 from aquascope.utils.http_client import CachedHTTPClient, RateLimiter
@@ -54,6 +55,7 @@ PARAM_LABELS: dict[str, str] = {
 
 MILES2_TO_KM2 = 2.589988110336
 FT3S_TO_M3S = 0.028316846592
+FT_TO_M = 0.3048
 
 # Registry variable -> USGS parameter codes advertised in time-series-metadata.
 STATION_VARIABLE_CODES: dict[str, tuple[str, ...]] = {
@@ -62,13 +64,26 @@ STATION_VARIABLE_CODES: dict[str, tuple[str, ...]] = {
     "water_quality": ("00010", "00095", "00300", "00400"),
 }
 
-# 50 states + DC + territories, as the NWIS site service's stateCd expects.
-NWIS_STATE_CODES: tuple[str, ...] = (
-    "al", "ak", "az", "ar", "ca", "co", "ct", "de", "dc", "fl", "ga", "hi", "id", "il", "in", "ia", "ks", "ky",
-    "la", "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh",
-    "ok", "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "pr", "vi", "gu",
-    "as", "mp",
-)
+# NWIS alpha code (FIPS 5-1) -> two digit ANSI numeric code
+US_STATE_CODES: dict[str, str] = {
+    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06", "CO": "08",
+    "CT": "09", "DE": "10", "DC": "11", "FL": "12", "GA": "13", "HI": "15",
+    "ID": "16", "IL": "17", "IN": "18", "IA": "19", "KS": "20", "KY": "21",
+    "LA": "22", "ME": "23", "MD": "24", "MA": "25", "MI": "26", "MN": "27",
+    "MS": "28", "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
+    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38", "OH": "39",
+    "OK": "40", "OR": "41", "PA": "42", "RI": "44", "SC": "45", "SD": "46",
+    "TN": "47", "TX": "48", "UT": "49", "VT": "50", "VA": "51", "WA": "53",
+    "WV": "54", "WI": "55", "WY": "56",
+    "AQ": "60",
+    "FM": "64",
+    "GU": "66",
+    "MH": "68",
+    "MP": "69",
+    "PW": "70",
+    "PR": "72",
+    "VI": "78",
+}
 
 
 def _parse_nwis_rdb_sites(text: str) -> list[tuple[str, str]]:
@@ -201,6 +216,7 @@ class USGSCollector(BaseCollector):
         state_cd = kwargs.get("stateCd")
         county_cd = kwargs.get("countyCd")
         huc_val = kwargs.get("huc")
+        stat_cd = kwargs.get("statCd") or kwargs.get("stat_cd")
 
         if self.api_key == "DEMO_KEY" or not self.api_key:
             if collection not in ("daily", "sta"):
@@ -254,6 +270,8 @@ class USGSCollector(BaseCollector):
                 params["countyCd"] = county_cd
             if huc_val:
                 params["huc"] = huc_val
+            if stat_cd:
+                params["statCd"] = stat_cd  # e.g. 00003, the daily mean only
 
             if start_date:
                 params["startDT"] = start_date
@@ -344,10 +362,65 @@ class USGSCollector(BaseCollector):
         if parameter_cd:
             params["parameter_code"] = parameter_cd
         if state_cd:
-            params["state_code"] = state_cd
+            state_cd, multiple_states_in_query = self._take_first_value(state_cd)
+            if multiple_states_in_query:
+                logger.warning(
+                    "USGS OGC state_code takes one state per query; stateCd contained a "
+                    "comma-separated list. Using the first value (%r) and dropping the rest.",
+                    state_cd,
+                )
+            state_code = self._normalise_state_code(state_cd)
+            if state_code is None:
+                logger.warning(
+                    "Could not map NWIS-style state code %r to a two-digit ANSI code for the "
+                    "USGS OGC API; the stateCd filter was dropped from the query.",
+                    state_cd,
+                )
+            else:
+                params["state_code"] = state_code
         if county_cd:
-            params["county_code"] = county_cd
+            county_cd, multiple_counties_in_query = self._take_first_value(county_cd)
+            if multiple_counties_in_query:
+                logger.warning(
+                    "USGS OGC county_code takes one county per query; countyCd contained a "
+                    "comma-separated list. Using the first value (%r) and dropping the rest.",
+                    county_cd,
+                )
+            county_code = self._normalise_county_code(county_cd)
+            if county_code is None:
+                logger.warning(
+                    "Could not map NWIS-style county code %r to a three-digit ANSI code for the "
+                    "USGS OGC API; the countyCd filter was dropped from the query.",
+                    county_cd,
+                )
+            else:
+                params["county_code"] = county_code
+                # A three-digit county code is only unique within its state. A
+                # full five-digit FIPS code carries the state prefix, so
+                # we attempt to recover it; a bare three-digit code without a
+                # state filter matches that county in every state.
+                if "state_code" not in params:
+                    stripped_county_cd = county_cd.strip()
+                    if len(stripped_county_cd) == 5 and stripped_county_cd.isdigit():
+                        state_code = self._normalise_state_code(stripped_county_cd[:2])
+                        if state_code is not None:
+                            params["state_code"] = state_code
+                    else:
+                        logger.warning(
+                            "County code %r is only unique within its state; without a state code "
+                            "filter, the USGS OGC query matches county %s in every state, so the "
+                            "response will contain data from multiple states.",
+                            county_cd,
+                            county_code,
+                        )
         if huc_val:
+            huc_val, multiple_hucs_in_query = self._take_first_value(huc_val)
+            if multiple_hucs_in_query:
+                logger.warning(
+                    "USGS OGC hydrologic_unit_code takes one HUC per query; huc contained a "
+                    "comma-separated list. Using the first value %r and dropping the rest.",
+                    huc_val,
+                )
             params["hydrologic_unit_code"] = huc_val
 
         url = f"collections/{collection}/items"
@@ -483,7 +556,7 @@ class USGSCollector(BaseCollector):
     ) -> dict[str, str]:
         """Station names from the keyless NWIS site service (RDB), as a fallback.
 
-        One request for a ``bbox``; otherwise one per state/territory (~56
+        One request for a ``bbox``; otherwise one per state/territory (~59
         requests of ~50 KB). Only stream sites with daily values are asked for.
         """
         names: dict[str, str] = {}
@@ -492,7 +565,7 @@ class USGSCollector(BaseCollector):
         if bbox:
             queries = [{**common, "bBox": ",".join(f"{v:.6f}" for v in bbox)}]
         else:
-            queries = [{**common, "stateCd": st} for st in NWIS_STATE_CODES]
+            queries = [{**common, "stateCd": st} for st in US_STATE_CODES]
         for params in queries:
             try:
                 text = self.client.get_text(base, params=params)
@@ -521,8 +594,8 @@ class USGSCollector(BaseCollector):
                 return features
             url, page_params = next_link, None
 
-    def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample | StreamflowReading]:
-        samples: Sequence[WaterQualitySample | StreamflowReading] = []
+    def normalise(self, raw: list[dict]) -> Sequence[WaterQualitySample | StreamflowReading | WaterLevelReading]:
+        samples: list[WaterQualitySample | StreamflowReading | WaterLevelReading] = []
         for feat in raw:
             try:
                 props = feat.get("properties", {})
@@ -535,6 +608,11 @@ class USGSCollector(BaseCollector):
                 val = props.get("value")
                 if val is None:
                     continue
+
+                time_str = props.get("time")
+                if time_str is None:
+                    continue
+                dt = datetime.fromisoformat(str(time_str).replace("Z", "+00:00"))
 
                 loc = None
                 if coords[0] is not None:
@@ -557,12 +635,31 @@ class USGSCollector(BaseCollector):
                             station_id=props.get("monitoring_location_id"),
                             station_name=props.get("station_name"),
                             location=loc,
-                            reading_datetime=datetime.fromisoformat(props["time"]),
+                            reading_datetime=dt,
                             discharge_cms=rounded_discharge_cms,
                             source_type="in_situ",
                             uncertainty_cms=None,
                             catchment_area_km2=catchment_area_km2,
                             unit="m3/s",
+                        )
+                    )
+
+                elif param_code == "00065":  # Gage height, feet -> metres
+                    stage_sig_figs = self._count_sig_figs(val)
+                    if not stage_sig_figs:
+                        stage_sig_figs = 3  # default to 3 significant figures if unable to determine
+                    stage_m = float(val) * FT_TO_M
+                    rounded_stage_m = USGSCollector._round_to_sig_figs(stage_m, stage_sig_figs)
+
+                    samples.append(
+                        WaterLevelReading(
+                            source=DataSource.USGS,
+                            station_id=props.get("monitoring_location_id"),
+                            station_name=props.get("station_name"),
+                            location=loc,
+                            reading_datetime=dt,
+                            water_level=rounded_stage_m,
+                            unit="m",
                         )
                     )
 
@@ -572,7 +669,7 @@ class USGSCollector(BaseCollector):
                             source=DataSource.USGS,
                             station_id=props.get("monitoring_location_id", "unknown"),
                             location=loc,
-                            sample_datetime=datetime.fromisoformat(props["time"]),
+                            sample_datetime=dt,
                             parameter=param_label,
                             value=float(val),
                             unit=props.get("unit_of_measure", ""),
@@ -588,8 +685,7 @@ class USGSCollector(BaseCollector):
         if not location_id:
             return None
 
-        if not location_id.startswith("USGS-"):
-            location_id = f"USGS-{location_id}"
+        location_id = USGSCollector._normalise_monitoring_location_id(location_id)
 
         # One lookup per station per collector instance: a long daily record
         # would otherwise re-ask (and, when throttled, re-fail) once per row.
@@ -625,6 +721,59 @@ class USGSCollector(BaseCollector):
         cache[location_id] = rounded_catchment_area
 
         return rounded_catchment_area
+
+    @staticmethod
+    def _normalise_monitoring_location_id(location_id: str) -> str:
+        """Ensure an OGC ``monitoring_location_id`` carries its agency prefix."""
+        if location_id.startswith("USGS-"):
+            return location_id
+        return f"USGS-{location_id}"
+
+    @staticmethod
+    def _take_first_value(value: str) -> tuple[str, bool]:
+        """Return the first element of a comma-separated filter value.
+
+        The OGC API accepts only one state, county or HUC per query; a
+        comma-separated list returns an empty response rather than an error.
+        Returns ``(first_element, was_list)`` - if the value is a list, the
+        caller is warned, and the first element of the list is used
+        as a parameter.
+        """
+        parts = [part.strip() for part in value.split(",")]
+        return parts[0], len(parts) > 1
+
+    @staticmethod
+    def _normalise_state_code(state_cd: str) -> str | None:
+        """Translate an NWIS state code to the two-digit ANSI code the OGC API expects (e.g. "AK" becomes "02").
+
+        Returns ``None`` when ``state_cd`` is neither a recognised abbreviation
+        nor a one- or two-digit numeric code, so callers can warn instead of
+        sending a filter that silently matches nothing.
+        """
+        code = state_cd.strip()
+        if code.isdigit():
+            if len(code) <= 2:
+                # If a numeric ANSI code, return the provided code with left padding if needed (e.g. "2" becomes "02").
+                return code.zfill(2)
+            return None
+        # Convert NWIS code to corresponding ANSI code; if a mapping doesn't exist, return None.
+        return US_STATE_CODES.get(code.upper())
+
+    @staticmethod
+    def _normalise_county_code(county_cd: str) -> str | None:
+        """Drop the two-digit state prefix from an NWIS five-digit county code.
+
+        The OGC ``county_code`` queryable is the three-digit ANSI county code
+        (e.g. "24033" becomes "033"). Returns ``None`` when ``county_cd`` is
+        neither a three- nor five-digit numeric code, so callers can warn
+        instead of filtering silently.
+        """
+        code = county_cd.strip()
+        if len(code) == 5 and code.isdigit():
+            return code[2:]
+        if len(code) == 3 and code.isdigit():
+            return code
+        return None
 
     @staticmethod
     def _count_sig_figs(value: str | float) -> int:

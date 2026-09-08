@@ -179,6 +179,87 @@
         "test",
         "doc"
       ]
+    },
+    {
+      "login": "dchaudhari7177",
+      "name": "Dipak Chaudhari",
+      "avatar_url": "https://avatars.githubusercontent.com/u/111210939?v=4",
+      "profile": "https://dipakchaudhari.me",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "Sanchar127",
+      "name": "Sanchar127",
+      "avatar_url": "https://avatars.githubusercontent.com/u/143952019?v=4",
+      "profile": "https://github.com/Sanchar127",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "Mr-Neutr0n",
+      "name": "hari",
+      "avatar_url": "https://avatars.githubusercontent.com/u/64578610?v=4",
+      "profile": "http://harikp.com",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "leatke",
+      "name": "leatke",
+      "avatar_url": "https://avatars.githubusercontent.com/u/147705788?v=4",
+      "profile": "https://github.com/leatke",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "taliapulsifer",
+      "name": "Talia Pulsifer",
+      "avatar_url": "https://avatars.githubusercontent.com/u/70988138?v=4",
+      "profile": "https://github.com/taliapulsifer",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "mikemikimike",
+      "name": "mikemikimike",
+      "avatar_url": "https://avatars.githubusercontent.com/u/186855910?v=4",
+      "profile": "https://github.com/mikemikimike",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "jddrtn",
+      "name": "Jade",
+      "avatar_url": "https://avatars.githubusercontent.com/u/202679891?v=4",
+      "profile": "https://github.com/jddrtn",
+      "contributions": [
+        "code",
+        "test",
+        "data"
+      ]
+    },
+    {
+      "login": "be-student",
+      "name": "송은우",
+      "avatar_url": "https://avatars.githubusercontent.com/u/80899085?v=4",
+      "profile": "https://github.com/be-student",
+      "contributions": [
+        "code",
+        "test",
+        "doc"
+      ]
     }
   ],
   "commitType": "docs"

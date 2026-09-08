@@ -188,13 +188,18 @@ export function ensureBasinsLayers() {
     map.addSource("basins6", { type: "vector", url: `pmtiles://${basinsUrl("lev06.pmtiles")}` });
     map.addSource("basins12", { type: "vector", url: `pmtiles://${basinsUrl("lev12.pmtiles")}` });
     const before = map.getLayer("catchment-fill") ? "catchment-fill" : undefined;
-    map.addLayer({ id: "basins6-line", type: "line", source: "basins6", "source-layer": "basins6", minzoom: 1, maxzoom: 7,
+    // From zoom 3 rather than 1: at the world view every level-6 basin on Earth
+    // drew at once and buried the map under outlines.
+    map.addLayer({ id: "basins6-line", type: "line", source: "basins6", "source-layer": "basins6", minzoom: 3, maxzoom: 7,
       layout: { visibility: "none" }, paint: { "line-color": "#6a1b9a", "line-opacity": 0.35, "line-width": 0.6 } }, before);
     map.addLayer({ id: "basins12-line", type: "line", source: "basins12", "source-layer": "basins", minzoom: 6,
       layout: { visibility: "none" }, paint: { "line-color": "#6a1b9a", "line-opacity": 0.4, "line-width": 0.5 } }, before);
     map.addLayer({ id: "basins12-up", type: "fill", source: "basins12", "source-layer": "basins", minzoom: 4,
       filter: ["in", ["get", "HYBAS_ID"], ["literal", []]],
-      paint: { "fill-color": "#6a1b9a", "fill-opacity": 0.18, "fill-outline-color": "#4a148c" } }, before);
+      // A full-strength outline per sub-basin turned an upstream area of a few
+      // hundred polygons into a solid purple mesh; the wash is the signal, and
+      // basins12-line already draws the boundaries for anyone who wants them.
+      paint: { "fill-color": "#6a1b9a", "fill-opacity": 0.16, "fill-outline-color": "rgba(106,27,154,0.22)" } }, before);
     basinsLayersAdded = true;
   } catch (err) {
     console.info("basins layers unavailable:", err && err.message);
@@ -238,6 +243,31 @@ async function subBasinAt(lat, lon) {
   };
 }
 
+// One FlatGeobuf read per point: the basin card and the "what can be answered
+// here" card both ask for the sub-basin of the same click.
+let subBasinCache = { key: null, promise: null };
+function subBasinAtCached(lat, lon) {
+  const key = `${lat},${lon}`;
+  if (subBasinCache.key !== key) {
+    const promise = subBasinAt(lat, lon);
+    subBasinCache = { key, promise };
+    promise.catch(() => { if (subBasinCache.promise === promise) subBasinCache = { key: null, promise: null }; });
+  }
+  return subBasinCache.promise;
+}
+
+// The upstream area of the sub-basin containing a point (km²), or null.
+export async function catchmentAreaAt(lat, lon) {
+  const sb = await subBasinAtCached(lat, lon);
+  return sb && Number.isFinite(sb.up_area) ? sb.up_area : null;
+}
+
+// How many gauged catchments the similarity search can draw donors from.
+export async function donorPoolSize() {
+  const { rows } = await ensureSimilarTable();
+  return rows.filter((r) => r.area_km2 !== null && r.area_km2 !== undefined).length;
+}
+
 async function ensureTopology() {
   if (topoLoaded) return topoLoaded;
   topoLoaded = (async () => {
@@ -259,12 +289,49 @@ async function upstreamIds(hybasId, limit = 20000) {
   return res.toArray().map((r) => Number(r.hybas_id));
 }
 
-async function basinAttributes(hybasId) {
+// The outlet sub-basin's raw BasinATLAS row, as stored.
+async function basinRow(hybasId) {
   const { conn } = await duck();
   const res = await conn.query(`SELECT * FROM read_parquet('${basinsUrl("lev12_attributes.parquet")}') WHERE hybas_id = ${Number(hybasId)} LIMIT 1`);
   const rows = res.toArray().map((r) => r.toJSON());
-  if (!rows.length) return null;
-  const row = rows[0];
+  return rows.length ? rows[0] : null;
+}
+
+// DuckDB hands 64-bit integers back as BigInt, which JSON cannot carry.
+const plain = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "bigint" ? Number(v) : v]));
+
+// What a Study run needs to describe the catchment in the worker, where
+// BasinATLAS cannot be read: the sub-basin the page found and the outlet's raw
+// row, for aquascope.archive.basins.describe_catchment_from_row. The outlet
+// row's upstream fields already describe the whole catchment, so the upstream
+// walk (a topology download on a fresh page) is not repeated here.
+// The donor tables a Study run needs in the worker for similar_basins and
+// regionalize_signatures (pyarrow does not run there): the station catchments
+// and signatures the page already reads with DuckDB for its own cards, plus
+// the published leave-one-out skill. Read once, then reused.
+let donorTables = null;
+export async function donorTablesForWorker() {
+  if (donorTables) return donorTables;
+  const { rows } = await ensureSimilarTable();
+  const { sig, skill } = await ensureRegimeData();
+  // Only a station with archived signatures can lend them, so the pool the worker
+  // ranks is those (about 800 rows, a few hundred KB), not every catalog station.
+  const usable = rows.filter((r) => sig.has(`${r.source}/${r.station_id}`));
+  donorTables = { catchments: usable.map(plain), signatures: [...sig.values()].map(plain), skill };
+  return donorTables;
+}
+
+export async function catchmentForWorker(lat, lon) {
+  const sb = await subBasinAtCached(lat, lon);
+  if (!sb || sb.hybas_id === null) return null;
+  const row = await basinRow(sb.hybas_id).catch(() => null);
+  const { geometry, ...rest } = sb;
+  return { sub_basin: plain(rest), row: row ? plain(row) : null };
+}
+
+async function basinAttributes(hybasId) {
+  const row = await basinRow(hybasId);
+  if (!row) return null;
   const out = {};
   for (const [key, label, uf, sf, unit, div] of BASIN_FIELDS) {
     const raw = row[uf] ?? row[sf];
@@ -284,7 +351,7 @@ export async function requestBasin(lat, lon, target) {
   setCard(el, "loading", { message: "Finding the sub-basin (BasinATLAS)…" });
   setTab(r, "catchment", { enabled: true });
   try {
-    const sb = await subBasinAt(lat, lon);
+    const sb = await subBasinAtCached(lat, lon);
     if (my !== basinReq) return;
     if (!sb || sb.hybas_id === null) {
       setCard(el, "empty", { message: "No BasinATLAS sub-basin here (open sea, or outside the level-12 layer)." });

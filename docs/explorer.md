@@ -56,18 +56,35 @@ These are the same functions the Streamlit dashboard used to own, so
 implementation rather than four that drift. The public Streamlit deployments
 have been retired in favour of this.
 
+## The shell
+
+The map is the page. It fills the window, and the layer rail, the inspector and
+the Analyst float over it as cards, so the map is the first thing you see and
+opening a panel never takes width from it. The rail (the stacked-squares button
+at the top left) is closed on arrival and groups its controls under **Sources**,
+**Basemap**, **Relief**, **Overlays** and **Credits**; the chevron at the top
+right folds the inspector away when you want the whole map. On a phone the map
+keeps the screen and the inspector is a bottom sheet.
+
+The world view is a **globe**, because the coverage is worldwide and thin, and
+Mercator spends its pixels on the empty high latitudes. MapLibre eases the globe
+back to Mercator by about zoom 5, so everything below the world view behaves
+like an ordinary map. The button under the layers button switches projection,
+and `gl=0` in a link pins a flat map.
+
 ## Map layers
 
-The left rail is a layer stack, and every layer in it is keyless and free to
-use. Nothing here needs an account, and each carries its attribution and licence
-in the rail, in the map credits and in an info panel.
+The rail is a layer stack, and every layer in it is keyless and free to use.
+Nothing here needs an account, and each carries its attribution and licence in
+the rail, in the map credits and in an info panel.
 
 **Basemaps**: OpenFreeMap light, dark and streets (OpenStreetMap data, ODbL);
 Sentinel-2 cloudless 2016 and 2025 from EOX; EOX Terrain Light; NASA GIBS VIIRS
 true colour for a chosen day; USGS imagery over the United States.
 
-**Terrain**: 3D terrain and hillshade from the AWS Terrain Tiles DEM, and a
-globe projection.
+**Relief**: 3D terrain and hillshade from the AWS Terrain Tiles DEM. Hillshade
+is on by default; the light basemap on its own is near-white land on pale water,
+which reads as an empty page rather than as a map.
 
 **Overlays**, each with an opacity slider and its own colour scale: GPM IMERG
 precipitation rate, SMAP root-zone soil moisture, MODIS snow cover, MODIS land
@@ -75,9 +92,15 @@ surface temperature, GRACE water storage anomaly, and ESA WorldCover land cover.
 The time-driven ones share a single date control, so you can walk a flood or a
 snowmelt day by day.
 
-**The gauges themselves** can be coloured by agency, by record length or by how
-recently they last reported, with a legend, and a density heat map shows where
-the world is actually measured. **Select an area** drags a box and hands back
+**The gauges themselves** carry their agency as a shape as well as a colour: a
+circle for USGS, a triangle for the Environment Agency, a square for Hub'Eau, a
+diamond for PEGELONLINE, a pentagon for OPW and a cross for CWA. Colour alone
+does not survive colour-vision deficiency (Hub'Eau's red and the Environment
+Agency's green are ΔE 4.2 apart under deuteranopia, and they are the two largest
+European sources), so identity carries two channels. They can also be coloured
+by record length or by how recently they last reported, with a legend, and the
+shape goes on saying the agency underneath; a density heat map shows where the
+world is actually measured. **Select an area** drags a box and hands back
 the gauges inside it as CSV.
 
 The whole state (basemap, overlays, opacity, date, terrain, globe, colouring)
@@ -132,8 +155,8 @@ why BasinATLAS is what we mirror. MERIT-Basins is CC BY-NC.
 The **Ask** button (top right) opens the [Analyst](analyst.md) inside the
 Explorer. Type a question ("What is the 100-year flood of the Thames at
 Kingston, and how sure can we be?"), pick a provider (Groq and Hugging Face
-have free tiers; OpenAI, Mistral, OpenRouter, or any OpenAI-compatible
-endpoint), paste your key, and the same `aquascope.ai_engine.analyst.ask`
+have free tiers; Anthropic, OpenAI, Mistral, OpenRouter, or any
+OpenAI-compatible endpoint), paste your key, and the same `aquascope.ai_engine.analyst.ask`
 that runs behind `aquascope ask` runs in the browser worker: the model picks
 the tools (`find_stations` over the catalog already loaded in your tab,
 `analyze_station`, `flood_frequency`, `get_timeseries`, `anywhere`),
@@ -169,6 +192,44 @@ set" rather than presented as the full Analyst.
 
 **Your own key**, as described above, for the full tool loop.
 
+## Study: a complete study at a place
+
+The drawer's second mode. **Study this place** on a gauge or on a point (or
+the Study button at the top right) opens it with the site set, and the
+[Studio](studio.md) crew runs in the same Pyodide worker as everything else:
+you say the problem, the Consultant asks at most three questions (chips
+answer them, **Just go** takes the defaults), the Scout lists what is in
+reach, the Methodologist shows the plan as a card you **Approve**, **Edit**
+(the arguments inline, revalidated) or **Decline**, the Analysts run it with
+a gate on every step while the timeline and the figures appear, and the
+Author's report lands with the key numbers, the figures, what is not
+established, **Download bundle** and links for the Word, Excel, Markdown,
+notebook and `study.yaml` files. The input stays open for a follow-up: a
+question is answered from the workspace, a change is planned, run and
+re-authored.
+
+Keyless by default, which is a complete study; the key Ask holds is offered
+on one line for the prose. An on-device model that is already there (Chrome's
+built-in model, or the small model Ask loaded) joins the keyless crew: it
+reads the first sentence into a brief, writes the plan at review (the
+engine's validator checks it before the card shows it; the playbook's plan
+stands when it fails, and the card says why) and, after the run, the prose
+(four calls at most; the Critic's checks drop a sentence with a number the
+results do not carry, and the line under the answer says how many). The
+card says who wrote what, and nothing is ever downloaded for it.
+
+Drop a CSV or an XLSX (turned into CSV in the worker), or attach the table
+open in My data, and the Scout lists it with its QA next to the gauges.
+**Stop** terminates the worker and boots it again; the plan is kept and the
+next Approve rebuilds the study. A study is saved in the browser after every
+reply (IndexedDB, the last five): opening Study at the same place offers
+**Resume the last study**, and a `workspace.json` from a bundle dropped on
+the board resumes too. The figures and the documents are made in the worker
+and stay there until you ask for one; the plotting and document libraries
+load once, before the first run, and the Study modules themselves load on
+first use, never on a visit that runs no study. See
+[studio.md](studio.md#in-the-explorer).
+
 ### For an assistant already in your browser
 
 Where the browser supports [WebMCP](https://github.com/webmachinelearning/webmcp)
@@ -185,8 +246,8 @@ support the MCP Apps extension.
 
 | source | record you get | analyses |
 | --- | --- | --- |
-| USGS | daily mean discharge (or gage height), full period requested (40 years) | all of the above |
-| UK Environment Agency | daily mean flow (falls back to level, rainfall, groundwater), full period | all of the above |
+| USGS | daily mean discharge (or gage height), full record requested (from the catalog's first date) | all of the above |
+| Environment Agency (England) | daily mean flow (falls back to level, rainfall, groundwater), full record requested | all of the above |
 | Hub'Eau (France) | daily mean discharge (obs_elab `QmnJ`, multi-decade where computed), else last 30 days real-time | all of the above when the daily series exists |
 | PEGELONLINE (Germany) | last 31 days of W / Q | hydrograph |
 | Ireland OPW | last month of 15-minute levels | hydrograph |
@@ -221,12 +282,19 @@ loop is nine times faster, same numbers to 1e-14), which is what makes
 - `index.html`, `style.css` and ES modules under `src/` (still no bundler):
   `map.js`, `layers.js` and `layer-ui.js` (MapLibre, the basemap and overlay
   registry), `catalog.js` (DuckDB-WASM over the archive's GeoParquet, GeoJSON
-  fallback), `search.js`, `shell.js` and `url.js` (the three-pane shell and
+  fallback), `search.js`, `shell.js` and `url.js` (the map-first shell and
   URL-as-state), the `panel-*.js` inspectors, `charts.js` (Plotly), `ask.js`
-  with `showcase.js` and `local-model.js`, and `webmcp.js`. `app.js` wires them
-  together.
+  with `showcase.js` and `local-model.js`, `studio.js` with `intake.js`,
+  `studio-device.js` and `study-store.js` (Study, loaded on first use), and
+  `webmcp.js`. `app.js` wires them together.
 - `worker.js`: a Web Worker that loads Pyodide, numpy / scipy / pandas, and the
-  aquascope wheel, then calls `aquascope.explore`.
+  aquascope wheel, then calls `aquascope.explore`; the `studio` message drives
+  `aquascope.studio.Studio` for Study, loading matplotlib and the document
+  libraries only when a study runs. Its ops: `start`, `say` (with a
+  `proposed` brief), `approve` (with a `plan`), `follow_up`, `narrate`,
+  `context` (a role's compact context with its system prompt), `check_plan`,
+  `prompts`, `file`, `export` and `table` (an XLSX to CSV), each guarded on
+  the engine having the method.
 - `aquascope.explore` (in the package): the Python half, the same
   `(source, station) -> answer` entry point the CLI and the MCP server use.
   It runs unchanged in CPython, which is how it is tested (`tests/test_explore.py`).

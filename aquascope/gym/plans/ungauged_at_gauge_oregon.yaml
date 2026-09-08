@@ -1,0 +1,45 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A bare point with a 22-year gauge 10 km away: the gauge's flow-duration curve is the primary estimate and the
+# regionalised signatures for the point itself are set beside it, as the ungauged_flow at_gauge branch has it.
+id: ungauged_at_gauge_oregon
+playbook: ungauged_flow
+title: Flow available for a micro-hydro screening near a gauged creek
+brief: >-
+  What flow can this creek on the Warm Springs reservation give for a micro-hydro screening: the mean flow, the
+  Q95 low flow and the Q05 high flow? There is a gauge on Shitike Creek about ten kilometres away.
+intake:
+  purpose: hydropower screening
+  statistic: all
+site:
+  name: A bare point on the Warm Springs reservation, Oregon (Shitike Creek gauge 9.7 km)
+  lat: 44.7579
+  lon: -121.4263
+  recon: oregon_point
+expected_branch: at_gauge
+steps:
+  - tool: describe_catchment
+    optional: true
+    note: The catchment at the point, to compare with the gauge's; framing.
+  - tool: analyze_station
+    method: flow_duration
+    gates:
+      - {check: min_years, path: years}
+      - {check: unit_present, path: unit}
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    gates:
+      - {check: not_empty, path: estimates}
+  - tool: similar_basins
+    method: similar_basins
+    optional: true
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+forbidden:
+  tools: [load_table, flow_duration]
+  methods: [spi, spei, groundwater_trend, sgi, recharge_wtf]
+rationale: >-
+  The nearest discharge gauge has 22 years of record within 10 km, enough for a flow-duration curve to be the
+  primary estimate (the registry's floor is five years); the point is not the gauge, so the signatures transferred
+  to the point itself, with their band and leave-one-out skill, are set beside the curve to judge the transfer.
+  No rain gauge or well lies within reach, so the precipitation and groundwater methods are not defensible.

@@ -12,6 +12,16 @@ evolution with the simulator) with a leaderboard helper.
     >>> env = CalibrationEnv(synthetic_basin(0), objective="nse", max_steps=30)
     >>> obs, info = env.reset(seed=0)
     >>> obs, reward, terminated, truncated, info = env.step({"X1": 300, "X2": -1, "X3": 80, "X4": 2})
+
+Phase 1: :mod:`aquascope.gym.tasks` generates a benchmark of problems at real
+sites from the playbooks (the tree's branch, gates and declines as the key)
+and :mod:`aquascope.gym.bench` plays the ``tree``, ``team`` and ``ask`` agents
+on it and renders a leaderboard (``aquascope gym tasks|bench|leaderboard``).
+
+Phase 2: :mod:`aquascope.gym.plans` scores the *plan* an agent writes against
+expert reference plans at real sites with their reconnaissance saved
+(``aquascope gym plans list|show|validate``, ``aquascope gym bench --agent
+methodologist``), with the leaderboard extended to plan quality.
 """
 
 from aquascope.gym.baselines import (
@@ -22,10 +32,15 @@ from aquascope.gym.baselines import (
     run_leaderboard,
 )
 from aquascope.gym.basins import Basin, load_basin, suggest_basins, synthetic_basin
+from aquascope.gym.bench import Result, leaderboard, run_bench
 from aquascope.gym.env import HAS_GYMNASIUM, OBJECTIVES, OBS_NAMES, PARAM_NAMES, CalibrationEnv, episode_table, make
+from aquascope.gym.plans import PlanResult, Reference, load_references, plan_leaderboard, run_plan_bench, score_plan
+from aquascope.gym.tasks import Task, read_tasks, suggest_sites, tasks_from_playbooks, write_tasks
 
 __all__ = [
-    "BASELINES", "HAS_GYMNASIUM", "OBJECTIVES", "OBS_NAMES", "PARAM_NAMES", "Basin", "CalibrationEnv",
-    "differential_evolution", "episode_table", "load_basin", "make", "nelder_mead", "random_search",
-    "run_leaderboard", "suggest_basins", "synthetic_basin",
+    "BASELINES", "HAS_GYMNASIUM", "OBJECTIVES", "OBS_NAMES", "PARAM_NAMES", "Basin", "CalibrationEnv", "PlanResult",
+    "Reference", "Result", "Task", "differential_evolution", "episode_table", "leaderboard", "load_basin",
+    "load_references", "make", "nelder_mead", "plan_leaderboard", "random_search", "read_tasks", "run_bench",
+    "run_leaderboard", "run_plan_bench", "score_plan", "suggest_basins", "suggest_sites", "synthetic_basin",
+    "tasks_from_playbooks", "write_tasks",
 ]

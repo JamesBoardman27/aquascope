@@ -1,0 +1,51 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A rain gauge with 35 years at the point and ERA5 temperature reachable: SPI and SPEI with their divergence, and
+# the well and the river within reach add the propagation and the low-flow context.
+id: drought_gauge_tetbury
+playbook: drought_status
+title: Drought status for the water supply from a 35-year rain gauge
+brief: >-
+  Is the Tetbury area in drought? The water company wants the SPI and SPEI at one, three and twelve months from
+  the Tetbury rain gauge, and how severe this year is against the record.
+intake:
+  timescales: [1, 3, 12]
+  drought_concern: water supply
+site:
+  name: Tetbury, Gloucestershire (rain gauge; Tetbury Slads Farm gauge 0.7 km; Brokenborough borehole 3.9 km)
+  lat: 51.633147
+  lon: -2.153993
+  source: uk_ea
+  station_id: 02bd4687-2b55-4f42-b1cf-77066f01cc70
+  years: 34.9
+  recon: tetbury
+expected_branch: gauge_indices
+steps:
+  - tool: drought_indices
+    method: spei
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: indices}
+      - {check: not_empty, path: current.spei}
+  - tool: low_flow_context
+    method: low_flow_frequency
+    optional: true
+    alternatives:
+      - {tool: low_flow_context, method: flow_duration}
+      - {tool: low_flow_context, method: baseflow_separation}
+      - {tool: analyze_station, method: flow_duration}
+    note: The river's side of the drought at the gauge 0.7 km away.
+  - tool: drought_propagation
+    method: sgi
+    optional: true
+    note: The groundwater drought index at the borehole and the lag at which rain deficits reach it.
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [load_table, spei]
+  methods: []
+rationale: >-
+  Thirty-five years of precipitation at the point pass the 30-year floor WMO sets for a standardised index, and
+  ERA5 temperature is reachable, so SPI and SPEI are both defensible and their divergence is the signal to read
+  under warming. A well with fifty years of levels and a discharge gauge with 48 years lie within a few kilometres,
+  so the propagation to the water table and the low-flow context are worth adding; the brief asks for the indices,
+  so they are optional here (compare offtree_drought_well_river_tetbury, where the brief asks for them).

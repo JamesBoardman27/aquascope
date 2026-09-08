@@ -1,0 +1,136 @@
+{
+ "id": "orleans-drought",
+ "title": "Hydrological drought of the Loire at Orleans",
+ "kind": "drought_status",
+ "shows": "Drought propagation: the ERA5 indices, the gauge's low-flow context and the lag between them.",
+ "site": {
+  "lat": 47.9,
+  "lon": 1.9,
+  "name": "Loire at Orleans, France"
+ },
+ "problem": "Is the Loire at Orleans in hydrological drought, and how does the river's low flow follow the rainfall deficit?",
+ "intake": {
+  "timescales": [
+   3,
+   12
+  ],
+  "drought_concern": "water supply",
+  "flash_drought": false
+ },
+ "upload": null,
+ "status": "done",
+ "declined_reason": null,
+ "error": null,
+ "model": "claude-sonnet-5",
+ "provider": "anthropic",
+ "recorded": "2026-09-07T19:19:38+00:00",
+ "seconds": 376.3,
+ "tokens": {
+  "prompt": 61398,
+  "completion": 31532,
+  "calls": 6,
+  "by_role": {
+   "consultant": {
+    "calls": 1,
+    "prompt_tokens": 3424,
+    "completion_tokens": 1172
+   },
+   "methodologist": {
+    "calls": 1,
+    "prompt_tokens": 10123,
+    "completion_tokens": 5857
+   },
+   "analyst": {
+    "calls": 1,
+    "prompt_tokens": 4859,
+    "completion_tokens": 766
+   },
+   "author": {
+    "calls": 2,
+    "prompt_tokens": 31094,
+    "completion_tokens": 11760
+   },
+   "critic": {
+    "calls": 1,
+    "prompt_tokens": 11898,
+    "completion_tokens": 11977
+   }
+  },
+  "total": 92930
+ },
+ "usd": 0.6572,
+ "usd_per_mtoken": [
+  3.0,
+  15.0
+ ],
+ "playbook": "drought_status",
+ "branch": null,
+ "plan_author": "methodologist",
+ "steps": 5,
+ "gates": {
+  "passed": 10,
+  "total": 12
+ },
+ "checks": {
+  "passed": 6,
+  "total": 7
+ },
+ "replans": 1,
+ "stop_reason": "gate failed: max_return_period_factor (the gate names no return_period); the fallback low_flow_context did not pass its own gates",
+ "headline": "The Loire at Orleans (Hub'Eau K435001010, La Loire a Orleans - Pont Royal, 62.0 years of daily discharge) is currently in low-flow drought: the last 30 days averaged 27.6 m3/s and the last 90 days 31.9 m3/s, both below the record's Q95 o...",
+ "not_established": [
+  "Step s4, gate max_return_period_factor: the gate names no return_period",
+  "Step s4.fallback, gate min_years: no record length at 'years'",
+  "The study stopped at s4: gate failed: max_return_period_factor (the gate names no return_period); the fallback low_flow_context did not pass its own gates",
+  "These numbers are not in any tool result: -12.0, -30.0, -90.0, -12.0, -12.0, -12.0."
+ ],
+ "figures": [
+  {
+   "name": "s1_drought_strip.png",
+   "id": "fig-s1-drought_strip",
+   "step": "s1",
+   "caption": "SPEI (bars) with SPI (grey line) at the site at 47.90 N, 1.90 E for the 3, 12 month accumulations, 1986 to 2026: blue above zero is wetter than normal, red below is drier; the dashed lines mark the moderate (1), severe (1.5) and extreme (2) classes.",
+   "bytes": 159454
+  },
+  {
+   "name": "s2_fdc.png",
+   "id": "fig-s2-fdc",
+   "step": "s2",
+   "caption": "Flow-duration curve of discharge at La Loire à Orléans - Pont Royal (hubeau_hydrometrie K435001010) from the 7 percentiles the tool reported, with Q95, Q50 and Q10 marked (log scale).",
+   "bytes": 64857
+  },
+  {
+   "name": "s3_fdc.png",
+   "id": "fig-s3-fdc",
+   "step": "s3",
+   "caption": "Flow-duration curve of discharge at La Loire à Orléans - Pont Royal (hubeau_hydrometrie K435001010) from the ranked daily flows, with Q95, Q50 and Q10 marked (log scale).",
+   "bytes": 65508
+  },
+  {
+   "name": "s4_fdc.png",
+   "id": "fig-s4-fdc",
+   "step": "s4",
+   "caption": "Flow-duration curve of discharge at La Loire à Orléans - Pont Royal (hubeau_hydrometrie K435001010) from the ranked daily flows, with Q95, Q50 and Q10 marked (log scale).",
+   "bytes": 65508
+  },
+  {
+   "name": "s4.fallback_fdc.png",
+   "id": "fig-s4.fallback-fdc",
+   "step": "s4.fallback",
+   "caption": "Flow-duration curve of discharge at La Loire à Orléans - Pont Royal (hubeau_hydrometrie K435001010) from the 7 percentiles the tool reported, with Q95, Q50 and Q10 marked (log scale).",
+   "bytes": 64857
+  }
+ ],
+ "files": [
+  "workspace.json",
+  "report.md",
+  "study.yaml",
+  "figures/s1_drought_strip.png",
+  "figures/s2_fdc.png",
+  "figures/s3_fdc.png",
+  "figures/s4_fdc.png",
+  "figures/s4.fallback_fdc.png"
+ ],
+ "trimmed": [],
+ "aquascope_version": "0.14.0"
+}

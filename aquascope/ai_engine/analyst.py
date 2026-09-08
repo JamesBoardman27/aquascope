@@ -9,12 +9,14 @@ assembled deterministically from what the tools returned, never from the
 model's memory.
 
 Works with any OpenAI-compatible chat endpoint that supports tool calling
-(OpenAI, Groq, Hugging Face router, Mistral, OpenRouter, Ollama, ...).
-Configuration, in order: explicit arguments, ``AQUASCOPE_LLM_API_KEY`` /
-``AQUASCOPE_LLM_BASE_URL`` / ``AQUASCOPE_LLM_MODEL``, then ``OPENAI_API_KEY``,
-``GROQ_API_KEY``, ``HF_TOKEN``. Uses the ``openai`` SDK when installed and a
-built-in ``urllib`` client otherwise (``aquascope.ai_engine.llm_transport``),
-which is also what runs inside the Explorer's browser worker.
+(OpenAI, Groq, Hugging Face router, Mistral, OpenRouter, Ollama, ...) and with
+Anthropic's Messages API (``--provider anthropic``), which the transport
+translates. Configuration, in order: explicit arguments,
+``AQUASCOPE_LLM_API_KEY`` / ``AQUASCOPE_LLM_BASE_URL`` / ``AQUASCOPE_LLM_MODEL``,
+then ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, ``GROQ_API_KEY``, ``HF_TOKEN``.
+Uses the provider's SDK when installed and a built-in ``urllib`` client
+otherwise (``aquascope.ai_engine.llm_transport``), which is also what runs
+inside the Explorer's browser worker.
 """
 
 from __future__ import annotations
@@ -35,6 +37,27 @@ logger = logging.getLogger(__name__)
 
 MAX_TOOL_RESULT_CHARS = 14_000
 
+#: Providers with a large window raise both caps through the registry
+#: (``context_chars``): a single result may then take up to half the window.
+#: The whole conversation's budget, in characters (roughly four to a token).
+#: A per-result cap is not enough on a small window: three results at the cap
+#: exceed a free tier's 8,000 tokens a minute on their own, and the provider
+#: answers 413 "Request too large", which no amount of retrying will fix.
+#: 24,000 characters is about 6,000 tokens, leaving room for the reply.
+MAX_CONTEXT_CHARS = 24_000
+
+#: Below this there is no room for a useful tool result, so a 413 here is about
+#: something other than the conversation and should surface rather than loop.
+MIN_CONTEXT_CHARS = 3_000
+
+#: Said back to a model whose tool call the provider could not parse. Short on
+#: purpose: it is added to a conversation that may already be near the limit.
+TOOL_JSON_REMINDER = (
+    "Your last tool call could not be parsed. The arguments must be a single JSON object, "
+    'with any code as one JSON string: {"code": "import numpy as np\\nresult = 1"}. '
+    "Newlines and quotes inside it have to be escaped. Please make that call again."
+)
+
 # One registry for the whole project (aquascope.ai_engine.providers); this dict
 # is the shape the loop already used, kept so callers and tests do not change.
 PROVIDERS: dict[str, dict[str, str | None]] = {
@@ -45,6 +68,8 @@ PROVIDERS: dict[str, dict[str, str | None]] = {
 SYSTEM_PROMPT = """You are AquaScope's analyst, a careful hydrologist's assistant.
 You answer questions about rivers, gauges, floods, rainfall and water resources ONLY from tool results.
 Rules:
+- For a question about a place or a station, call assess_site(lat, lon) first and respect its sufficiency
+  table: do not run a method it marks not_defensible, say why, and offer what it marks defensible instead.
 - Find stations with find_stations before analysing; prefer stations with long records for flood questions.
 - Use analyze_station / flood_frequency for numbers; use anywhere(lat, lon) when the user names a place with no gauge.
 - Use describe_catchment(lat, lon) for the catchment itself: area, elevation, climate, land cover, soils, dams.
@@ -52,6 +77,9 @@ Rules:
 - For "what flow to expect" at an ungauged place, use regionalize_signatures (mm/d estimates with a band and
   the leave-one-out skill); always quote the band and the skill, never a bare number.
 - Never invent values, station ids, or citations. If a tool returns an error or an empty record, say so.
+- Do not add facts about the site from memory: historic floods or droughts, dams, regulation or abstraction
+  upstream, geography, land use. Everything about the site comes from a tool result. If a fact did not, leave
+  it out or label it in the same sentence: "from general knowledge, not from the data".
 - Report units. Quote return levels with their confidence intervals when available.
 - Say which record (station, source, period, number of years) each number comes from.
 - Keep the answer under 300 words unless the user asks for a full report; the tool outputs already carry
@@ -88,6 +116,7 @@ def _tool_specs() -> list[ToolSpec]:
     from aquascope.explore import anywhere
 
     num = {"type": "number"}
+    years_cap = "Optional cap on the record: the last N years. Leave it out for the full record (the default)."
     return [
         ToolSpec(
             "list_sources", "Every data source with agency, country, variables and licence.",
@@ -105,12 +134,28 @@ def _tool_specs() -> list[ToolSpec]:
             t.find_stations,
         ),
         ToolSpec(
+            "assess_site",
+            "What can be answered at a place, before any analysis: the gauges within reach (catalog record spans, "
+            "no agency call), the catchment, and a sufficiency table marking every method defensible, marginal or "
+            "not_defensible here, with the reason and the station it would use. Call it first for a question about "
+            "a place or a station. problem narrows the table: flood_risk, ungauged_flow, drought, "
+            "groundwater_decline, supply_reliability, climate_change, irrigation, water_quality.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "radius_km": num, "problem": {"type": "string"},
+                                              "return_period": num},
+             "required": ["lat", "lon"]},
+            t.assess_site,
+        ),
+        ToolSpec(
             "analyze_station",
             "Fetch one station's record and compute summary, annual maxima, flood frequency (GEV, LP3 with CI), "
             "FDC percentiles and trend. variable: discharge (default), water_level, precipitation or "
-            "groundwater_level for stations that have several.",
+            "groundwater_level for stations that have several. The full record is requested by default; "
+            "fetch_note in the result says what was asked for and what the agency served.",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
-                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"},
+                                              "years": {"type": "integer", "description": years_cap},
+                                              "bootstrap_ci": {"type": "boolean"},
+                                              "return_periods": {"type": "array", "items": num, "description":
+                                                                 "the T in years to report (default 2 to 100)"},
                                               "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.analyze_station,
@@ -119,7 +164,10 @@ def _tool_specs() -> list[ToolSpec]:
             "flood_frequency",
             "Return levels for T = 2..100 years at a station (subset of analyze_station).",
             {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
-                                              "years": {"type": "integer"}, "bootstrap_ci": {"type": "boolean"}},
+                                              "years": {"type": "integer", "description": years_cap},
+                                              "bootstrap_ci": {"type": "boolean"},
+                                              "return_periods": {"type": "array", "items": num, "description":
+                                                                 "the T in years to report (default 2 to 100)"}},
              "required": ["source", "station_id"]},
             t.flood_frequency,
         ),
@@ -131,6 +179,19 @@ def _tool_specs() -> list[ToolSpec]:
                                               "max_points": {"type": "integer"}, "variable": {"type": "string"}},
              "required": ["source", "station_id"]},
             t.get_timeseries,
+        ),
+        ToolSpec(
+            "water_quality_samples",
+            "Sampled water-quality parameters at a station (USGS daily values: temperature, conductivity, dissolved "
+            "oxygen, pH; Water Quality Portal discrete samples): tidy rows with per-parameter counts, units, period, "
+            "licence and attribution. A screening: the last 5 years and a short parameter list by default. Run "
+            "analyse_table with wqi, iwqi or who_screen on the rows.",
+            {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "years": {"type": "integer"},
+                                              "parameters": {"type": "array", "items": {"type": "string"}},
+                                              "use": {"type": "string"}},
+             "required": ["source", "station_id"]},
+            t.water_quality_samples,
         ),
         ToolSpec(
             "anywhere",
@@ -155,7 +216,8 @@ def _tool_specs() -> list[ToolSpec]:
             "donor selection for ungauged sites. method: similarity | proximity | combined.",
             {"type": "object", "properties": {"lat": num, "lon": num, "source": {"type": "string"},
                                               "station_id": {"type": "string"}, "k": {"type": "integer"},
-                                              "method": {"type": "string"},
+                                              "method": {"type": "string",
+                                                         "enum": ["similarity", "proximity", "combined"]},
                                               "sources": {"type": "array", "items": {"type": "string"}}}},
             t.similar_basins,
         ),
@@ -165,9 +227,64 @@ def _tool_specs() -> list[ToolSpec]:
             "baseflow index, FDC slope, flow frequencies, seasonality, flashiness) transferred from similar gauged "
             "donors, with an uncertainty band and the leave-one-out skill. method: similarity | regression | both.",
             {"type": "object", "properties": {"lat": num, "lon": num, "k": {"type": "integer"},
-                                              "method": {"type": "string"}},
+                                              "method": {"type": "string",
+                                                         "enum": ["similarity", "regression", "both"]}},
              "required": ["lat", "lon"]},
             t.regionalize_signatures,
+        ),
+        ToolSpec(
+            "drought_indices",
+            "Drought status at a place: SPI and SPEI at 1, 3 and 12 months (or timescales) with their divergence, "
+            "from a rain gauge (source + station_id, its whole record) or the ERA5 cell (lat, lon, last years). "
+            "pet: thornthwaite (default, from ERA5 temperature) | fao56 | none. Prefer SPEI under warming.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "years": {"type": "integer"},
+                                              "timescales": {"type": "array", "items": {"type": "integer"}},
+                                              "source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "pet": {"type": "string"}},
+             "required": ["lat", "lon"]},
+            t.drought_indices,
+        ),
+        ToolSpec(
+            "drought_propagation",
+            "Groundwater drought at a well (Standardised Groundwater Index) and the SPI timescale and lag in months "
+            "at which rainfall deficits reach it (cross-correlation, Bloomfield and Marchant 2013).",
+            {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "lat": num, "lon": num, "years": {"type": "integer"},
+                                              "max_lag": {"type": "integer"}},
+             "required": ["source", "station_id", "lat", "lon"]},
+            t.drought_propagation,
+        ),
+        ToolSpec(
+            "low_flow_context",
+            "How low is low at a gauge and is it low now: Q95/Q50/Q10, baseflow index, 7Q10, and where the last 30 "
+            "and 90 days sit in the record.",
+            {"type": "object", "properties": {"source": {"type": "string"}, "station_id": {"type": "string"},
+                                              "years": {"type": "integer"}},
+             "required": ["source", "station_id"]},
+            t.low_flow_context,
+        ),
+        ToolSpec(
+            "supply_reliability",
+            "Can a river supply a demand (demand_m3s or demand_ml_day): a run-of-river screening keeping a reserve "
+            "(q95 by default) in the river and taking at most share of the flow. Gauged with source + station_id "
+            "(fraction of days, years and volume met, over the year or over months), ungauged with lat + lon "
+            "(reliability band from donor-transferred Q95/median/Q05). Not a storage-yield analysis.",
+            {"type": "object", "properties": {"demand_m3s": num, "demand_ml_day": num, "source": {"type": "string"},
+                                              "station_id": {"type": "string"}, "lat": num, "lon": num,
+                                              "share": num, "reserve": {"type": "string"},
+                                              "months": {"type": "array", "items": {"type": "integer"}}}},
+            t.supply_reliability,
+        ),
+        ToolSpec(
+            "crop_water_demand",
+            "A crop's seasonal irrigation demand at a point (FAO-56 single Kc on ERA5 ET0, effective rain "
+            "subtracted, divided by efficiency): mm, m3 over area_ha, mean and peak-month m3/s, the season's "
+            "months. crop is a FAO-56 Table 12 key (maize, wheat_winter, rice_paddy, ...). Supply not checked.",
+            {"type": "object", "properties": {"lat": num, "lon": num, "crop": {"type": "string"}, "area_ha": num,
+                                              "planting_month": {"type": "integer"}, "efficiency": num,
+                                              "years": {"type": "integer"}},
+             "required": ["lat", "lon", "crop", "area_ha", "planting_month"]},
+            t.crop_water_demand,
         ),
         ToolSpec(
             "run_python",
@@ -186,8 +303,11 @@ def _tool_specs() -> list[ToolSpec]:
         ToolSpec(
             "analyse_table",
             "Run one workbench analysis on a table the user supplied as CSV text: eda, quality, who_screen, "
-            "flow_duration, baseflow, recession, flood_frequency, signatures, return_periods, sgi_drought, "
-            "recharge, aquifer_drawdown. params carries the analysis's own options.",
+            "wqi (CCME WQI 1.0 against WHO drinking-water, FAO 29 irrigation or CCME aquatic-life guidelines, "
+            "plus the NSF WQI; params use, variant), iwqi (FAO 29 irrigation suitability), flow_duration, "
+            "baseflow, recession, flood_frequency, signatures, return_periods, spei (precipitation with a "
+            "pet_column or temperature_column + latitude), sgi_drought, recharge, aquifer_drawdown. params "
+            "carries the analysis's own options.",
             {"type": "object", "properties": {"csv": {"type": "string"}, "analysis": {"type": "string"},
                                               "params": {"type": "object"}},
              "required": ["analysis"]},
@@ -196,6 +316,35 @@ def _tool_specs() -> list[ToolSpec]:
         ToolSpec(
             "describe_methods", "What each analysis computes and the reference to cite.",
             {"type": "object", "properties": {}}, t.describe_methods,
+        ),
+        ToolSpec(
+            "list_playbooks",
+            "The problem playbooks (flood risk, ungauged flow, groundwater decline, drought status, supply "
+            "reliability, irrigation feasibility, water quality): the method chain aquascope follows for the data "
+            "that exists at a site. Use solve_plan when the user has a problem at a place rather than a question "
+            "about a station.",
+            {"type": "object", "properties": {}}, t.list_playbooks,
+        ),
+        ToolSpec(
+            "describe_playbook", "One playbook in full: intake, branches, steps with gates, declines, caveats.",
+            {"type": "object", "properties": {"playbook": {"type": "string"}}, "required": ["playbook"]},
+            t.describe_playbook,
+        ),
+        ToolSpec(
+            "solve_plan",
+            "Plan (not run) a problem at a point with a playbook: reconnaissance, branch, and the study with its "
+            "gates, with zero model calls. Show the plan to the user, then call solve_run with the study.",
+            {"type": "object", "properties": {"problem": {"type": "string"}, "lat": num, "lon": num,
+                                              "playbook": {"type": "string"}, "intake": {"type": "object"}},
+             "required": ["problem", "lat", "lon"]},
+            t.solve_plan,
+        ),
+        ToolSpec(
+            "solve_run",
+            "Execute a study from solve_plan with its gates (a failed gate runs the fallback once or stops with "
+            "the reason); returns the gate outcomes, the report and the re-runnable study.",
+            {"type": "object", "properties": {"study": {"type": "object"}}, "required": ["study"]},
+            t.solve_run,
         ),
     ]
 
@@ -228,8 +377,9 @@ def resolve_llm(
             provider = "ollama" if base_url or os.environ.get("AQUASCOPE_LLM_BASE_URL") else None
     if provider is None:
         raise RuntimeError(
-            "No LLM configured. Set OPENAI_API_KEY, GROQ_API_KEY or HF_TOKEN, or AQUASCOPE_LLM_API_KEY with "
-            "AQUASCOPE_LLM_BASE_URL/AQUASCOPE_LLM_MODEL, or pass --provider ollama for a local model."
+            "No LLM configured. Set OPENAI_API_KEY, GROQ_API_KEY, NVIDIA_API_KEY or HF_TOKEN, or "
+            "AQUASCOPE_LLM_API_KEY with AQUASCOPE_LLM_BASE_URL/AQUASCOPE_LLM_MODEL, or pass --provider ollama "
+            "for a local model."
         )
     if provider not in PROVIDERS and provider != "custom":
         raise ValueError(f"Unknown provider {provider!r}; choose from {list(PROVIDERS)}")
@@ -267,6 +417,8 @@ class AskResult:
     verified: bool = True
     #: The steps behind the answer as a study file, so it can be run again.
     study: str = ""
+    #: Model calls and tokens, summed from the provider's usage fields when it reports them.
+    usage: dict[str, int] = field(default_factory=lambda: {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0})
 
     def to_markdown(self) -> str:
         lines = [f"# {self.question}", "", self.answer.strip(), ""]
@@ -311,7 +463,8 @@ def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskRe
         if isinstance(m, dict) and m.get("name") and m["name"] not in seen:
             res.methods.append({k: str(m.get(k, "")) for k in ("name", "text", "citation")})
             seen.add(m["name"])
-    if name in ("analyze_station", "flood_frequency", "get_timeseries") and result.get("source"):
+    record_tools = ("analyze_station", "flood_frequency", "get_timeseries", "water_quality_samples")
+    if name in record_tools and result.get("source"):
         label = f"{result.get('source')} / {result.get('station_id')}"
         period = None
         if result.get("start") and result.get("end"):
@@ -347,8 +500,75 @@ def _harvest_provenance(name: str, args: dict[str, Any], result: Any, res: AskRe
             })
 
 
+def _add_usage(total: dict[str, int], usage: Any) -> None:
+    """Add one response's usage (an object or a dict, fields missing on some providers) to ``total``."""
+    total["calls"] = total.get("calls", 0) + 1
+    for key in ("prompt_tokens", "completion_tokens"):
+        v = usage.get(key) if isinstance(usage, dict) else getattr(usage, key, None)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            total[key] = total.get(key, 0) + int(v)
+
+
 def _truncate(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + f'... [truncated {len(text) - limit} chars]'
+
+
+def _conversation_size(messages: list[dict[str, Any]]) -> int:
+    """Everything that goes on the wire, not just the text a human would read.
+
+    An assistant turn carries its ``tool_calls`` with the arguments the model
+    wrote, which for a ``run_python`` call is a whole snippet. Counting only
+    ``content`` under-reads the request badly, which is how a conversation
+    budgeted at 6,000 tokens arrived as 9,300.
+    """
+    try:
+        return len(json.dumps(messages, ensure_ascii=False, default=str))
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return sum(len(str(m.get("content") or "")) for m in messages)
+
+
+def fit_context(messages: list[dict[str, Any]], budget: int = MAX_CONTEXT_CHARS) -> list[dict[str, Any]]:
+    """Shrink the oldest tool results until the conversation fits the budget.
+
+    The model needs the last result in full to answer; the older ones it has
+    usually already summarised into its own reasoning. So the oldest are cut
+    first, each keeping a readable head and saying what was removed, and the
+    most recent is left alone. Nothing else is touched: the system prompt, the
+    question and the assistant's own turns stay whole.
+    """
+    if _conversation_size(messages) <= budget:
+        return messages
+    out = [dict(m) for m in messages]
+    tool_indexes = [i for i, m in enumerate(out) if m.get("role") == "tool"]
+    for i in tool_indexes[:-1] if len(tool_indexes) > 1 else []:
+        if _conversation_size(out) <= budget:
+            break
+        content = str(out[i].get("content") or "")
+        if len(content) <= 400:
+            continue
+        out[i]["content"] = content[:400] + f"... [trimmed {len(content) - 400} chars to fit the context]"
+    # Still over: the newest result is itself too big, so cut that too. The
+    # note about the cut is part of the message, so leave room for it, or the
+    # conversation comes out just over the budget it was supposed to fit.
+    if _conversation_size(out) > budget and tool_indexes:
+        i = tool_indexes[-1]
+        content = str(out[i].get("content") or "")
+        note_allowance = 80
+        room = max(200, budget - (_conversation_size(out) - len(content)) - note_allowance)
+        if len(content) > room:
+            out[i]["content"] = content[:room] + f"... [trimmed {len(content) - room} chars to fit the context]"
+    return out
+
+
+def context_budget(provider: str | None) -> int:
+    """How much conversation to keep before trimming, in characters.
+
+    The default is sized for free tiers that meter tokens per minute. A
+    provider with a large window says so in the registry (``context_chars``)
+    and gets to keep its tool results whole.
+    """
+    spec = _REGISTRY.get(provider or "")
+    return spec.context_chars if spec is not None and spec.context_chars else MAX_CONTEXT_CHARS
 
 
 def ask(
@@ -363,24 +583,29 @@ def ask(
     on_event: Callable[[str], None] | None = None,
     data: dict[str, Any] | None = None,
     verify_answer: bool = True,
+    context_chars: int | None = None,
 ) -> AskResult:
     """Answer ``question`` with tool calls over aquascope; returns an :class:`AskResult`.
 
     ``client`` lets tests (or callers with their own SDK setup) pass an
     OpenAI-compatible client; otherwise one is built from ``resolve_llm``
     (the ``openai`` SDK if installed, else the built-in ``urllib`` client).
+    With a client, ``provider`` still names the provider so its context
+    budget applies.
 
     ``data`` is put in reach of the ``run_python`` tool (the Explorer passes the
     record on screen). ``verify_answer`` runs the deterministic checks in
     :mod:`aquascope.ai_engine.verify` and reports what the answer does not
     establish, rather than leaving it to the reader to notice.
+    ``context_chars`` caps how much conversation is kept (the registry's
+    budget for the provider otherwise); a benchmark uses it to bound spend.
     """
-    cfg = {"provider": "custom", "model": model or "test", "api_key": None, "base_url": base_url}
+    cfg = {"provider": provider or "custom", "model": model or "test", "api_key": None, "base_url": base_url}
     if client is None:
         from aquascope.ai_engine.llm_transport import make_client
 
         cfg = resolve_llm(provider, model, api_key, base_url)
-        client = make_client(cfg["api_key"], cfg["base_url"])
+        client = make_client(cfg["api_key"], cfg["base_url"], provider=cfg["provider"])
     specs = {s.name: s for s in _tool_specs()}
     tools = _openai_tools(list(specs.values()))
     messages: list[dict[str, Any]] = [
@@ -393,11 +618,40 @@ def ask(
     _SANDBOX_DATA.update(data or {})
     seen: list[dict[str, Any]] = []          # what each tool actually returned, for the checks
 
+    budget = int(context_chars) if context_chars else context_budget(cfg["provider"])
+    result_cap = max(MAX_TOOL_RESULT_CHARS, budget // 2)
     for step in range(1, max_steps + 1):
         result.steps = step
-        response = client.chat.completions.create(
-            model=cfg["model"], messages=messages, tools=tools, tool_choice="auto"
-        )
+        messages = fit_context(messages, budget)
+        # A 413 is the provider saying this request cannot fit its window, at
+        # any speed, so retrying it unchanged is pointless. Halve the budget and
+        # go again: the window belongs to the provider and is not ours to guess.
+        from aquascope.ai_engine.llm_transport import LLMHTTPError
+        malformed = 0
+        for attempt in range(6):
+            try:
+                response = client.chat.completions.create(
+                    model=cfg["model"], messages=messages, tools=tools, tool_choice="auto"
+                )
+                break
+            except LLMHTTPError as exc:
+                body = (exc.body or "").lower()
+                too_large = exc.status == 413 or "too large" in body or "too long" in body
+                # Some providers reject the whole request when the model's own
+                # tool call will not parse as JSON. The model wrote it, so the
+                # model can write it again: say what was wrong and resample.
+                bad_call = exc.status == 400 and "tool_use_failed" in body
+                if too_large and attempt < 5 and budget > MIN_CONTEXT_CHARS:
+                    budget = max(MIN_CONTEXT_CHARS, budget // 2)
+                    say(f"the request was too large for the model's window, retrying within {budget} characters")
+                    messages = fit_context(messages, budget)
+                elif bad_call and malformed < 2:
+                    malformed += 1
+                    say("the model's tool call was not valid JSON, asking it to write that call again")
+                    messages = [*messages, {"role": "user", "content": TOOL_JSON_REMINDER}]
+                else:
+                    raise
+        _add_usage(result.usage, getattr(response, "usage", None))
         choice = response.choices[0]
         msg = choice.message
         calls = getattr(msg, "tool_calls", None) or []
@@ -432,7 +686,8 @@ def ask(
             text = json.dumps(payload, ensure_ascii=False, default=str)
             summary = text[:160]
             result.tool_calls.append(ToolCallRecord(name=name, arguments=args, ok=ok, summary=summary))
-            messages.append({"role": "tool", "tool_call_id": c.id, "name": name, "content": _truncate(text)})
+            messages.append({"role": "tool", "tool_call_id": c.id, "name": name,
+                             "content": _truncate(text, result_cap)})
     else:
         result.answer = (result.answer or "").strip() or (
             "I ran out of tool-call steps before finishing. Here is what the tools returned so far; "

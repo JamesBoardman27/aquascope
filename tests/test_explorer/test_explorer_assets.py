@@ -156,6 +156,27 @@ def test_the_recorded_showcase_traces_are_part_of_the_build(tmp_path: Path, monk
     assert Path("showcase/kingston.json") in files
 
 
+def test_the_recorded_studies_are_part_of_the_build(tmp_path: Path, monkeypatch) -> None:
+    """The recorded studies (#366) are directories under explorer/showcase/studies/: the index, one meta,
+    workspace, report and study file per case as text, and the figures as bytes."""
+    build = _build_module()
+    src = tmp_path / "explorer"
+    case = src / "showcase" / "studies" / "kingston-flood"
+    (case / "figures").mkdir(parents=True)
+    (src / "index.html").write_text("<!-- page -->", encoding="utf-8")
+    (src / "showcase" / "studies" / "index.json").write_text('{"studies": []}', encoding="utf-8")
+    for name, text in (("meta.json", "{}"), ("workspace.json", "{}"), ("report.md", "# r"), ("study.yaml", "a: 1")):
+        (case / name).write_text(text, encoding="utf-8")
+    (case / "figures" / "s3_frequency_curve.png").write_bytes(b"\x89PNG")
+    monkeypatch.setattr(build, "SRC", src)
+
+    files = build.text_files()
+    for rel in ("index.json", "kingston-flood/meta.json", "kingston-flood/workspace.json", "kingston-flood/report.md",
+                "kingston-flood/study.yaml"):
+        assert Path("showcase/studies") / rel in files, rel
+    assert Path("showcase/studies/kingston-flood/figures/s3_frequency_curve.png") in build.binary_files()
+
+
 pytestmark_node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 
 
@@ -170,7 +191,13 @@ def test_fmt_honours_its_digits_argument() -> None:
       m.fmt(3.4217), m.fmt(null), m.fmt(2320.4, 0),
     ]));
     """
-    out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
+    out = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
     got = json.loads(out.stdout)
     assert got[0] == "303"          # digits honoured below 1000
     assert got[1] == "1.51"         # and below 10
@@ -179,6 +206,35 @@ def test_fmt_honours_its_digits_argument() -> None:
     assert got[4] == "3.422"
     assert got[5] == "—"
     assert got[6] == "2,320"
+
+
+@pytestmark_node
+def test_fmt_p_formats_small_p_values_and_handles_nones() -> None:
+    """A test with p = 0.000192 must format as '< 0.001' rather than 'p = 0'."""
+    core = EXPLORER / "src" / "core.js"
+    script = f"""
+    const m = await import({json.dumps(core.as_uri())});
+    console.log(JSON.stringify([
+      m.fmtP(0.000192), m.fmtP(0.0009), m.fmtP(0.001), m.fmtP(0.042),
+      m.fmtP(1.0), m.fmtP(null), m.fmtP(undefined), m.fmtP(Number.NaN),
+    ]));
+    """
+    out = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
+    got = json.loads(out.stdout)
+    assert got[0] == "< 0.001"
+    assert got[1] == "< 0.001"
+    assert got[2] == "0.001"
+    assert got[3] == "0.042"
+    assert got[4] == "1.000"
+    assert got[5] == "—"
+    assert got[6] == "—"
+    assert got[7] == "—"
 
 
 @pytestmark_node
@@ -553,3 +609,104 @@ def test_running_before_the_provider_list_arrives_says_so() -> None:
     assert "ASK_PROVIDERS[provider]" in guard and "askStatus(" in guard, (
         "runAsk() must check the chosen provider exists and report it, not throw on undefined"
     )
+
+
+def test_the_explorer_asks_for_the_full_record_by_default() -> None:
+    """#270: the page passed a 40-year window while the note said 'full period requested'."""
+    config = (EXPLORER / "config.js").read_text(encoding="utf-8")
+    assert re.search(r"\byears:\s*null\b", config), "CONFIG.years is a cap; null asks for the full record"
+    worker = (EXPLORER / "worker.js").read_text(encoding="utf-8")
+    assert "|| 40" not in worker, "the worker must not fall back to a hard-coded window"
+    assert "period_start" in worker, "the catalog's first date travels with the request"
+    panel = (EXPLORER / "src" / "panel-station.js").read_text(encoding="utf-8")
+    assert "period_start: r.period_start" in panel
+
+
+# ── Study (the crew in the page) ────────────────────────────────────────────
+
+
+def test_the_study_drawer_is_wired_end_to_end() -> None:
+    """One drawer, two modes; the worker face of aquascope.studio.Studio; the button wired before any await."""
+    html = _html()
+    for needed in ('id="btn-study"', 'id="study-pane"', 'id="ask-pane"', 'name="drawer-mode"', 'id="study-board"',
+                   'id="study-thread"', 'id="study-text"', 'id="btn-study-st"', 'id="btn-study-pt"'):
+        assert needed in html, needed
+    assert 'id="solve-pane"' not in html and 'id="btn-solve"' not in html, "Study replaces Solve in the drawer"
+    assert not (EXPLORER / "src" / "solve.js").exists()
+    app = (EXPLORER / "app.js").read_text(encoding="utf-8")
+    assert "url.study" in app
+    # Study is loaded on first use: app.js wires the button synchronously (before the boot awaits anything)
+    # and the click imports the module; studio.js no longer imports at boot.
+    assert 'import("./src/studio.js?v=__BUILD__")' in app, "the Study modules load on first use"
+    assert 'from "./src/studio.js' not in app, "studio.js must not be a static import of app.js"
+    boot = app[app.index("(async function boot()"):]
+    assert "initStudyLoader()" in boot[:boot.index("await ")], "the Study button is wired before any await"
+    loader = app[app.index("function initStudyLoader()"):]
+    assert '$("btn-study").addEventListener' in loader[:300], "the Study button is wired in the loader"
+    studio = (EXPLORER / "src" / "studio.js").read_text(encoding="utf-8")
+    assert "export function initStudy()" in studio and "export function toggleStudy()" in studio
+    shell = (EXPLORER / "src" / "shell.js").read_text(encoding="utf-8")
+    assert 'const MODES = ["ask", "study"]' in shell
+    url = (EXPLORER / "src" / "url.js").read_text(encoding="utf-8")
+    assert 'q.set("study", state.study.recorded || "1")' in url and 'q.has("study") || q.has("solve")' in url, (
+        "old Solve links open Study; a recording on the board is in the link")
+
+
+def test_the_worker_studio_message_keeps_the_contract() -> None:
+    """The ops, the events, the lazy packages, and the bytes that stay in the worker."""
+    worker = (EXPLORER / "worker.js").read_text(encoding="utf-8")
+    assert 'm.type === "studio"' in worker
+    for op in ('op == "start"', 'op == "say"', 'op == "approve"', 'op == "follow_up"', 'op == "file"',
+               'op == "export"'):
+        assert op in worker, op
+    assert "Studio.from_dict" in worker or "_Studio.from_dict" in worker
+    assert "_STUDIO = {}" in worker, "the full workspace, with the artifact bytes, stays in the worker"
+    assert "with_artifacts=False" in worker, "the page gets the workspace without the bytes"
+    assert "bundle_bytes" in worker and "describe_catchment_from_row" in worker
+    assert 'post("studio_progress"' in worker and 'post("studio_artifact"' in worker
+    # the Python lives in a JS template literal: a backtick or a ${ inside it ends the string (node --check
+    # still passes, the tail parses as a tagged template) and the worker dies before Pyodide loads
+    opening = "const STUDIO_PY = `"
+    block = worker[worker.index(opening) + len(opening):worker.index("# --- end studio face ---")]
+    assert "`" not in block and "${" not in block, "no backticks or ${ inside the STUDIO_PY template literal"
+    assert 'with_data=art.media_type == "image/png"' in worker, "PNG figures travel with bytes, SVG and CSV without"
+    # nothing loads until a study runs: matplotlib before the first run, the document libraries before the bundle
+    assert 'loadPackage("matplotlib")' in worker and 'install(["openpyxl", "python-docx"])' in worker
+    init = worker[worker.index("async function init("):worker.index("async function analyze(")]
+    assert "matplotlib" not in init and "openpyxl" not in init and "STUDIO_PY" not in init
+    assert "Loading the plotting library (once)" in worker and "Loading the document libraries (once)" in worker
+    # the solve messages stay for the faces that mirror them
+    for needed in ("solve_plan", "solve_run", "coerce_intake"):
+        assert needed in worker, needed
+    # one call at a time: an abandoned run must not hand its arguments to the message queued behind it
+    assert "studioChain" in worker and 'm.type === "studio") return await studioSerial(m)' in worker
+    client = (EXPLORER / "src" / "worker-client.js").read_text(encoding="utf-8")
+    assert "onStudioProgress" in client and "onStudioArtifact" in client
+    assert 'm.type === "studio_progress"' in client and 'm.type === "studio_artifact"' in client
+
+
+def test_the_study_surface_writes_with_plain_hyphens() -> None:
+    """House style: no em or en dashes in what the Study surface says."""
+    for path in (EXPLORER / "src" / "studio.js", EXPLORER / "src" / "intake.js", EXPLORER / "playbooks.json"):
+        text = path.read_text(encoding="utf-8")
+        assert "—" not in text and "–" not in text, path.name
+    html = _html()
+    pane = html[html.index('id="study-pane"'):html.index("</aside>", html.index('id="study-pane"'))]
+    assert "—" not in pane and "–" not in pane
+
+
+@pytestmark_node
+def test_the_node_tests_of_the_pure_modules_pass() -> None:
+    """explorer/tests/*.test.mjs are node:test suites over the pure modules (studio-showcase.js, #366)."""
+    # The files themselves, not the directory: Node 22 reads a directory argument as a pattern and finds nothing.
+    files = sorted(str(f) for f in (EXPLORER / "tests").glob("*.test.mjs"))
+    assert files, "no node suites under explorer/tests"
+    out = subprocess.run(
+        ["node", "--test", *files],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=str(EXPLORER.parent),
+    )
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert re.search(r"^# fail 0$", out.stdout, re.M), out.stdout

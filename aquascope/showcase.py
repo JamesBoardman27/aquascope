@@ -21,8 +21,8 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field, fields
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +30,7 @@ from aquascope import __version__
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["QUESTIONS", "ShowcaseEntry", "build", "diagnose", "write"]
+__all__ = ["QUESTIONS", "ShowcaseEntry", "already_recorded", "build", "diagnose", "load_recorded", "write"]
 
 #: The questions worth showing. Each is answerable from the archive, exercises a
 #: different part of the tool surface, and is short enough to read.
@@ -102,6 +102,51 @@ class ShowcaseEntry:
         return asdict(self)
 
 
+def already_recorded(out_dir: str | Path, *, fresh_for_days: float) -> set[str]:
+    """Ids with a recording newer than ``fresh_for_days``, which need not be redone.
+
+    Eight questions cost about a free tier's whole daily token budget, so a run
+    that fails halfway must be able to top up rather than start again. Anything
+    already recorded and still fresh is left alone.
+    """
+    out = Path(out_dir)
+    if not out.is_dir() or fresh_for_days <= 0:
+        return set()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=fresh_for_days)
+    fresh: set[str] = set()
+    for path in out.glob("*.json"):
+        if path.name == "index.json":
+            continue
+        try:
+            entry = json.loads(path.read_text(encoding="utf-8"))
+            when = datetime.fromisoformat(entry["recorded"])
+        except (OSError, ValueError, KeyError):
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        if when > cutoff and entry.get("answer"):
+            fresh.add(str(entry.get("id") or path.stem))
+    return fresh
+
+
+def load_recorded(out_dir: str | Path) -> list[ShowcaseEntry]:
+    """The recordings already on disk, so a top-up run can republish them all."""
+    out = Path(out_dir)
+    entries: list[ShowcaseEntry] = []
+    if not out.is_dir():
+        return entries
+    known = {f.name for f in fields(ShowcaseEntry)}
+    for path in sorted(out.glob("*.json")):
+        if path.name == "index.json":
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        entries.append(ShowcaseEntry(**{k: v for k, v in data.items() if k in known}))
+    return entries
+
+
 def build(
     questions: list[dict[str, str]] | None = None,
     *,
@@ -110,17 +155,28 @@ def build(
     max_steps: int = 8,
     on_event: Any = None,
     client: Any = None,
+    pause: float = 0.0,
 ) -> list[ShowcaseEntry]:
     """Run each question once and record the trace.
 
     ``client`` is an OpenAI-compatible client for tests and for callers that
     already have one; otherwise the usual environment configuration applies.
+
+    ``pause`` waits between questions. A free tier is limited per minute as well
+    as per day, and one tool-calling question spends most of a minute's tokens,
+    so eight in a row hit the wall on the second. The transport retries a 429,
+    but arriving slower is cheaper than retrying.
     """
+    import time
+
     from aquascope.ai_engine.analyst import ask
 
     say = on_event or (lambda m: logger.info("%s", m))
     out: list[ShowcaseEntry] = []
-    for spec in questions or QUESTIONS:
+    for index, spec in enumerate(questions or QUESTIONS):
+        if index and pause:
+            say(f"waiting {pause:.0f}s so the rate-limit window refills")
+            time.sleep(pause)
         entry = ShowcaseEntry(id=spec["id"], question=spec["question"], shows=spec.get("shows", ""))
         say(f"asking: {spec['id']}")
         try:
@@ -164,6 +220,12 @@ def write(entries: list[ShowcaseEntry], out_dir: str | Path) -> dict[str, str]:
         if entry.error and not entry.answer:
             logger.warning("skipping %s: %s", entry.id, entry.error)
             continue
+        # A model will happily answer over a failed tool call. That is what
+        # `tools_were_used` catches, and an answer with nothing behind it is the
+        # last thing to publish as a worked example.
+        if any(c.get("name") == "tools_were_used" and not c.get("passed") for c in entry.checks):
+            logger.warning("skipping %s: no tool call succeeded, so there is nothing to show", entry.id)
+            continue
         path = out / f"{entry.id}.json"
         path.write_text(json.dumps(entry.to_dict(), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
         written[entry.id] = str(path)
@@ -198,12 +260,24 @@ def diagnose(entries: list[ShowcaseEntry]) -> str:
     if not errors:
         return ""
     joined = " ".join(errors).lower()
-    if "403" in joined or "sufficient permissions" in joined or "401" in joined:
+    # 401 and 403 are different problems with different fixes, and saying the
+    # wrong one sends you looking in the wrong place: 401 is "this key is not a
+    # key", 403 is "this key is real but may not call the model".
+    if "401" in joined or "invalid api key" in joined or "rejected" in joined:
         return (
-            "Every question failed on authentication, so the key exists but is not allowed to "
-            "call the model. A Hugging Face token needs the 'Make calls to Inference Providers' "
-            "permission (a write token scoped to repositories does not have it); a Groq key "
-            "needs nothing else. Set GROQ_API_KEY as a repository secret for the free tier: "
+            "Every question failed with 401: the provider rejected the key itself. It is not a "
+            "permissions problem, the value is wrong. The usual cause is a truncated or "
+            "whitespace-padded paste; a Groq key starts with 'gsk_' and is about fifty characters "
+            "longer than that. Pipe it in rather than typing it at a prompt:\n"
+            "  printf '%s' \"$(pbpaste)\" | gh secret set GROQ_API_KEY --repo <owner>/<repo>\n"
+            "Then check the key is still listed at https://console.groq.com/keys"
+        )
+    if "403" in joined or "sufficient permissions" in joined:
+        return (
+            "Every question failed with 403: the key is real but is not allowed to call the "
+            "model. A Hugging Face token needs the 'Make calls to Inference Providers' "
+            "permission, which a write token scoped to repositories does not have. A Groq key "
+            "needs nothing else, so setting GROQ_API_KEY is the shorter path: "
             "https://console.groq.com/keys"
         )
     if "429" in joined or "rate" in joined and "limit" in joined:
@@ -226,20 +300,42 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover - a mainten
     ap.add_argument("--model", default=None)
     ap.add_argument("--max-steps", type=int, default=8)
     ap.add_argument("--only", default=None, help="Comma-separated ids to rebuild")
+    ap.add_argument("--pause", type=float, default=25.0,
+                    help="Seconds between questions, so a per-minute rate limit can refill")
+    ap.add_argument("--refresh-after", type=float, default=30.0, metavar="DAYS",
+                    help="Re-record an example only when its recording is older than this "
+                         "(0 records every question every time). A full run costs about a free "
+                         "tier's daily token budget, so a failed half is topped up, not redone.")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     questions = QUESTIONS
+    kept: list[ShowcaseEntry] = []
     if args.only:
         wanted = {q.strip() for q in args.only.split(",")}
         questions = [q for q in QUESTIONS if q["id"] in wanted]
+        kept = [e for e in load_recorded(args.out) if e.id not in wanted]
+    else:
+        fresh = already_recorded(args.out, fresh_for_days=args.refresh_after)
+        if fresh:
+            print(f"already recorded and still fresh, skipping: {', '.join(sorted(fresh))}", flush=True)
+            kept = [e for e in load_recorded(args.out) if e.id in fresh]
+            questions = [q for q in QUESTIONS if q["id"] not in fresh]
+    if not questions:
+        print(f"nothing to record: all {len(kept)} examples are current", flush=True)
+        return
     entries = build(questions, provider=args.provider, model=args.model, max_steps=args.max_steps,
-                    on_event=lambda m: print(m, flush=True))
-    paths = write(entries, args.out)
+                    pause=args.pause, on_event=lambda m: print(m, flush=True))
+    # Republish what was kept alongside what was just recorded, or the index
+    # would shrink to this run's handful.
+    paths = write(kept + entries, args.out)
     ok = sum(1 for e in entries if not e.error)
-    print(f"recorded {ok}/{len(entries)} into {args.out}", flush=True)
-    if ok == 0:
+    print(f"recorded {ok}/{len(entries)} this run, {len(paths) - 1} published in total", flush=True)
+    if ok == 0 and not kept:
         print(diagnose(entries), flush=True)
         raise SystemExit(1)
+    if ok == 0:
+        print(diagnose(entries), flush=True)
+        print("kept the existing recordings; run again when the budget refills", flush=True)
     print("\n".join(f"  {k}: {v}" for k, v in paths.items()))
 
 

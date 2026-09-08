@@ -39,7 +39,8 @@ const TOOLS = [
       type: "object",
       properties: {
         source: { type: "string" }, station_id: { type: "string" },
-        years: { type: "integer" }, variable: { type: "string" },
+        years: { type: "integer", description: "Optional cap on the record (the last N years); leave it out for the full record." },
+        variable: { type: "string" },
       },
       required: ["source", "station_id"],
     },
@@ -102,7 +103,7 @@ export function registerWebMcpTools({ actions }) {
               return textResult({ shown: `${args.source}/${args.station_id}` });
             }
             if (typeof args.lat === "number" && typeof args.lon === "number") {
-              actions.selectPoint(args.lat, args.lon);
+              actions.selectPoint(args.lat, args.lon, { fly: true });
               return textResult({ shown: [args.lat, args.lon] });
             }
             return textResult({ error: "Give a source and station_id, or a lat and lon." });

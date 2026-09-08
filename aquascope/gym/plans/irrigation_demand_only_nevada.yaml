@@ -1,0 +1,44 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# No gauge within reach: the demand is computed and the supply is not checked, said plainly, as the
+# irrigation_feasibility demand_only branch has it.
+id: irrigation_demand_only_nevada
+playbook: irrigation_feasibility
+title: Alfalfa water demand at an ungauged desert site
+brief: >-
+  How much water would 20 hectares of alfalfa planted in April need at this point in the Big Smoky Valley, as a
+  seasonal total and as a peak rate? There is no gauged river; the supply would come from a well.
+intake:
+  crop: alfalfa
+  area_ha: 20
+  planting_month: 4
+  efficiency: 0.7
+site:
+  name: A bare point in the Big Smoky Valley, Nevada (no gauge within 50 km)
+  lat: 38.0
+  lon: -117.0
+  recon: nevada_point
+expected_branch: demand_only
+steps:
+  - tool: anywhere
+    method: fao56_et0
+    optional: true
+    gates:
+      - {check: not_empty, path: climate}
+    note: The climate frame; the crop demand step computes the FAO-56 ET0 itself, so this is context, not a requirement.
+  - tool: crop_water_demand
+    method: crop_water_requirement
+    gates:
+      - {check: not_empty, path: demand.gross_irrigation_mm}
+      - {check: not_empty, path: demand.peak_month_m3s}
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [supply_reliability, analyze_station, low_flow_context, get_timeseries, irrigation, reference_et,
+          load_table]
+  methods: [supply_reliability, flow_duration, low_flow_frequency, regionalize_signatures, groundwater_trend,
+            recharge_wtf]
+rationale: >-
+  ERA5 reference ET0 and rainfall are reachable for any point on land, so the seasonal and peak demand of alfalfa
+  on 20 ha is computable and is the answer. No gauge lies within 50 km, so a supply screening on a record is not
+  defensible, and a regionalised supply band answers a question the client did not ask (the water would come from
+  a well, about which the catalog has nothing here). The report says the supply was not checked.
