@@ -16,6 +16,8 @@ All notable changes to AquaScope are documented here.
 ### Changed
 - **Verified FAO-56 crop coefficients against the revised 2025 edition and updated citations** (#310). Cross-checked single ($K_c$, Table 12) and basal ($K_{cb}$, Table 17) coefficients across all 26 crops in `aquascope.agri.crop_water` against the 2025 second revised edition (FAO-56 Rev.1, Pereira et al. 2025, doi:10.4060/cd6621en), updated module and function docstring references alongside historical 1998 citations, and updated `aquascope.methods` preconditions.
 
+### Fixed
+
 ## [0.15.1] - 2026-09-07
 
 The 0.15.0 tag was cut on the wrong commit (before the version bump merged) and never reached PyPI; 0.15.1 is that release, with nothing else changed.
