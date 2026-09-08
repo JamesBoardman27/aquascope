@@ -1,5 +1,8 @@
 """
-Collector for Colorado CDSS (Colorado Department of Statewide Transportation) water data.
+Collector for Colorado DWR/CDSS telemetry data.
+
+CDSS is Colorado's Decision Support Systems, operated by the Colorado
+Division of Water Resources.
 
 API docs:
 https://dwr.state.co.us/Rest/GET/Help/Api/GET-api-v2-telemetrystations-telemetrytimeseriesraw
@@ -24,9 +27,7 @@ CFS_TO_CMS = 0.028316846592
 
 
 class ColoradoCDSSCollector(BaseCollector):
-    """
-    Collector for Colorado CDSS (Colorado Department of Statewide Transportation) water data.
-    """
+    """Collect telemetry streamflow data from Colorado DWR/CDSS."""
 
     name = "colorado_cdss"
 
@@ -66,8 +67,13 @@ class ColoradoCDSSCollector(BaseCollector):
         if self.api_key:
             params["apiKey"] = self.api_key
         data = self.client.get_json(TELEMETRY_PATH, params=params)
+        if isinstance(data, dict):
+            data = data.get("ResultList", [])
         if not isinstance(data, list):
-            logger.warning("Colorado CDSS: expected a list response, received %s.", type(data).__name__)
+            logger.warning(
+                "Colorado CDSS: expected ResultList to be a list, received %s.",
+                type(data).__name__,
+            )
             return []
         return [row for row in data if isinstance(row, dict)]
 

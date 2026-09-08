@@ -40,12 +40,19 @@ class TestColoradoCDSSCollectorFetchRaw:
             self.collector.fetch_raw(abbrev="")
 
     def test_builds_expected_request(self):
-        self.client.get_json.return_value = [VALID_ROW]
+        self.client.get_json.return_value = {
+            "PageNumber": 1,
+            "PageCount": 1,
+            "ResultCount": 1,
+            "ResultDateTime": "2026-09-02T12:00:00-06:00",
+            "ResultList": [VALID_ROW],
+        }
 
         rows = self.collector.fetch_raw(
             abbrev="PLAKERCO",
             parameter="DISCHRG",
-            minMeasDateTime="2026-09-01",
+            startDate="09/01/2026",
+            endDate="09/02/2026",
         )
 
         assert rows == [VALID_ROW]
@@ -55,26 +62,46 @@ class TestColoradoCDSSCollectorFetchRaw:
                 "format": "json",
                 "abbrev": "PLAKERCO",
                 "parameter": "DISCHRG",
-                "minMeasDateTime": "2026-09-01",
+                "startDate": "09/01/2026",
+                "endDate": "09/02/2026",
             },
         )
 
     def test_includes_optional_api_key(self):
         client = MagicMock()
-        client.get_json.return_value = []
+        client.get_json.return_value = {"ResultList": []}
         collector = ColoradoCDSSCollector(api_key="secret", client=client)
 
         collector.fetch_raw(abbrev="PLAKERCO")
 
         assert client.get_json.call_args.kwargs["params"]["apiKey"] == "secret"
 
-    def test_non_list_response_returns_empty(self):
-        self.client.get_json.return_value = {"error": "daily limit exceeded"}
+    def test_extracts_rows_from_result_list_envelope(self):
+        self.client.get_json.return_value = {
+            "PageNumber": 1,
+            "PageCount": 1,
+            "ResultCount": 1,
+            "ResultList": [VALID_ROW],
+        }
+
+        assert self.collector.fetch_raw(abbrev="PLAKERCO") == [VALID_ROW]
+
+    def test_missing_result_list_returns_empty(self):
+        self.client.get_json.return_value = {
+            "PageNumber": 1,
+            "PageCount": 0,
+            "ResultCount": 0,
+        }
+
+        assert self.collector.fetch_raw(abbrev="PLAKERCO") == []
+
+    def test_invalid_result_list_shape_returns_empty(self):
+        self.client.get_json.return_value = {"ResultList": "invalid"}
 
         assert self.collector.fetch_raw(abbrev="PLAKERCO") == []
 
     def test_non_dictionary_items_are_removed(self):
-        self.client.get_json.return_value = [VALID_ROW, None, "invalid"]
+        self.client.get_json.return_value = {"ResultList": [VALID_ROW, None, "invalid"]}
 
         assert self.collector.fetch_raw(abbrev="PLAKERCO") == [VALID_ROW]
 
@@ -129,7 +156,7 @@ class TestColoradoCDSSCollectorNormalise:
 
     def test_collect_chains_fetch_and_normalise(self):
         client = MagicMock()
-        client.get_json.return_value = [VALID_ROW]
+        client.get_json.return_value = {"ResultList": [VALID_ROW]}
         collector = ColoradoCDSSCollector(client=client)
 
         records = collector.collect(abbrev="PLAKERCO")
