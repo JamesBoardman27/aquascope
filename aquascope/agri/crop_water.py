@@ -6,6 +6,12 @@ approaches from FAO Irrigation and Drainage Paper 56.
 
 References
 ----------
+Pereira, L. S., Allen, R. G., Paredes, P., López-Urrea, R., Raes, D.,
+    Smith, M., Kilic, A., & Salman, M. (2025).
+    Crop evapotranspiration: Guidelines for computing crop water requirements.
+    Second edition, revised 2025. FAO Irrigation and Drainage Paper No. 56 Rev.1.
+    Rome: FAO. doi:10.4060/cd6621en
+
 Allen, R. G., Pereira, L. S., Raes, D., & Smith, M. (1998).
     Crop evapotranspiration: Guidelines for computing crop water requirements.
     FAO Irrigation and Drainage Paper 56. Rome: FAO.
@@ -30,39 +36,38 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 KC_TABLE: dict[str, dict[str, float]] = {
-    "wheat_winter": {"initial": 0.4, "mid": 1.15, "late": 0.25},
-    "maize": {"initial": 0.3, "mid": 1.20, "late": 0.60},
-    "rice_paddy": {"initial": 1.05, "mid": 1.20, "late": 0.90},
-    "soybean": {"initial": 0.4, "mid": 1.15, "late": 0.50},
-    "cotton": {"initial": 0.35, "mid": 1.15, "late": 0.70},
-    "sugarcane": {"initial": 0.40, "mid": 1.25, "late": 0.75},
-    "tomato": {"initial": 0.60, "mid": 1.15, "late": 0.80},
-    "potato": {"initial": 0.50, "mid": 1.15, "late": 0.75},
+    # Woody crops & winter wheat retained pending #372 multi-row ground-cover models
+    "wheat_winter": {"initial": 0.40, "mid": 1.15, "late": 0.25},
     "grape": {"initial": 0.30, "mid": 0.85, "late": 0.45},
     "citrus": {"initial": 0.65, "mid": 0.60, "late": 0.65},
     "olive": {"initial": 0.65, "mid": 0.70, "late": 0.65},
-    "sunflower": {"initial": 0.35, "mid": 1.05, "late": 0.35},
-    "barley": {"initial": 0.30, "mid": 1.15, "late": 0.25},
-    "alfalfa": {"initial": 0.40, "mid": 0.95, "late": 0.90},
-    "onion": {"initial": 0.70, "mid": 1.05, "late": 0.75},
-    "cabbage": {"initial": 0.70, "mid": 1.05, "late": 0.95},
-    "pepper": {"initial": 0.60, "mid": 1.05, "late": 0.90},
-    "banana": {"initial": 0.50, "mid": 1.10, "late": 1.00},
-    "coffee": {"initial": 0.90, "mid": 0.95, "late": 0.95},
-    "tea": {"initial": 0.95, "mid": 1.00, "late": 1.00},
-    "sorghum": {"initial": 0.30, "mid": 1.05, "late": 0.55},
-    "groundnut": {"initial": 0.40, "mid": 1.15, "late": 0.60},
-    "sugar_beet": {"initial": 0.35, "mid": 1.20, "late": 0.70},
-    # FAO-56 Table 12
-    "millet": {"initial": 0.30, "mid": 1.00, "late": 0.30},
-    # FAO-56 Table 12
-    "cassava": {"initial": 0.30, "mid": 0.80, "late": 0.30},
-    # FAO-56 Table 12; initial Kc inherited from the Legumes group header.
-    "chickpea": {"initial": 0.40, "mid": 1.00, "late": 0.35},
+    # FAO-56 Rev.1 (2025) Table 6.1 (vegetables) & Table 6.2 (field crops)
+    "alfalfa": {"initial": 0.50, "mid": 1.20, "late": 1.15},
+    "banana": {"initial": 0.50, "mid": 1.05, "late": 1.00},
+    "barley": {"initial": 0.30, "mid": 1.10, "late": 0.25},
+    "cabbage": {"initial": 0.70, "mid": 1.05, "late": 1.00},
+    "cassava": {"initial": 0.30, "mid": 1.00, "late": 0.60},
+    "chickpea": {"initial": 0.40, "mid": 1.05, "late": 0.35},
+    "coffee": {"initial": 0.90, "mid": 1.00, "late": 1.00},
+    "cotton": {"initial": 0.40, "mid": 1.10, "late": 0.50},
+    "groundnut": {"initial": 0.40, "mid": 1.05, "late": 0.60},
+    "maize": {"initial": 0.30, "mid": 1.20, "late": 0.30},
+    "millet": {"initial": 0.30, "mid": 1.10, "late": 0.35},
+    "onion": {"initial": 0.70, "mid": 1.05, "late": 0.70},
+    "pepper": {"initial": 0.60, "mid": 1.10, "late": 1.00},
+    "potato": {"initial": 0.50, "mid": 1.10, "late": 0.40},
+    "rice_paddy": {"initial": 1.05, "mid": 1.20, "late": 1.05},
+    "sorghum": {"initial": 0.30, "mid": 1.05, "late": 0.45},
+    "soybean": {"initial": 0.40, "mid": 1.10, "late": 0.50},
+    "sugar_beet": {"initial": 0.35, "mid": 1.10, "late": 0.75},
+    "sugarcane": {"initial": 0.40, "mid": 1.20, "late": 0.80},
+    "sunflower": {"initial": 0.35, "mid": 1.15, "late": 0.30},
+    "tea": {"initial": 1.05, "mid": 1.05, "late": 1.05},
+    "tomato": {"initial": 0.60, "mid": 1.10, "late": 0.85},
 }
 
 # ---------------------------------------------------------------------------
-# FAO-56 Table 17 – basal crop coefficients (Kcb) for dual approach
+# FAO-56 Table 17 / Tables 7.x – basal crop coefficients (Kcb) for dual approach
 # Keys: initial, mid, late
 # ---------------------------------------------------------------------------
 
@@ -70,9 +75,8 @@ KCB_TABLE: dict[str, dict[str, float]] = {
     "wheat_winter": {"initial": 0.15, "mid": 1.10, "late": 0.25},
     "maize": {"initial": 0.15, "mid": 1.15, "late": 0.50},
     "rice_paddy": {"initial": 1.00, "mid": 1.15, "late": 0.70},
-    "soybean": {"initial": 0.15, "mid": 1.10, "late": 0.30},
-    "cotton": {"initial": 0.15, "mid": 1.10, "late": 0.50},
-    "sugarcane": {"initial": 0.15, "mid": 1.20, "late": 0.70},
+    "soybean": {"initial": 0.15, "mid": 1.05, "late": 0.35},
+    "cotton": {"initial": 0.15, "mid": 1.05, "late": 0.40},
     "tomato": {"initial": 0.15, "mid": 1.10, "late": 0.70},
     "potato": {"initial": 0.15, "mid": 1.10, "late": 0.65},
     "grape": {"initial": 0.15, "mid": 0.80, "late": 0.40},
@@ -88,14 +92,12 @@ KCB_TABLE: dict[str, dict[str, float]] = {
     "coffee": {"initial": 0.85, "mid": 0.90, "late": 0.90},
     "tea": {"initial": 0.90, "mid": 0.95, "late": 0.95},
     "sorghum": {"initial": 0.15, "mid": 0.95, "late": 0.35},
-    "groundnut": {"initial": 0.15, "mid": 1.10, "late": 0.50},
-    "sugar_beet": {"initial": 0.15, "mid": 1.15, "late": 0.50},
-    # FAO-56 Table 17; initial Kcb inherited from the Cereals group header.
+    "groundnut": {"initial": 0.15, "mid": 1.00, "late": 0.50},
+    "sugar_beet": {"initial": 0.15, "mid": 1.05, "late": 0.50},
+    "sugarcane": {"initial": 0.15, "mid": 1.15, "late": 0.70},
     "millet": {"initial": 0.15, "mid": 0.95, "late": 0.20},
-    # FAO-56 Table 17, cassava year 1.
     "cassava": {"initial": 0.15, "mid": 0.70, "late": 0.20},
-    # FAO-56 Table 17; initial Kcb inherited from the Legumes group header.
-    "chickpea": {"initial": 0.15, "mid": 0.95, "late": 0.25},
+    "chickpea": {"initial": 0.15, "mid": 1.00, "late": 0.25},
 }
 
 # ---------------------------------------------------------------------------
@@ -167,7 +169,7 @@ def get_kc(crop: str, stage: str | None = None) -> float | dict[str, float]:
 
     References
     ----------
-    Allen et al. (1998), Table 12. ISBN 92-5-104219-5.
+    Allen et al. (1998), Table 12; Pereira et al. (2025), FAO-56 Rev.1.
     """
     if crop not in KC_TABLE:
         raise ValueError(f"Unknown crop '{crop}'. Available: {sorted(KC_TABLE)}")
@@ -201,7 +203,7 @@ def get_kcb(crop: str, stage: str | None = None) -> float | dict[str, float]:
 
     References
     ----------
-    Allen et al. (1998), Table 17. ISBN 92-5-104219-5.
+    Allen et al. (1998), Table 17; Pereira et al. (2025), FAO-56 Rev.1.
     """
     if crop not in KCB_TABLE:
         raise ValueError(f"Unknown crop '{crop}'. Available: {sorted(KCB_TABLE)}")
@@ -258,7 +260,7 @@ def compute_ke(
 
     References
     ----------
-    Allen et al. (1998), FAO-56 Eq. 71, §7.3. ISBN 92-5-104219-5.
+    Allen et al. (1998); Pereira et al. (2025), FAO-56 Eq. 71, §7.3.
     """
     ke = min(kr * (kc_max - kcb), few * kc_max)
     return max(ke, 0.0)
@@ -285,7 +287,7 @@ def crop_et(eto: float, kc: float) -> float:
 
     References
     ----------
-    Allen et al. (1998), Eq. 58. ISBN 92-5-104219-5.
+    Allen et al. (1998); Pereira et al. (2025), FAO-56 Eq. 58.
     """
     return kc * eto
 
@@ -313,7 +315,7 @@ def effective_rainfall(precipitation: float, method: str = "usda") -> float:
     References
     ----------
     USDA SCS (1970). Irrigation Water Requirements. Technical Release 21.
-    Allen et al. (1998), FAO-56. ISBN 92-5-104219-5.
+    Allen et al. (1998); Pereira et al. (2025), FAO-56.
     """
     if precipitation <= 0:
         return 0.0
@@ -411,8 +413,7 @@ def crop_water_requirement(
 
     References
     ----------
-    Allen et al. (1998), FAO-56 Ch. 6 (single), Ch. 7 (dual).
-    ISBN 92-5-104219-5.
+    Allen et al. (1998); Pereira et al. (2025), FAO-56 Ch. 6 (single), Ch. 7 (dual).
     """
     import pandas as pd
 
@@ -527,7 +528,7 @@ def irrigation_schedule(
 
     References
     ----------
-    Allen et al. (1998), FAO-56 Ch. 7. ISBN 92-5-104219-5.
+    Allen et al. (1998); Pereira et al. (2025), FAO-56 Ch. 7.
     """
     import pandas as pd
 
