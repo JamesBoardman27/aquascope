@@ -15,6 +15,7 @@ All notable changes to AquaScope are documented here.
 ### Changed
 
 ### Fixed
+- Dashboard: the USGS region filter offered "No filter (all US)" even without an API key, where the keyless path rejects a request carrying no filter at all and surfaced a raw `ValueError`. The option now appears only when `USGS_API_KEY` is set (`DEMO_KEY` counts as keyless), the form says so when it is not, and an empty "Custom bbox" is blocked for the same reason instead of reaching the collector. (#254)
 
 ## [0.15.1] - 2026-09-07
 

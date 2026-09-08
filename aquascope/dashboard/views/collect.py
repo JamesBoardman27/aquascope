@@ -72,6 +72,8 @@ def missing_required_fields(source_key: str, fetch: dict) -> list[str]:
     return missing
 
 
+_BLOCKED_KEY = "__blocked__"
+
 _REGION_ORDER = [
     "Global",
     "United States",
@@ -120,6 +122,26 @@ def usgs_region_options(has_api_key: bool) -> dict[str, str | None]:
         options["No filter (all US — slow)"] = None
     options["Custom bbox"] = "__custom__"
     return options
+
+
+def usgs_bbox_block_reason(region_label: str, custom_bbox: str | None, has_api_key: bool) -> str | None:
+    """Why the USGS form as filled cannot be collected, or None when it can.
+
+    Selecting "Custom bbox" and leaving the box empty submits no filter at all,
+    which the keyless USGS path rejects with a bare ``ValueError``. That is the
+    same failure #254 is about, reached by a different route, so the form blocks
+    it instead of letting the collector raise.
+    """
+    if region_label != "Custom bbox":
+        return None
+    if (custom_bbox or "").strip():
+        return None
+    if has_api_key:
+        return None
+    return (
+        "Enter a bounding box, or pick a region instead. Without a USGS API key "
+        "the source rejects a request that carries no filter at all."
+    )
 
 
 def render() -> None:
@@ -186,6 +208,10 @@ def _render_api_tab() -> None:
     _source_form(source_key, ctor_kwargs, fetch_kwargs)
 
     if st.button("🚀 Collect data", type="primary", key="collect_btn"):
+        blocked = fetch_kwargs.pop(_BLOCKED_KEY, None)
+        if blocked:
+            st.warning(blocked)
+            return
         label = SOURCES[source_key][0]
 
         # Check before the spinner: a predictable empty field should not look
@@ -386,7 +412,12 @@ def _source_form(source_key: str, ctor: dict, fetch: dict) -> None:  # noqa: C90
         region_label = st.selectbox("Region filter", list(regions.keys()), index=0)
         bbox_val = regions[region_label]
         if bbox_val == "__custom__":
-            bbox_val = st.text_input("Bounding box (minLon,minLat,maxLon,maxLat)", placeholder="-80,37,-66,48") or None
+            custom_bbox = st.text_input("Bounding box (minLon,minLat,maxLon,maxLat)", placeholder="-80,37,-66,48")
+            blocked = usgs_bbox_block_reason(region_label, custom_bbox, _usgs_has_api_key())
+            if blocked:
+                st.warning(blocked)
+                fetch[_BLOCKED_KEY] = blocked
+            bbox_val = custom_bbox or None
         if bbox_val:
             fetch["bbox"] = bbox_val
         fetch["max_items"] = st.slider("Max records", 100, 10_000, 2_000, step=100)
