@@ -113,6 +113,10 @@ basins = [
     "shapely>=2.0",
     "pyarrow>=14",
 ]
+benchmarks = [
+    "dataretrieval>=0.5",
+    "lmoments3>=1.0",
+]
 studio = [
     "matplotlib>=3.7",
     "openpyxl>=3.1",
