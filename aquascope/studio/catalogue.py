@@ -152,7 +152,7 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
         "gates": [{"check": "min_years", "path": "years"}],
     },
     "supply_reliability": {
-        "kind": "site", "yields": ["reliability", "fdc"], "methods": ["supply_reliability"],
+        "kind": "site", "yields": ["reliability", "fdc"], "methods": ["supply_reliability", "regionalize_signatures"],
         "tables": ["reliability", "fdc_percentiles"], "figures": ["reliability_curve"],
         "gates": [{"check": "not_empty", "path": "reliability"}, {"check": "not_empty", "path": "fdc"},
                   {"check": "min_years", "path": "years"}, {"check": "unit_present", "path": "unit"}],
@@ -373,7 +373,8 @@ def repair_gate_path(gate: dict[str, Any], entry: Entry) -> bool:
 
 
 def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
-                  sufficiency: list[dict[str, Any]] | None = None, repair: bool = True) -> list[str]:
+                  sufficiency: list[dict[str, Any]] | None = None, repair: bool = True,
+                  stations: set[tuple[str, str]] | None = None) -> list[str]:
     """Errors in one plan step, in plain words. Empty means the step is acceptable.
 
     Checks: the tool exists; the arguments are the tool's (``from_step`` allowed
@@ -405,6 +406,21 @@ def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
     for k in entry.required:
         if k not in args and not (k == "from_step" and "from_step" in args):
             errors.append(f"step {sid}: {tool} needs argument {k!r}")
+    for k, v in list(args.items()):
+        schema = entry.arguments.get(k)
+        allowed_values = schema.get("enum") if isinstance(schema, dict) else None
+        if allowed_values and isinstance(v, str) and v not in allowed_values:
+            if repair:
+                # A model often invents a label for a choice ("regionalization", "physio_climatic"); the tool
+                # would reject it at run time, so the first allowed value stands in and the step records it.
+                step.setdefault("notes", []).append(f"{k}={v!r} is not a choice of {tool}; used {allowed_values[0]!r}")
+                args[k] = allowed_values[0]
+            else:
+                errors.append(f"step {sid}: {tool} argument {k}={v!r} is not one of {allowed_values}")
+    if stations is not None and entry.kind == "station" and args.get("source") and args.get("station_id"):
+        key = (str(args["source"]), str(args["station_id"]))
+        if key not in stations and "{{" not in key[0] and "{{" not in key[1]:
+            errors.append(f"step {sid}: station {key[0]} {key[1]} is not in the inventory of this site")
     ids = known_ids or set()
     ref = re.compile(r"\{\{\s*result\.([A-Za-z0-9_]+)\.")
     for k, v in args.items():
@@ -440,12 +456,12 @@ def validate_step(step: dict[str, Any], *, known_ids: set[str] | None = None,
     fb = step.get("fallback")
     if isinstance(fb, dict) and isinstance(fb.get("step"), dict):
         errors += [f"fallback of {e}" for e in validate_step(fb["step"], known_ids=ids, sufficiency=sufficiency,
-                                                             repair=repair)]
+                                                             repair=repair, stations=stations)]
     return errors
 
 
 def validate_plan(steps: list[dict[str, Any]], *, sufficiency: list[dict[str, Any]] | None = None,
-                  repair: bool = True) -> list[str]:
+                  repair: bool = True, stations: set[tuple[str, str]] | None = None) -> list[str]:
     """Every error over an ordered list of steps (ids must be unique; references may only point backwards).
     With ``repair`` (the default) a gate path the tool does not have is replaced by the one it has, in place."""
     errors: list[str] = []
@@ -457,6 +473,7 @@ def validate_plan(steps: list[dict[str, Any]], *, sufficiency: list[dict[str, An
             sid = f"s{i}"
         elif sid in seen:
             errors.append(f"step {sid}: duplicate id")
-        errors += validate_step(step, known_ids=set(seen), sufficiency=sufficiency, repair=repair)
+        errors += validate_step(step, known_ids=set(seen), sufficiency=sufficiency, repair=repair,
+                                stations=stations)
         seen.add(str(sid))
     return errors

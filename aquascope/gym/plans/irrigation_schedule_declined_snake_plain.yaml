@@ -1,0 +1,28 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A day-by-day schedule needs the soil and the season's actual weather: the playbook declines and offers the
+# seasonal demand.
+id: irrigation_schedule_declined_snake_plain
+playbook: irrigation_feasibility
+title: A daily irrigation schedule asked of a seasonal climatology (declined)
+brief: >-
+  Give me the day-by-day irrigation schedule for my 40 hectares of maize at Gooding this season: when to
+  irrigate and how much each day.
+intake:
+  crop: maize
+  area_ha: 40
+  planting_month: 4
+  decision: daily schedule
+site:
+  name: Malad River near Gooding, Idaho
+  lat: 42.88639
+  lon: -114.80306
+  source: usgs
+  station_id: USGS-13152500
+  years: 110.4
+  recon: snake_plain_gauge
+decline: true
+decline_kind: declined
+rationale: >-
+  A schedule of when and how much to irrigate each day needs the soil's water-holding capacity, the rooting depth
+  and the actual weather of the season; the playbook computes a seasonal demand from a reanalysis climatology. The
+  right plan declines and offers the seasonal demand and the supply screening.

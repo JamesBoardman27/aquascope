@@ -1,0 +1,58 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# Off-tree: the brief asks for two estimates and their agreement. The at_site branch gives one; the comparison
+# needs the donor transfer as required steps, not as a fallback.
+id: offtree_atsite_vs_regional_potomac
+playbook: flood_risk
+title: Compare the at-site 100-year flow with a regional estimate from similar catchments
+brief: >-
+  For the Little Falls bridge design I want two independent 100-year estimates: the at-site fit on the Potomac
+  gauge, and a regional estimate transferred from similar gauged catchments. Do they agree, and by how much do
+  they differ?
+intake:
+  return_period: 100
+  decision: design flow
+site:
+  name: Potomac River near Washington, DC (Little Falls pump station)
+  lat: 38.94978
+  lon: -77.12764
+  source: usgs
+  station_id: USGS-01646500
+  years: 96.5
+  recon: potomac_little_falls
+expected_branch: at_site
+tags: [off_tree]
+steps:
+  - tool: describe_catchment
+    optional: true
+  - tool: analyze_station
+    method: trend_mann_kendall
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: trend}
+  - tool: flood_frequency
+    method: at_site_flood_frequency
+    gates:
+      - {check: max_return_period_factor, path: years}
+      - {check: ci_finite, path: ffa.fits.gev_bootstrap.ci}
+      - {check: spread_within, path: "ffa.fits.gev_lmoments.q, ffa.fits.lp3.q"}
+  - tool: similar_basins
+    method: similar_basins
+    gates:
+      - {check: min_donors, path: k}
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    gates:
+      - {check: not_empty, path: estimates}
+      - {check: not_empty, path: skill}
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+forbidden:
+  tools: [load_table, return_periods]
+  methods: [gr4j_calibration, spi, spei, groundwater_trend, sgi]
+rationale: >-
+  The at-site fit is defensible on 96 years and is one estimate; the comparison the brief asks for needs the second
+  one as a required step, not the fallback the tree keeps for a failed gate: donor catchments chosen by similarity
+  (the registry calls the search marginal at a gauged site, not indefensible) and the signatures transferred from
+  them with their band and leave-one-out skill, so that the two 100-year figures can be set side by side and the
+  difference stated with both uncertainties.

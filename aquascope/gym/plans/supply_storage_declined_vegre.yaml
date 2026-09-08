@@ -1,0 +1,26 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A reservoir needs a storage-yield analysis the run-of-river screening does not do: the playbook declines.
+id: supply_storage_declined_vegre
+playbook: supply_reliability
+title: A reservoir scheme asked of a run-of-river screening (declined)
+brief: >-
+  We plan a small reservoir on the Vègre at Asnières to supply 0.5 m3/s to the town through the summer. How
+  reliable would the supply from the reservoir be?
+intake:
+  demand_m3s: 0.5
+  use: municipal
+  storage: true
+site:
+  name: La Vègre à Asnières-sur-Vègre, Sarthe
+  lat: 47.88843
+  lon: -0.23269
+  source: hubeau_hydrometrie
+  station_id: M058302010
+  years: 45.8
+  recon: vegre
+decline: true
+decline_kind: declined
+rationale: >-
+  A scheme with storage needs a yield-reliability analysis: the capacity, the operating rule and a sequence of
+  inflows worked through the reservoir. The run-of-river screening against the flow-duration curve is a different
+  question; the right plan declines and offers the run-of-river reliability or asks for the capacity and rule.

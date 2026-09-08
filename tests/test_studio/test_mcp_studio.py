@@ -30,8 +30,9 @@ def test_questions_over_mcp(no_deliverables):
     with patched():
         start = m.studio_start("Can the river supply the town reliably?", 51.415, -0.308)
         assert start["reply"]["kind"] == "questions" and start["reply"]["payload"]["questions"][0]["id"] == "demand_m3s"
-        nxt = m.studio_say(start["workspace"], "2 m3/s")
+        nxt = m.studio_say(start["workspace"], "2 m3/s, a licence")
         assert nxt["reply"]["kind"] == "plan" and nxt["workspace"]["brief"]["intake"]["demand_m3s"] == 2.0
+        assert nxt["workspace"]["brief"]["decision"] == "an abstraction licence"
 
 
 def test_the_server_registers_the_studio_tools():

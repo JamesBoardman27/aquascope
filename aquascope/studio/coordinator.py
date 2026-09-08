@@ -14,6 +14,18 @@ workspace consistent, so a face can stop anywhere and resume with
 :meth:`Studio.from_dict`. A role's exception never kills the study: it is an
 event, and a decline (intake, planning) or a report of what happened (the
 run).
+
+Bring your own model: a face that runs a model of its own (the Explorer's
+on-device model, any client) hands the crew what that model wrote and the
+crew treats it exactly like its own model's output. ``say(text,
+proposed={"brief": ...})`` merges a brief with the Consultant's coercion;
+``approve(plan=...)`` takes a plan through the Methodologist's validator
+(repair, pruning, the tree as the fall-back); ``narrate(sections)`` replaces
+the report's prose after the Critic's deterministic checks (a sentence whose
+numbers are in no result is dropped). :meth:`Studio.consultant_context`,
+:meth:`Studio.methodologist_context` and :meth:`Studio.author_context` are
+the prompts and the compact contexts the roles would send, so the same
+prompts run anywhere.
 """
 
 from __future__ import annotations
@@ -137,10 +149,12 @@ class Studio:
 
     # ── the conversation ──
 
-    def say(self, text: str) -> Reply:
+    def say(self, text: str, *, proposed: dict[str, Any] | None = None) -> Reply:
         """The client's message. Intake until the brief is ready, then scouting and planning; at review, an
         approval word runs the plan and anything else changes the brief and plans again; after the report,
-        a follow-up."""
+        a follow-up. ``proposed`` is ``{"brief": {...}, "source": "device"}``: a brief a model of the caller's
+        own wrote from the text (decision, quantities, period, horizon, constraints, kind, playbook, intake,
+        assumptions, questions), merged with the coercion a model reply gets before the flow goes on."""
         from aquascope.studio.roles.consultant import consult
 
         ws = self.ws
@@ -154,14 +168,14 @@ class Studio:
             if _APPROVE.match(text or ""):
                 return self.approve()
             try:
-                consult(ws, self.model, text, tables=self._frames)
+                consult(ws, self.model, text, tables=self._frames, proposed=proposed)
             except Exception as exc:  # noqa: BLE001
                 ws.event("consultant", "error", f"{type(exc).__name__}: {exc}")
                 return self._plan_reply()
             ws.event("coordinator", "replan", "the brief changed at review")
             return self._plan()
         try:
-            msg = consult(ws, self.model, text, tables=self._frames)
+            msg = consult(ws, self.model, text, tables=self._frames, proposed=proposed)
         except Exception as exc:  # noqa: BLE001 - an intake failure is a decline, not a crash
             ws.event("consultant", "error", f"{type(exc).__name__}: {exc}")
             return self._decline(f"the Consultant could not take the brief: {exc}", role="consultant")
@@ -200,15 +214,36 @@ class Studio:
 
     # ── the run ──
 
-    def approve(self, edits: dict[str, Any] | list[dict[str, Any]] | None = None) -> Reply:
-        """Approve the plan (with the user's edits, revalidated) and run the crew to the report."""
-        from aquascope.studio.roles.methodologist import revise
+    def approve(self, edits: dict[str, Any] | list[dict[str, Any]] | None = None, *,
+                plan: dict[str, Any] | None = None) -> Reply:
+        """Approve the plan (with the user's edits, revalidated) and run the crew to the report.
+
+        ``plan`` is a plan a model of the caller's own wrote, in the Methodologist's reply shape (objective,
+        decision, methodology, steps with id, tool, arguments, rationale, method, expects, fallback,
+        depends_on, outputs; assumptions, alternatives, limitations_expected, citations) plus an optional
+        ``source`` (default ``device``). It goes the way a model plan goes: the validator with its repairs, a
+        wrong method dropped, the invalid steps pruned, the tree when nothing valid remains. The report's
+        payload then carries ``plan_errors`` (the validator's findings) and ``plan_used`` (``proposed`` or
+        ``tree``), and the plan says who wrote it.
+        """
+        from aquascope.studio.roles.methodologist import adopt, revise
 
         ws = self.ws
         if ws.status == "declined":
             return Reply("declined", f"Declined: {ws.declined_reason}", {"reason": ws.declined_reason})
         if ws.status != "review" or not ws.study:
             return Reply("answer", f"There is no plan to approve (status {ws.status}).", {"status": ws.status})
+        extra: dict[str, Any] = {}
+        if plan:
+            source = str(plan.get("source") or "device") if isinstance(plan, dict) else "device"
+            try:
+                _, errors, used = adopt(ws, plan, source=source)
+            except Exception as exc:  # noqa: BLE001 - a broken proposal runs the plan at review
+                ws.event("methodologist", "error", f"{source} plan: {type(exc).__name__}: {exc}")
+                errors, used = [f"{type(exc).__name__}: {exc}"], "tree"
+            extra = {"plan_errors": list(errors), "plan_used": used}
+            ws.event("coordinator", "review", f"the {source} plan was {'adopted' if used == 'proposed' else 'refused'}"
+                     + (f" ({len(errors)} validator finding(s))" if errors else ""))
         if edits:
             try:
                 revise(ws, self.model, edits)
@@ -216,9 +251,12 @@ class Studio:
                 reply = self._plan_reply()
                 reply.text = f"The edit was not accepted: {exc}\n\n" + reply.text
                 reply.payload["errors"] = str(exc).split("; ")
+                reply.payload.update(extra)
                 return reply
         ws.event("coordinator", "review", "the plan was approved" + (" with edits" if edits else ""))
-        return self._run_to_report()
+        reply = self._run_to_report()
+        reply.payload.update(extra)
+        return reply
 
     def _run_to_report(self, *, prior: Any = None) -> Reply:
         from aquascope.studio.roles.analysts import run
@@ -334,6 +372,76 @@ class Studio:
         ws.set_status("review")
         ws.event("coordinator", "review", "a follow-up change runs without a second approval")
         return self._run_to_report(prior=prior)
+
+    def narrate(self, sections: dict[str, str] | list[dict[str, Any]], *, source: str = "device") -> Reply:
+        """Prose a model of the caller's own wrote for the report, after the crew's checks (only after the
+        report). ``sections`` maps section ids (as in ``ws.report["sections"]``, plus ``answer`` and
+        ``recommendations``) to text, or lists ``{"id", "text"}``. A sentence whose numbers are in no tool
+        result is dropped and counted; the report says which source wrote which section
+        (``ws.report["written_by"]``, the footer); the deliverables are rebuilt. The reply is the report with
+        ``dropped`` and ``written_by`` in its payload. Sections not given keep their text."""
+        from aquascope.studio.roles.author import narrate
+        from aquascope.studio.roles.critic import critique
+
+        ws = self.ws
+        if ws.status != "done" or not ws.report:
+            return Reply("answer", f"There is no report to narrate yet (status {ws.status}).", {"status": ws.status})
+        given: dict[str, str] = {}
+        rows = sections.items() if isinstance(sections, dict) else \
+            [(r.get("id"), r.get("text")) for r in sections if isinstance(r, dict)]
+        for sid, text in rows:
+            if sid and isinstance(text, str) and text.strip():
+                given[str(sid)] = text
+        outcome = narrate(ws, given, source=source)
+        try:
+            critique(ws, None)
+        except Exception as exc:  # noqa: BLE001
+            ws.event("critic", "error", f"{type(exc).__name__}: {exc}")
+        if ws.critique is not None:
+            ws.report["not_established"] = list(ws.critique.get("not_established") or [])
+            ws.report["critique"] = {"issues": ws.critique.get("issues") or [],
+                                     "checks_passed": sum(1 for c in ws.critique.get("checks") or []
+                                                          if c.get("passed")),
+                                     "checks": len(ws.critique.get("checks") or [])}
+        self._build_deliverables()
+        ws.say("author", str(ws.report.get("answer") or ""), kind="report",
+               payload={"title": ws.report.get("title"), "key_numbers": ws.report.get("key_numbers"),
+                        "not_established": ws.report.get("not_established"), "written_by": outcome["written_by"],
+                        "artifacts": [a.to_dict(with_data=False) for a in ws.artifacts]})
+        reply = self._report_reply()
+        reply.payload.update(outcome)
+        return reply
+
+    # ── bring your own model: the prompts and the contexts the roles would send ──
+
+    def consultant_context(self, text: str) -> dict[str, Any]:
+        """The Consultant's context for ``text`` (the brief's, or the answers' while questions are open) with
+        the system prompt under ``system``; a page runs the same prompt on a model of its own and hands the
+        reply to :meth:`say` as ``proposed``."""
+        from aquascope.studio.roles.consultant import brief_context
+
+        system, context = brief_context(self.ws, text, self._frames)
+        return {**context, "system": system}
+
+    def methodologist_context(self, request: str | None = None) -> dict[str, Any]:
+        """The Methodologist's context at this point (the plan's; with ``request``, or after the report, the
+        change's) with the system prompt under ``system``; the reply goes to :meth:`approve` as ``plan``."""
+        from aquascope.studio.roles.methodologist import change_context, plan_context
+
+        ws = self.ws
+        if request is not None or ws.status == "done":
+            system, context = change_context(ws, request or "")
+        else:
+            system, context = plan_context(ws)
+        return {**context, "system": system}
+
+    def author_context(self, issues: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """The Author's context at this point (the report's; with ``issues``, the fix round's) with the system
+        prompt under ``system``; the reply's sections go to :meth:`narrate`."""
+        from aquascope.studio.roles.author import report_context
+
+        system, context = report_context(self.ws, issues=issues)
+        return {**context, "system": system}
 
     # ── files and checkpoints ──
 

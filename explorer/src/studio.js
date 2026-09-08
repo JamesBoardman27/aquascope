@@ -6,9 +6,16 @@
 // where and what to bring (intake), the plan to approve (review), the timeline
 // and the figures as they land (running), the answer and the bundle (done), or
 // why the crew declined. Keyless by default: the key Ask holds is offered on
-// one line, and an on-device model, when one is already there, reads the first
-// sentence into a brief before the Consultant sees it. Nothing is downloaded
-// for that; nothing is uploaded, ever.
+// one line, and an on-device model, when one is already there, joins the crew:
+// it reads the first sentence into a brief, writes the plan (the engine's
+// validator checks it, the playbook tree stands when it fails) and, after the
+// run, the prose (the Critic's checks drop what the results do not carry).
+// The card says who wrote what. Nothing is downloaded for that; nothing is
+// uploaded, ever. A study is saved in this browser after every reply, so a
+// reload offers it back; Stop terminates the worker and keeps the plan. The
+// recorded studies (explorer/showcase/studies, made once with a model) are
+// chips on the intake board: one opens as its finished board, as recorded,
+// and Re-run live runs its plan again here, keyless.
 
 import { $, actions, escapeHtml, fmt, sourceStyle, state, stationKey } from "./core.js?v=__BUILD__";
 import { shapeSvg } from "./shapes.js?v=__BUILD__";
@@ -17,11 +24,20 @@ import { catchmentAreaAt, catchmentForWorker, donorPoolSize, donorTablesForWorke
 import { askModelConfig, mdToHtml } from "./ask.js?v=__BUILD__";
 import { closeDrawer, drawerMode, drawerOpen, openDrawer, setStatusEl } from "./shell.js?v=__BUILD__";
 import {
-  Cancelled, call, callCancelable, ensureCatalogInWorker, onStudioArtifact, onStudioProgress,
+  Cancelled, call, callCancelable, ensureCatalogInWorker, onStudioArtifact, onStudioProgress, restartWorker,
 } from "./worker-client.js?v=__BUILD__";
-import { generateJsonLocally, localModelReady } from "./local-model.js?v=__BUILD__";
+import { generateJsonLocally, localModelReady, localReaderLabel } from "./local-model.js?v=__BUILD__";
 import { briefPrompt, briefSchema, parseBriefReply } from "./intake.js?v=__BUILD__";
 import { hasTable, tableLabel } from "./panel-workbench.js?v=__BUILD__";
+import { narrateOnDevice, planLine, planOnDevice, proseLine } from "./studio-device.js?v=__BUILD__";
+import { agoWords, latestStudy, loadStudy, saveStudy } from "./study-store.js?v=__BUILD__";
+import { loadRecorded, recordedIndex, replayBrief, replayPlan } from "./studio-showcase.js?v=__BUILD__";
+import {
+  recordedChipsHtml, recordedFigures, recordedFilesHtml, recordedNoteHtml, recordedPlanLine,
+} from "./studio-recorded.js?v=__BUILD__";
+import { writeUrl } from "./url.js?v=__BUILD__";
+
+const RECORDED_BASE = "./showcase/studies/";
 
 const DONOR_K = 10;
 const BRIEF_TIMEOUT_MS = 25000;
@@ -85,7 +101,9 @@ const S = {
   ws: null,             // the workspace dict, without the artifact bytes
   site: null,           // where the study was started: { key, lat, lon, text, html }
   catchment: null, area: null, donors: null,
+  siteReady: false,     // the catchment row, the area and the donor pool are loaded for S.site
   busy: false,          // a call is in flight: the board shows the timeline
+  writing: false,       // the device model is writing the prose: the input waits
   declined: null,       // the reader's own decline of the plan (the crew's is ws.status)
   editing: false,
   useKey: true,         // the key Ask holds, when there is one
@@ -94,6 +112,16 @@ const S = {
   figures: new Map(),   // artifact id -> { id, src, caption, step, job }
   events: [],
   jobId: null, cancel: null, run: 0,
+  proposal: null,       // the device model's plan shown on the card: { plan, steps, model }
+  planLine: null,       // who planned, in words, for the card and the foot
+  proseLine: null,      // who wrote the prose, in words
+  prompts: undefined,   // the crew's exported prompts and schemas: undefined (not asked), null (none), or the dict
+  resume: null,         // a saved study offered on the intake board: { id, at, site }
+  index: undefined,     // the recorded studies' index rows: undefined (not asked), else the list
+  moreRecorded: false,  // every recorded chip shown, not just the first six
+  recorded: null,       // the recording on the board: { id, meta, workspace, report, figures, files }
+  planSource: null,     // "recorded" while a re-run's plan is with the engine, for the words on the foot
+  planModel: null,      // the model that wrote the recorded plan being re-run
 };
 
 const note = (text, kind = "info") => setStatusEl($("study-status"), text, kind);
@@ -118,9 +146,37 @@ function where() {
   return null;
 }
 
+// A site from a saved record or a workspace: the page's own when it is the
+// same place, else the bare coordinates.
+function siteFrom(rec) {
+  const w = where();
+  if (w && rec && Number(rec.lat) === w.lat && Number(rec.lon) === w.lon) return w;
+  const lat = Number(rec.lat), lon = Number(rec.lon);
+  const text = rec.text || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  return { key: rec.key || `p/${lat},${lon}`, lat, lon, text, html: `${escapeHtml(text)} <span class="muted">saved study</span>` };
+}
+
 function modelForRun() {
   const cfg = S.useKey ? askModelConfig() : null;
   return cfg ? { provider: cfg.provider, model: cfg.model, api_key: cfg.api_key, base_url: cfg.base_url } : {};
+}
+
+// What only the page can read for a site: the sub-basin row for
+// describe_catchment, the catchment area and the donor pool for the
+// reconnaissance. Loaded once per site, before the first call that needs it.
+async function loadSiteInfo(w, my) {
+  if (S.siteReady) return;
+  const [catchment, area, pool] = await Promise.all([
+    catchmentForWorker(w.lat, w.lon).catch(() => null),
+    (state.selected && w.key === stationKey(state.selected) ? stationArea(w.key).then((a) => (a ? a.area : null))
+      : catchmentAreaAt(w.lat, w.lon)).catch(() => null),
+    donorPoolSize().catch(() => 0),
+  ]);
+  if (my !== S.run) return;
+  S.catchment = catchment;
+  S.area = area;
+  S.donors = area ? Math.min(DONOR_K, pool) : null;
+  S.siteReady = true;
 }
 
 // ── the board: one thing, by status ─────────────────────────────────────────
@@ -150,7 +206,7 @@ function intakeHtml() {
   } else {
     data = `<div class="study-data">` +
       `<label class="link" for="study-file">Add a CSV or XLSX</label>` +
-      `<input type="file" id="study-file" accept=".csv,.txt,.xlsx,.xls" multiple hidden>` +
+      `<input type="file" id="study-file" accept=".csv,.txt,.xlsx,.xls,.json" multiple hidden>` +
       (hasTable()
         ? ` <button type="button" class="btn tiny" data-act="my-data" aria-pressed="${S.useMyData}">${S.useMyData ? "Using" : "Use"} the table in My data</button>`
         : "") +
@@ -159,7 +215,12 @@ function intakeHtml() {
         : "") +
       `</div>`;
   }
-  return `<p class="study-where">${w ? w.html : `<span class="muted">Pick a gauge or a spot on the map first.</span>`}</p>${model}${data}`;
+  // A study saved in this browser at this place (or, with nothing picked, the last one anywhere).
+  const resume = !started && S.resume
+    ? `<p class="study-resume"><button type="button" class="chip" data-act="resume" title="${escapeHtml(`${S.resume.site.text}, ${agoWords(S.resume.at)}`)}">Resume the last study${w ? "" : ` at ${escapeHtml(S.resume.site.text)}`}</button></p>`
+    : "";
+  const recorded = !started ? recordedChipsHtml(S.index, { showAll: S.moreRecorded }) : "";
+  return `<p class="study-where">${w ? w.html : `<span class="muted">Pick a gauge or a spot on the map first.</span>`}</p>${model}${data}${resume}${recorded}`;
 }
 
 const fmtArg = (v) => (typeof v === "string" ? v : JSON.stringify(v));
@@ -199,10 +260,16 @@ function stepHtml(s) {
     `</li>`;
 }
 
+// The steps on the card: the device model's proposal when there is one, else the study's.
+function shownSteps() {
+  if (S.proposal) return S.proposal.steps;
+  return ((S.ws && S.ws.study) || {}).steps || [];
+}
+
 function planHtml() {
   const study = S.ws.study || {};
-  const plan = study.plan || {};
-  const steps = study.steps || [];
+  const plan = S.proposal ? { ...study.plan, ...S.proposal.plan } : (study.plan || {});
+  const steps = shownSteps();
   const notes = [...(plan.assumptions || []), ...(plan.caveats || [])];
   return `<article class="study-plan" tabindex="-1" aria-label="The plan">` +
     (plan.objective ? `<p class="study-objective">${escapeHtml(plan.objective)}</p>` : "") +
@@ -210,6 +277,7 @@ function planHtml() {
     (notes.length
       ? `<details class="study-notes"><summary>${notes.length} note${notes.length === 1 ? "" : "s"}</summary><ul>${notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul></details>`
       : "") +
+    (S.planLine ? `<p class="study-by muted">${escapeHtml(S.planLine)}</p>` : "") +
     `<div class="row-actions">` +
       `<button type="button" class="btn primary" data-act="approve">Approve</button>` +
       `<button type="button" class="btn" data-act="edit" aria-pressed="${S.editing}">${S.editing ? "Cancel edits" : "Edit"}</button>` +
@@ -266,12 +334,20 @@ function footLine() {
   return `${steps} step${steps === 1 ? "" : "s"} · ${gates - failed} of ${gates} gates passed · ${model}`;
 }
 
+// Who planned and who wrote, from the replies when they said, else from the workspace.
+function crewLine() {
+  const study = S.ws.study || {};
+  const plan = S.planLine || planLine({ author: (study.plan || {}).author, model: deviceLabel() });
+  return [plan, S.proseLine].filter(Boolean).join(" · ");
+}
+
 function doneHtml() {
   const report = S.ws.report || {};
   const numbers = (report.key_numbers || []).slice(0, 12);
   const artifacts = S.ws.artifacts || [];
-  const figs = artifacts.filter((a) => a.kind === "figure" && a.media_type === "image/png");
   const not = report.not_established || [];
+  if (S.recorded) return recordedDoneHtml(report, numbers, not);
+  const figs = artifacts.filter((a) => a.kind === "figure" && a.media_type === "image/png");
   const docs = DOCS.filter(([id]) => artifacts.some((a) => a.id === id));
   return `<article class="study-answer ask-result" tabindex="-1" aria-label="The answer">${mdToHtml(report.answer || "No answer was produced.")}</article>` +
     (numbers.length
@@ -286,6 +362,26 @@ function doneHtml() {
     `<div class="row-actions"><button type="button" class="btn primary" data-act="bundle">Download bundle</button>` +
     `<button type="button" class="btn" data-act="again">New study</button></div>` +
     (docs.length ? `<p class="study-docs muted">${docs.map(([id, label]) => `<a href="#" data-file="${id}">${label}</a>`).join(" · ")}</p>` : "") +
+    `<p class="study-foot muted">${escapeHtml(footLine())}</p>` +
+    `<p class="study-by muted">${escapeHtml(crewLine())}</p>`;
+}
+
+// A recording, as recorded: the note first (the numbers are the recording's), the answer, the key numbers,
+// the figures from their PNG urls, the recorded files as links, Re-run live. No worker call is made.
+function recordedDoneHtml(report, numbers, not) {
+  const rec = S.recorded;
+  return recordedNoteHtml(rec.meta) +
+    `<article class="study-answer ask-result" tabindex="-1" aria-label="The answer">${mdToHtml(report.answer || "No answer was produced.")}</article>` +
+    (numbers.length
+      ? `<table class="ffa study-numbers"><tbody>${numbers.map((k) => `<tr><td>${escapeHtml(k.label)}</td><td>${escapeHtml(numValue(k))}</td></tr>`).join("")}</tbody></table>`
+      : "") +
+    (S.figures.size ? `<div class="study-figs">${[...S.figures.values()].map(figHtml).join("")}</div>` : "") +
+    (not.length
+      ? `<div class="ask-checks warn"><strong>Not established</strong><ul>${not.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul></div>`
+      : "") +
+    `<div class="row-actions"><button type="button" class="btn primary" data-act="rerun" title="Run the recorded plan again here, keyless">Re-run live</button>` +
+    `<button type="button" class="btn" data-act="again">New study</button></div>` +
+    recordedFilesHtml(rec.files) +
     `<p class="study-foot muted">${escapeHtml(footLine())}</p>`;
 }
 
@@ -322,24 +418,27 @@ const PLACEHOLDER = {
 function renderCompose(status) {
   const text = $("study-text"), send = $("study-send"), go = $("study-go");
   const questions = openQuestions().length > 0;
-  const canType = !S.busy && status !== "running";
+  const canType = !S.busy && !S.writing && !S.recorded && status !== "running";
   text.disabled = !canType;
   send.disabled = !canType || (!S.ws && !where());
   go.hidden = !(questions && canType);
-  text.placeholder = PLACEHOLDER[questions ? "questions" : status] || PLACEHOLDER.intake;
+  text.placeholder = S.recorded ? "Re-run live to go on here" : PLACEHOLDER[questions ? "questions" : status] || PLACEHOLDER.intake;
 }
 
 // A figure the page has not seen (the worker was restarted, or the study came
-// from elsewhere) is fetched by id when the report shows it.
+// from elsewhere) is fetched by id when the report shows it; one the worker
+// cannot serve either (its bytes were never in this session) leaves the board
+// rather than standing as a broken image. The next run draws it again.
 function loadMissingFigures() {
   for (const img of board().querySelectorAll("img[data-art]")) {
     const id = img.dataset.art;
+    const drop = () => { const fig = img.closest("figure"); if (fig) fig.remove(); };
     call("studio", { op: "file", workspace: S.ws, artifact_id: id }).then((res) => {
-      if (!res || res.error || !res.data) return;
+      if (!res || res.error || !res.data) { drop(); return; }
       const f = { id, src: `data:${res.media_type};base64,${res.data}`, caption: img.alt, job: null };
       S.figures.set(id, f);
       if (img.isConnected) img.src = f.src;
-    }).catch((err) => console.info("figure unavailable:", err && err.message));
+    }).catch((err) => { console.info("figure unavailable:", err && err.message); drop(); });
   }
 }
 
@@ -429,18 +528,36 @@ function job(op, extra = {}) {
   return j.promise.finally(() => { if (S.jobId === j.id) { S.cancel = null; S.jobId = null; } });
 }
 
-function applyReply(res) {
+function applyReply(res, op) {
   S.ws = res.workspace || S.ws;
   S.busy = false;
   state.study.running = false;
   S.editing = false;
   $("study-text").value = "";
   const r = res.reply || {};
+  const p = r.payload || {};
   note("");
-  if (r.kind === "plan" && r.payload && r.payload.errors) note(`The edit was not accepted: ${r.payload.errors.join("; ")}`, "warn");
+  if (r.kind === "plan" && p.errors) note(`The edit was not accepted: ${p.errors.join("; ")}`, "warn");
+  if (r.kind === "plan") { S.proposal = null; S.planLine = null; S.proseLine = null; }
+  if (r.kind === "report" && (op === "approve" || op === "follow_up")) {
+    S.proposal = null;
+    if (p.plan_used && S.planSource === "recorded") {
+      S.planLine = recordedPlanLine({ used: p.plan_used, errors: p.plan_errors || [], model: S.planModel });
+    } else if (p.plan_used) {
+      S.planLine = planLine({ used: p.plan_used, errors: p.plan_errors || [], model: deviceLabel() });
+    }
+    S.planSource = null;
+    S.proseLine = null;
+  }
   renderAll();
-  if (r.kind === "plan") { focusBoard(".study-plan"); announce("The plan is ready to approve."); return; }
-  if (r.kind === "report") { focusBoard(".study-answer"); announce("The report is ready."); return; }
+  persist();
+  if (r.kind === "plan") { focusBoard(".study-plan"); announce("The plan is ready to approve."); maybePlanOnDevice(); return; }
+  if (r.kind === "report") {
+    focusBoard(".study-answer");
+    announce("The report is ready.");
+    if (op === "approve" || op === "follow_up") maybeNarrateOnDevice();
+    return;
+  }
   if (r.kind === "declined") { announce(r.text || "Declined."); return; }
   $("study-text").focus({ preventScroll: true });
 }
@@ -451,6 +568,36 @@ function failed(err) {
   if (err instanceof Cancelled) note("Stopped.", "warn");
   else note(`The crew could not continue: ${err.message}`, "error");
   renderBoard();
+}
+
+// ── the device model on the crew ────────────────────────────────────────────
+// Keyless, with a model already on the machine: the brief before the
+// Consultant sees it, the plan at review (validated by the engine before it
+// is shown; the tree stands when it fails), the prose after the run (the
+// Critic's checks drop what the results do not carry). Every phase is bounded
+// (one or a few calls, 25 s each), never starts a download, and on failure
+// leaves the keyless result in place and says so in one line.
+
+const deviceLabel = () => localReaderLabel() || "this device";
+
+async function deviceOnCrew() {
+  return !modelForRun().provider && await localModelReady();
+}
+
+// The crew's prompts and schemas: the exported file next to the page when the
+// build made one, else what the engine in the worker exports, else none.
+async function loadPrompts() {
+  if (S.prompts !== undefined) return S.prompts;
+  let prompts = null;
+  try {
+    const resp = await fetch("./prompts.json?v=__BUILD__", { cache: "force-cache" });
+    if (resp.ok) prompts = await resp.json();
+  } catch { /* not shipped */ }
+  if (!prompts) {
+    try { prompts = await call("studio", { op: "prompts" }); } catch (err) { console.info("no prompts from the worker:", err && err.message); }
+  }
+  S.prompts = prompts && typeof prompts === "object" ? prompts : null;
+  return S.prompts;
 }
 
 // The first sentence, read on the device when a small model is already there
@@ -470,45 +617,145 @@ async function readOnDevice(text) {
   }
 }
 
-async function start(text) {
+// At review: the plan from the device, checked by the engine's validator
+// before the card shows it. Any call the reader makes meanwhile (Approve,
+// a change of brief) moves S.run on, and what arrives late is dropped.
+async function maybePlanOnDevice() {
+  if (!S.ws || S.ws.status !== "review" || ((S.ws.study || {}).plan || {}).author === "device") return;
+  if (!(await deviceOnCrew())) return;
+  const my = S.run;
+  let ctx;
+  try {
+    ctx = await call("studio", { op: "context", role: "methodologist", workspace: S.ws });
+  } catch (err) {
+    console.info("no methodologist context:", err && err.message);
+    return;
+  }
+  if (my !== S.run || !ctx || ctx.error) { if (ctx && ctx.error) console.info("methodologist context:", ctx.error); return; }
+  const prompts = await loadPrompts();
+  if (my !== S.run) return;
+  note("Planning on your device…");
+  const label = deviceLabel();
+  const { plan, error } = await planOnDevice({ context: ctx, prompts, generate: generateJsonLocally, onProgress: (m) => note(m) });
+  if (my !== S.run) return;
+  if (!plan) {
+    S.planLine = `the playbook's plan (the device model gave no plan: ${error})`;
+    note("");
+    renderBoard();
+    return;
+  }
+  let chk = null;
+  try {
+    chk = await call("studio", { op: "check_plan", workspace: S.ws, plan });
+  } catch (err) {
+    chk = { ok: false, errors: [err.message] };
+  }
+  if (my !== S.run) return;
+  note("");
+  if (chk && chk.ok === false) {
+    S.planLine = planLine({ used: "tree", errors: chk.errors && chk.errors.length ? chk.errors : ["no reason given"], model: label });
+    renderBoard();
+    return;
+  }
+  if (S.editing) {   // the reader is editing the tree's plan: that is the plan
+    S.planLine = "the playbook's plan";
+    return;
+  }
+  const steps = chk && Array.isArray(chk.steps) && chk.steps.length ? chk.steps : plan.steps;
+  S.proposal = { plan: { ...plan, steps }, steps, model: label };
+  S.planLine = planLine({ used: "proposed", model: label });
+  renderBoard();
+  focusBoard(".study-plan");
+  announce("The device wrote a plan; it is on the card.");
+}
+
+// After the run: the summary and the recommendations from the device, then
+// the steps while it is quick, handed to the engine's narrate, which keeps
+// only what the checks allow and remakes the documents.
+async function maybeNarrateOnDevice() {
+  if (!S.ws || S.ws.status !== "done") return;
+  if (!(await deviceOnCrew())) return;
+  const my = S.run;
+  let ctx;
+  try {
+    ctx = await call("studio", { op: "context", role: "author", workspace: S.ws });
+  } catch (err) {
+    console.info("no author context:", err && err.message);
+    return;
+  }
+  if (my !== S.run || !ctx || ctx.error) { if (ctx && ctx.error) console.info("author context:", ctx.error); return; }
+  const prompts = await loadPrompts();
+  if (my !== S.run) return;
+  const label = deviceLabel();
+  S.writing = true;
+  renderCompose("done");
+  note("Writing on your device…");
+  try {
+    const { sections, error } = await narrateOnDevice({ context: ctx, prompts, generate: generateJsonLocally, onProgress: (m) => note(m) });
+    if (my !== S.run) return;
+    if (!Object.keys(sections).length) {
+      S.proseLine = proseLine({ failed: `the device model ${error}` });
+      return;
+    }
+    note("Checking the prose…");
+    const res = await call("studio", { op: "narrate", workspace: S.ws, sections, source: "device" });
+    if (my !== S.run) return;
+    if (!res || res.error) {
+      S.proseLine = proseLine({ failed: (res && res.error) || "the engine kept the template text" });
+      return;
+    }
+    S.ws = res.workspace || S.ws;
+    const p = ((res.reply || {}).payload) || {};
+    S.proseLine = proseLine({ writtenBy: p.written_by || "device", dropped: p.dropped, model: label });
+    persist();
+  } catch (err) {
+    if (my !== S.run) return;
+    S.proseLine = proseLine({ failed: err.message });
+  } finally {
+    if (my === S.run) {
+      S.writing = false;
+      note("");
+      renderAll();
+    }
+  }
+}
+
+// ── start, say, approve ─────────────────────────────────────────────────────
+
+async function start(text, { intake: given = null } = {}) {
   const w = where();
   if (!w) { note("Pick a gauge or a spot on the map first.", "warn"); return; }
   const my = ++S.run;
   S.site = w;
+  S.siteReady = false;
   S.declined = null;
   S.editing = false;
   S.events = [];
   S.figures.clear();
+  S.proposal = null;
+  S.planLine = null;
+  S.proseLine = null;
   setBusy(true);
   note(state.workerReady ? "" : "Loading Python in your browser (about 15 MB, once)…");
   try {
-    let intake = null, brief = null;
-    if (!modelForRun().provider && await localModelReady()) {
+    let intake = given, brief = null;
+    if (!given && await deviceOnCrew()) {
       const read = await readOnDevice(text);
       if (my !== S.run) return;
       if (read) ({ intake, brief } = read);
     }
     await ensureCatalogInWorker();
-    // What only the page can read: the sub-basin row for describe_catchment,
-    // the catchment area and the donor pool for the reconnaissance.
-    const [catchment, area, pool] = await Promise.all([
-      catchmentForWorker(w.lat, w.lon).catch(() => null),
-      (state.selected ? stationArea(w.key).then((a) => (a ? a.area : null)) : catchmentAreaAt(w.lat, w.lon)).catch(() => null),
-      donorPoolSize().catch(() => 0),
-    ]);
+    await loadSiteInfo(w, my);
     if (my !== S.run) return;
-    S.catchment = catchment;
-    S.area = area;
-    S.donors = area ? Math.min(DONOR_K, pool) : null;
     const tables = {};
     for (const f of S.files) tables[f.id] = f.csv;
     note("");
     const res = await job("start", {
       lat: w.lat, lon: w.lon, text, tables, use_frame: Boolean(S.useMyData && hasTable()), frame_label: tableLabel(),
-      intake, brief,
+      intake, proposed: brief ? { brief, source: "device" } : null,
     });
     if (my !== S.run) return;
-    applyReply(res);
+    applyReply(res, "start");
   } catch (err) {
     if (my !== S.run) return;
     failed(err);
@@ -516,24 +763,30 @@ async function start(text) {
 }
 
 async function callStudio(op, extra = {}) {
-  if (S.busy || !S.ws) return;
+  if (S.busy || S.writing || !S.ws) return;
   const my = ++S.run;
   S.events = [];
   S.declined = null;
   setBusy(true);
   try {
-    // A run may reach for donors (similar_basins, regionalize_signatures); the worker cannot read the
-    // parquet tables, so the page hands over the ones it holds, once.
-    if ((op === "approve" || op === "follow_up") && S.catchment && !("donors_tables" in extra)) {
-      extra = { ...extra, donors_tables: await donorTablesForWorker().catch((err) => {
-        console.warn("donor tables unavailable, the donor steps will say so:", err && err.message);
-        return null;
-      }) };
+    if (op === "approve" || op === "follow_up") {
+      await ensureCatalogInWorker();
+      // A resumed study (a reload, a dropped workspace.json) has not read its site yet.
+      if (S.site && !S.siteReady) await loadSiteInfo(S.site, my);
       if (my !== S.run) return;
+      // A run may reach for donors (similar_basins, regionalize_signatures); the worker cannot read the
+      // parquet tables, so the page hands over the ones it holds, once.
+      if (S.catchment && !("donors_tables" in extra)) {
+        extra = { ...extra, donors_tables: await donorTablesForWorker().catch((err) => {
+          console.warn("donor tables unavailable, the donor steps will say so:", err && err.message);
+          return null;
+        }) };
+        if (my !== S.run) return;
+      }
     }
     const res = await job(op, extra);
     if (my !== S.run) return;
-    applyReply(res);
+    applyReply(res, op);
   } catch (err) {
     if (my !== S.run) return;
     failed(err);
@@ -542,7 +795,7 @@ async function callStudio(op, extra = {}) {
 
 function send(given) {
   const text = (given !== undefined ? given : $("study-text").value).trim();
-  if (!text || S.busy) return;
+  if (!text || S.busy || S.writing) return;
   if (!S.ws) { start(text); return; }
   const st = S.ws.status;
   if (st === "done") callStudio("follow_up", { text });
@@ -559,13 +812,13 @@ function coerce(raw) {
   return t;
 }
 
-// The inputs that differ from the plan, as the Methodologist's edits:
-// {step id: {arguments: {name: value}}}, revalidated in the worker.
-function readEdits() {
+// The inputs that differ from the steps on the card, as the Methodologist's
+// edits: {step id: {arguments: {name: value}}}, revalidated in the worker.
+function readEdits(steps) {
   const edits = {};
-  const steps = new Map(((S.ws.study || {}).steps || []).map((s) => [s.id, s]));
+  const byId = new Map(steps.map((s) => [s.id, s]));
   for (const input of board().querySelectorAll("input[data-step]")) {
-    const s = steps.get(input.dataset.step);
+    const s = byId.get(input.dataset.step);
     if (!s || !input.value.trim()) continue;
     const old = (s.arguments || {})[input.dataset.arg];
     if (fmtArg(old) === input.value.trim()) continue;
@@ -575,7 +828,16 @@ function readEdits() {
 }
 
 function approve() {
-  const edits = S.editing ? readEdits() : null;
+  if (S.proposal) {
+    // The device's plan, with the reader's edits folded in, goes as the proposed plan: the engine validates it
+    // again and runs it, or runs the tree and says why.
+    const edits = S.editing ? readEdits(S.proposal.steps) : null;
+    const steps = S.proposal.steps.map((s) => (edits && edits[s.id]
+      ? { ...s, arguments: { ...(s.arguments || {}), ...edits[s.id].arguments } } : s));
+    callStudio("approve", { plan: { ...S.proposal.plan, steps }, edits: null });
+    return;
+  }
+  const edits = S.editing ? readEdits(((S.ws.study || {}).steps || [])) : null;
   callStudio("approve", { edits });
 }
 
@@ -586,22 +848,221 @@ function decline() {
   $("study-text").focus({ preventScroll: true });
 }
 
+// Stop that means stop: the worker is terminated and boots again (the
+// progress bar as at first load). The page's copy of the workspace is the one
+// from before the run, so the plan is kept; the figures the run had drawn are
+// gone with the worker; the next Approve rebuilds the study from this copy.
+function stop() {
+  if (!S.busy) return;
+  const stoppedJob = S.jobId;
+  S.run++;
+  restartWorker();
+  S.busy = false;
+  state.study.running = false;
+  S.cancel = null;
+  S.jobId = null;
+  for (const [id, f] of S.figures) if (f.job === stoppedJob) S.figures.delete(id);
+  S.events = [];
+  renderAll();
+  note(S.ws ? "Stopped; the figures made so far are gone, the plan is kept." : "Stopped.", "warn");
+}
+
 function reset() {
   S.run++;
   if (S.cancel) S.cancel();
   S.ws = null;
   S.site = null;
+  S.siteReady = false;
   S.declined = null;
   S.editing = false;
   S.busy = false;
+  S.writing = false;
   state.study.running = false;
   S.files = [];
   S.useMyData = false;
   S.figures.clear();
   S.events = [];
+  S.proposal = null;
+  S.planLine = null;
+  S.proseLine = null;
+  S.planSource = null;
+  S.recorded = null;
+  state.study.recorded = null;
   note("");
   renderAll();
+  refreshResume();
+  if (drawerOpen()) writeUrl();
 }
+
+// ── saved studies ───────────────────────────────────────────────────────────
+// After every reply the workspace (without bytes) and the PNG figures go to
+// IndexedDB under the workspace id; the last five are kept. The intake board
+// offers the latest one at the place on screen (or, with nothing picked, the
+// latest anywhere), and a dropped workspace.json from a bundle resumes too.
+
+async function blobOf(src) {
+  const r = await fetch(src);
+  return r.blob();
+}
+
+async function persist() {
+  if (!S.ws || !S.site) return;
+  try {
+    const figures = {};
+    for (const [id, f] of S.figures) {
+      if (f.src) figures[id] = { blob: await blobOf(f.src), caption: f.caption || "", step: f.step || null };
+    }
+    const { key, lat, lon, text } = S.site;
+    await saveStudy({ id: S.ws.id, at: Date.now(), site: { key, lat, lon, text }, ws: S.ws, figures,
+                      lines: { plan: S.planLine, prose: S.proseLine } });
+  } catch (err) {
+    console.info("study not saved:", err && err.message);
+  }
+}
+
+async function refreshResume() {
+  const w = where();
+  let rec = null;
+  try { rec = await latestStudy(w ? w.key : null); } catch { rec = null; }
+  S.resume = rec && rec.site ? rec : null;
+  if (!S.ws && !S.busy && drawerOpen() && drawerMode() === "study") renderBoard();
+}
+
+function openWorkspace(ws, figures, lines = {}) {
+  S.run++;
+  S.ws = ws;
+  S.site = siteFrom({ ...(ws.site || {}), ...(S.resume && S.resume.id === ws.id ? S.resume.site : {}) });
+  S.siteReady = false;
+  S.declined = null;
+  S.editing = false;
+  S.busy = false;
+  S.writing = false;
+  state.study.running = false;
+  S.events = [];
+  S.figures = figures;
+  S.proposal = null;
+  S.planLine = lines.plan || null;
+  S.proseLine = lines.prose || null;
+  S.recorded = null;
+  state.study.recorded = null;
+  note("");
+  renderAll();
+  announce(`Study resumed: ${statusWord(ws.status)}.`);
+}
+
+// ── the recorded studies ────────────────────────────────────────────────────
+// Made once with a model and committed under showcase/studies/ (docs/studio.md,
+// "Recorded studies"). The index is read once and offered as chips; a chip
+// opens the recording as its finished board, with no worker call; Re-run live
+// starts the same study at the recorded site and approves the recorded plan,
+// which runs here keyless through the validator and the gates.
+
+async function loadIndex() {
+  if (S.index !== undefined) return S.index;
+  try {
+    const data = await recordedIndex(RECORDED_BASE, { version: "__BUILD__" });
+    S.index = data.studies.filter((r) => r && r.id);
+  } catch (err) {
+    console.info("recorded studies unavailable:", err && err.message);
+    S.index = [];
+  }
+  if (!S.ws && !S.busy && drawerOpen() && drawerMode() === "study") renderBoard();
+  return S.index;
+}
+
+async function openRecorded(id) {
+  note("Opening the recorded study…");
+  let rec;
+  try {
+    rec = await loadRecorded(RECORDED_BASE, id, { version: "__BUILD__" });
+  } catch (err) {
+    note(`Could not open that recording: ${err.message}`, "error");
+    return;
+  }
+  if (!rec.workspace || !rec.workspace.status) { note("That recording carries no study.", "warn"); return; }
+  S.run++;
+  if (S.cancel) S.cancel();
+  const site = (rec.meta && rec.meta.site) || rec.workspace.site || {};
+  S.ws = rec.workspace;
+  S.recorded = rec;
+  S.site = siteFrom({ lat: site.lat, lon: site.lon, text: site.name, key: `rec/${rec.id}` });
+  S.siteReady = false;
+  S.declined = null;
+  S.editing = false;
+  S.busy = false;
+  S.writing = false;
+  state.study.running = false;
+  state.study.recorded = rec.id;
+  S.files = [];
+  S.events = [];
+  S.figures = new Map(recordedFigures(rec).map((f) => [f.id, f]));
+  S.proposal = null;
+  S.planLine = null;
+  S.proseLine = null;
+  S.planSource = null;
+  note("");
+  renderAll();
+  if (drawerOpen()) writeUrl();
+  focusBoard(".study-answer");
+  announce(`Recorded study opened: ${(rec.meta && rec.meta.title) || rec.id}.`);
+}
+
+// The same study at the recorded site, live: the point on the map (so the URL and the header say where),
+// the recorded text and intake as the brief, the defaults for any question, the recorded plan approved.
+async function rerunRecorded() {
+  const rec = S.recorded;
+  if (!rec || S.busy) return;
+  const b = replayBrief(rec.workspace);
+  const plan = replayPlan(rec.workspace);
+  if (!Number.isFinite(Number(b.lat)) || !Number.isFinite(Number(b.lon))) { note("This recording has no site.", "warn"); return; }
+  const model = (rec.meta && rec.meta.model) || null;
+  S.recorded = null;
+  state.study.recorded = null;
+  S.ws = null;
+  S.figures = new Map();
+  S.files = Object.entries(b.tables || {}).filter(([, csv]) => typeof csv === "string" && csv).map(([id, csv]) => ({ id, csv }));
+  S.useMyData = false;
+  try { actions.selectPoint(Number(b.lat), Number(b.lon), { fly: true, push: true }); } catch (err) { console.warn(err); }
+  openDrawer({ mode: "study" });
+  await start(b.text || (rec.meta && rec.meta.problem) || "", { intake: b.intake });
+  if (S.ws && S.ws.status === "intake" && openQuestions().length) await callStudio("say", { text: "just go" });
+  if (!S.ws || S.ws.status !== "review") return;
+  S.planSource = plan ? "recorded" : null;
+  S.planModel = model;
+  await callStudio("approve", plan ? { plan: { ...plan, source: "recorded" }, edits: null } : { edits: null });
+}
+
+async function resumeSaved() {
+  if (!S.resume) return;
+  const rec = await loadStudy(S.resume.id);
+  if (!rec || !rec.ws) { note("That study is no longer in this browser.", "warn"); S.resume = null; renderBoard(); return; }
+  const figures = new Map();
+  for (const [id, f] of Object.entries(rec.figures || {})) {
+    try {
+      figures.set(id, { id, src: URL.createObjectURL(f.blob), caption: f.caption || "", step: f.step, job: null });
+    } catch { /* a figure that cannot be shown is fetched by id */ }
+  }
+  openWorkspace(rec.ws, figures, rec.lines || {});
+}
+
+// A workspace.json from a bundle (or the CLI): the study as it was, without
+// bytes; the figures and the documents come back with the next run.
+function resumeWorkspace(obj) {
+  const ws = { ...obj };
+  const figures = new Map();
+  ws.artifacts = (ws.artifacts || []).map((a) => {
+    if (a && a.data && a.media_type === "image/png") {
+      figures.set(a.id, { id: a.id, src: `data:image/png;base64,${a.data}`, caption: a.caption || "", step: a.step, job: null });
+    }
+    const { data: _bytes, ...rest } = a || {};
+    return rest;
+  });
+  S.resume = null;
+  openWorkspace(ws, figures);
+  persist();
+}
+
+const looksLikeWorkspace = (obj) => Boolean(obj && typeof obj === "object" && obj.id && obj.status && obj.brief && obj.site);
 
 // ── files in, files out ─────────────────────────────────────────────────────
 
@@ -624,11 +1085,20 @@ function saveBytes(name, b64, type) {
 }
 
 // A CSV goes in as it is; an Excel file is turned into CSV in the worker, so
-// every table travels in the workspace the same way and round-trips.
+// every table travels in the workspace the same way and round-trips. A
+// workspace.json resumes the study it carries.
 async function addFiles(list) {
   for (const file of list) {
     const id = file.name.replace(/\s+/g, "_");
     try {
+      if (/\.json$/i.test(file.name)) {
+        let obj = null;
+        try { obj = JSON.parse(await file.text()); } catch { obj = null; }
+        if (!looksLikeWorkspace(obj)) throw new Error("not a workspace.json from a study bundle");
+        resumeWorkspace(obj);
+        return;
+      }
+      if (S.ws) continue;   // tables are attached before a study starts
       if (/\.xlsx?$|\.xls$/i.test(file.name)) {
         note(`Reading ${file.name}…`);
         const res = await call("studio", { op: "table", name: file.name, data: toBase64(await file.arrayBuffer()) });
@@ -679,13 +1149,20 @@ function appendFigure(f) {
 
 // ── open, wire ──────────────────────────────────────────────────────────────
 
-export function openStudy({ fresh = false } = {}) {
+export function openStudy({ fresh = false, recorded = null } = {}) {
   const w = where();
   // "Study this place" on a panel: a study made elsewhere is finished with; one made here goes on.
   if (fresh && S.ws && (!w || !S.site || w.key !== S.site.key)) reset();
   openDrawer({ mode: "study" });
   renderAll();
+  refreshResume();
+  loadIndex();
+  if (recorded) { openRecorded(recorded); return; }
   if (!S.busy) $("study-text").focus({ preventScroll: true });
+}
+
+export function toggleStudy() {
+  if (drawerOpen() && drawerMode() === "study") closeDrawer(); else openStudy();
 }
 
 function onBoardClick(e) {
@@ -695,12 +1172,17 @@ function onBoardClick(e) {
     if (what === "approve") approve();
     else if (what === "edit") { S.editing = !S.editing; renderBoard(); }
     else if (what === "decline") decline();
-    else if (what === "stop") { if (S.cancel) S.cancel(); }
+    else if (what === "stop") stop();
     else if (what === "bundle") downloadArtifact("bundle");
     else if (what === "again") reset();
     else if (what === "my-data") { S.useMyData = !S.useMyData; renderBoard(); }
+    else if (what === "resume") resumeSaved();
+    else if (what === "rerun") rerunRecorded();
+    else if (what === "more-recorded") { S.moreRecorded = true; renderBoard(); }
     return;
   }
+  const chip = e.target.closest("[data-recorded]");
+  if (chip) { openRecorded(chip.dataset.recorded); return; }
   const file = e.target.closest("[data-file]");
   if (file) { e.preventDefault(); downloadArtifact(file.dataset.file); return; }
   const remove = e.target.closest("[data-remove]");
@@ -715,11 +1197,10 @@ function onBoardChange(e) {
   }
 }
 
+// Wired by app.js on first use (the Study button, the drawer's radio, "Study
+// this place", a #study=1 link); the Study button itself is wired there,
+// before anything is awaited (#271).
 export function initStudy() {
-  // Wired before anything is awaited, like the Ask button (#271).
-  $("btn-study").addEventListener("click", () => {
-    if (drawerOpen() && drawerMode() === "study") closeDrawer(); else openStudy();
-  });
   $("study-send").addEventListener("click", () => send());
   $("study-go").addEventListener("click", () => send("just go"));
   $("study-text").addEventListener("keydown", (e) => {
@@ -729,13 +1210,13 @@ export function initStudy() {
   el.addEventListener("click", onBoardClick);
   el.addEventListener("change", onBoardChange);
   for (const type of ["dragenter", "dragover"]) {
-    el.addEventListener(type, (e) => { if (S.ws || S.busy) return; e.preventDefault(); el.classList.add("over"); });
+    el.addEventListener(type, (e) => { if (S.busy || S.writing) return; e.preventDefault(); el.classList.add("over"); });
   }
   for (const type of ["dragleave", "drop"]) {
     el.addEventListener(type, (e) => { e.preventDefault(); el.classList.remove("over"); });
   }
   el.addEventListener("drop", (e) => {
-    if (S.ws || S.busy) return;
+    if (S.busy || S.writing) return;
     const files = e.dataTransfer && e.dataTransfer.files;
     if (files && files.length) addFiles([...files]);
   });
@@ -743,7 +1224,7 @@ export function initStudy() {
     const chip = e.target.closest("[data-answer]");
     if (chip) send(chip.dataset.answer);
   });
-  $("drawer").addEventListener("drawermode", (e) => { if (e.detail.mode === "study") renderAll(); });
+  $("drawer").addEventListener("drawermode", (e) => { if (e.detail.mode === "study") { renderAll(); refreshResume(); loadIndex(); } });
   onStudioProgress((event, id) => {
     if (id !== S.jobId) return;
     S.events.push(event);

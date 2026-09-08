@@ -1,0 +1,56 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# ERA5 reference evapotranspiration for the point and a 110-year gauge at it: the crop's seasonal demand, then the
+# run-of-river screening of the peak-month demand over the season, as the irrigation_feasibility with_gauge branch.
+id: irrigation_with_gauge_snake_plain
+playbook: irrigation_feasibility
+title: Irrigating 40 ha of maize from the Malad River
+brief: >-
+  Can I irrigate 40 hectares of maize planted in April at Gooding, Idaho, from the Malad River by sprinkler?
+  What does the crop need over the season, and can the river supply the peak month?
+intake:
+  crop: maize
+  area_ha: 40
+  planting_month: 4
+  efficiency: 0.7
+site:
+  name: Malad River near Gooding, Idaho
+  lat: 42.88639
+  lon: -114.80306
+  source: usgs
+  station_id: USGS-13152500
+  years: 110.4
+  recon: snake_plain_gauge
+expected_branch: with_gauge
+steps:
+  - tool: anywhere
+    method: fao56_et0
+    optional: true
+    gates:
+      - {check: not_empty, path: climate}
+    note: The climate frame; the crop demand step computes the FAO-56 ET0 itself, so this is context, not a requirement.
+  - tool: crop_water_demand
+    method: crop_water_requirement
+    gates:
+      - {check: not_empty, path: demand.gross_irrigation_mm}
+      - {check: not_empty, path: demand.peak_month_m3s}
+      - {check: not_empty, path: season.months}
+  - tool: supply_reliability
+    method: supply_reliability
+    gates:
+      - {check: min_years, path: years}
+      - {check: not_empty, path: reliability}
+      - {check: unit_present, path: unit}
+  - tool: analyze_station
+    method: flow_duration
+    optional: true
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [irrigation, reference_et, load_table]
+  methods: [spi, spei, groundwater_trend, sgi]
+rationale: >-
+  The demand comes first: FAO-56 reference ET0 from ERA5 for the point, the crop coefficient curve of maize over its
+  stage lengths from an April planting, effective rainfall subtracted, the net depth divided by the sprinkler
+  efficiency, over the seasons in the ERA5 window. The supply check then screens the peak-month demand against the
+  Malad River's 110-year record over the season's months, Q95 kept in the river. The table irrigation tools need a
+  weather table nobody attached.

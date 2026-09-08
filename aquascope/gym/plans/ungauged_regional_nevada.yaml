@@ -1,0 +1,43 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# No gauge within reach and ten donors: the regional branch of ungauged_flow, with the catchment description
+# required because the transfer runs on its attributes.
+id: ungauged_regional_nevada
+playbook: ungauged_flow
+title: Flow regime at an ungauged desert wash for an irrigation offtake
+brief: >-
+  A rancher wants to take water from this wash in the Big Smoky Valley for irrigation. What flow can it give:
+  the mean, the Q95 and the Q05? Nothing is gauged for a long way around.
+intake:
+  purpose: irrigation offtake
+  statistic: all
+site:
+  name: A bare point in the Big Smoky Valley, Nevada (no gauge within 50 km)
+  lat: 38.0
+  lon: -117.0
+  recon: nevada_point
+expected_branch: regional
+steps:
+  - tool: describe_catchment
+    gates:
+      - {check: not_empty, path: sub_basin}
+  - tool: similar_basins
+    method: similar_basins
+    gates:
+      - {check: min_donors, path: k}
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    gates:
+      - {check: not_empty, path: estimates}
+      - {check: not_empty, path: skill}
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+forbidden:
+  tools: [analyze_station, flood_frequency, get_timeseries, low_flow_context, load_table, flow_duration]
+  methods: [flow_duration, at_site_flood_frequency, low_flow_frequency, baseflow_separation, trend_mann_kendall,
+            gr4j_calibration]
+rationale: >-
+  With no gauge within 50 km every at-site method is not defensible; the flow regime is transferred from donor
+  catchments chosen by similarity (ten found, three needed), each signature with its band and leave-one-out skill,
+  and the catchment description comes first because the transfer runs on its attributes. GloFAS for the cell is
+  the indicative cross-check. A number with no band is not an estimate here.

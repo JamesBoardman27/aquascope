@@ -1,0 +1,84 @@
+# An AquaScope study (version 3): the plan behind an answer, its gates, and what happened.
+#   aquascope run study.yaml
+version: 3
+title: "Estimate the 50-year design flood discharge for a culvert at: 40.2, -8.0"
+question: "Use my attached table of daily flows for a culvert design on an ungauged stream: the 50-year flood, with two fits and their spread."
+created: "2026-09-07T14:23:41+00:00"
+aquascope_version: "0.14.0"
+author: "methodologist"
+model: "claude-sonnet-5"
+problem:
+  kind: "flood_risk"
+  site: {"lat": 40.2, "lon": -8.0}
+  params: {"return_period": 50, "decision": "design flow"}
+  text: "Use my attached table of daily flows for a culvert design on an ungauged stream: the 50-year flood, with two fits and their spread."
+plan:
+  author: "methodologist"
+  playbook: "flood_risk"
+  objective: "Estimate the 50-year design flood discharge for a culvert at the site (40.2 N, -8.0 E) from the client's own daily flow record, using two independent frequency-distribution fits and reporting the spread between them."
+  decision: "set the 50-year design flood discharge for the culvert at this site using the uploaded daily flow record upload:my_flows.csv as the at-site record, since no catalog gauge exists within 50 km"
+  methodology: ["Load the client's uploaded daily discharge table upload:my_flows.csv as the primary at-site record for this study.", "Screen the loaded series for gaps, duplicates and outliers before extracting annual maxima.", "Fit a GEV distribution to the annual maxima and extract return levels for T = 2 to 100 years, reading off the 50-year value.", "Fit a Log-Pearson III distribution to the same annual maxima and extract return levels for T = 2 to 100 years, reading off the 50-year value.", "Compute the spread between the two 50-year estimates as their absolute and relative difference, flagging disagreement if it exceeds 25 percent.", "Summarize the flow-duration curve of the record for context on typical and low flows relevant to culvert operation outside flood events."]
+  assumptions: ["the uploaded my_flows.csv (date, flow_m3s) is treated as the at-site discharge record for this point, overriding the catalog's 'no gauge within 50 km' finding since it is the client's own measurement", "annual maxima will be extracted from the daily series to fit two distributions (commonly Gumbel and GEV) for the 50-year event", "the requested spread is the difference between the two fitted 50-year estimates, used to bound design uncertainty", "record length and start/end dates are whatever the uploaded csv covers; not separately specified", "upload:my_flows.csv (date, flow_m3s) is treated as the at-site discharge record for the design point, overriding the catalog finding of no gauge within 50 km, per the client's brief.", "Annual maxima are extracted from the daily series internally by the return_periods tool for each distribution fit.", "The 50-year design flood is read as the T=50 value from each of the two return-period tables computed in s3 and s4.", "The spread between fits is the difference {{ result.s3.return_levels.50 }} minus {{ result.s4.return_levels.50 }} (m3/s), reported alongside both values rather than averaged.", "30 years of daily record (10957 points, full coverage) is accepted as sufficient for a 50-year return-period estimate, noting the return period is under 2x the record length."]
+  alternatives: [{"method": "similar_basins", "why_not": "The brief supplies an at-site record (the upload), which is the stronger evidence for this point and is what the brief asks to use; regionalization is the fallback path only when no at-site record exists."}, {"method": "regionalize_signatures", "why_not": "Signature regionalization estimates flow regime, not flood frequency directly; with an at-site daily record available it is unnecessary for the 50-year design flood."}, {"method": "glofas_cross_check", "why_not": "GloFAS is a ~5 km grid-cell model output, indicative only, and secondary to the client's own gauge-quality daily record for a design decision."}]
+  limitations_expected: ["The record (30 years) is shorter than twice the 50-year return period requested, so the tail estimate carries wide uncertainty regardless of distribution choice.", "GEV and LP3 fits can diverge materially in the tail; a spread above 25 percent should be treated as genuine disagreement between estimators, not resolved by averaging.", "The estimate is stationary; no climate-change adjustment is applied, and any such adjustment would need to be layered on separately.", "No independent at-site cross-check (e.g., a nearby gauge) exists within 50 km to validate the upload record's flood behavior."]
+  citations: ["England, J. F. et al. (2019). Guidelines for determining flood flow frequency, Bulletin 17C. USGS Techniques and Methods 4-B5.", "Hosking, J. R. M. (1990). L-moments: analysis and estimation of distributions using linear combinations of order statistics. J. R. Stat. Soc. B 52, 105-124.", "Wasko, C. et al. (2024). A systematic review of climate change science for flood and design guidance. Hydrol. Earth Syst. Sci. 28, 1251-1285. doi:10.5194/hess-28-1251-2024", "Nonstationary flood frequency estimates are parameter-fragile: Stoch. Environ. Res. Risk Assess. (2024), doi:10.1007/s00477-024-02680-9", "Multi-approach cross-checks in infrastructure flood practice: J. Hydrol. (2024), doi:10.1016/j.jhydrol.2024.130698", "Oudin, L. et al. (2008). Spatial proximity, physical similarity, regression and ungaged catchments. Water Resour. Res. 44, W03413.", "Harrigan, S. et al. (2020). GloFAS-ERA5 operational global river discharge reanalysis 1979-present. Earth Syst. Sci. Data 12, 2043-2060.", "Wasko et al. 2024, HESS"]
+  caveats: ["Design-flood guidance under climate change is immature (Wasko et al. 2024, HESS): the estimate here is stationary, and any climate scenario is an overlay on it, not a nonstationary fit.", "Rare quantiles move with the distribution and the estimator. Two fits (GEV by L-moments and Log-Pearson III) are quoted with their intervals and the spread between them; a spread above 25 percent is reported as disagreement, not averaged away.", "GloFAS discharge is a model output for a grid cell of about 5 km, not a gauge reading; return levels from it are indicative only."]
+  rationale: "Estimate the 50-year design flood discharge for a culvert at the site (40.2 N, -8.0 E) from the client's own daily flow record, using two independent frequency-distribution fits and reporting the spread between them."
+  recon_notes: ["No catalog gauge within 50 km; the nearest is La Nivelle \u00e0 Ciboure (hubeau_hydrometrie/S516001001) at 633 km.", "10 donor gauges from a pool of 37,071 gauged catchments.", "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.", "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted.", "No gauge with a usable record within 50 km: at-site methods are not defensible; what remains is the regionalisation path (similar_basins, regionalize_signatures) and the GloFAS cross-check.", "upload:my_flows.csv: discharge in m3/s; coverage 100.0 %"]
+steps:
+  - tool: "load_table"
+    id: "s1"
+    rationale: "The attached table upload:my_flows.csv (daily discharge, 30 years, 10957 rows) is the only at-site record for this ungauged point and is the record the brief points at."
+    arguments:
+      table: "upload:my_flows.csv"
+    expects:
+      - {"check": "not_empty", "path": "n"}
+      - {"check": "min_years", "path": "years", "value": 1}
+    outputs: [{"kind": "table", "id": "s1_series", "caption": "loaded daily discharge series from upload:my_flows.csv"}]
+  - tool: "quality"
+    id: "s2"
+    rationale: "Checking for duplicates, gaps and outliers before extracting annual maxima protects the frequency fits from spurious values."
+    arguments:
+      from_step: "s1"
+    depends_on: ["s1"]
+    outputs: [{"kind": "table", "id": "s2_quality", "caption": "data quality flags for upload:my_flows.csv"}]
+  - tool: "return_periods"
+    id: "s3"
+    rationale: "A GEV fit on the annual maxima gives the first of the two required 50-year flood estimates."
+    method: "at_site_flood_frequency"
+    arguments:
+      from_step: "s1"
+      distribution: "gev"
+      periods: [2, 5, 10, 25, 50, 100]
+    expects:
+      - {"check": "not_empty", "path": "return_levels"}
+    depends_on: ["s1", "s2"]
+    outputs: [{"kind": "figure", "id": "s3_frequency_curve", "caption": "GEV frequency curve for upload:my_flows.csv"}, {"kind": "table", "id": "s3_return_levels", "caption": "GEV return levels including the 50-year discharge (m3/s)"}]
+  - tool: "return_periods"
+    id: "s4"
+    rationale: "A Log-Pearson III fit on the same annual maxima gives the second, independent 50-year flood estimate needed to quote a spread."
+    method: "at_site_flood_frequency"
+    arguments:
+      from_step: "s1"
+      distribution: "lp3"
+      periods: [2, 5, 10, 25, 50, 100]
+    expects:
+      - {"check": "not_empty", "path": "return_levels"}
+    depends_on: ["s1", "s2"]
+    outputs: [{"kind": "figure", "id": "s4_frequency_curve", "caption": "Log-Pearson III frequency curve for upload:my_flows.csv"}, {"kind": "table", "id": "s4_return_levels", "caption": "LP3 return levels including the 50-year discharge (m3/s)"}]
+  - tool: "flow_duration"
+    id: "s5"
+    rationale: "The flow-duration curve gives context on the range of flows the culvert will see outside the design flood, supporting sizing checks beyond the 50-year peak."
+    method: "flow_duration"
+    arguments:
+      from_step: "s1"
+    expects:
+      - {"check": "not_empty", "path": "percentiles"}
+    depends_on: ["s1", "s2"]
+    outputs: [{"kind": "figure", "id": "s5_fdc", "caption": "flow-duration curve for upload:my_flows.csv"}, {"kind": "table", "id": "s5_fdc_percentiles", "caption": "flow duration percentiles for upload:my_flows.csv"}]
+results:
+  s1: {"ok": true, "gates": [{"check": "not_empty", "passed": true, "detail": "'n' is present"}, {"check": "min_years", "passed": true, "detail": "30 years of record, 1 needed"}], "summary": "source=upload, station_id=upload:my_flows.csv, name=upload:my_flows.csv, variable=discharge, unit=m3/s, years=30.0, start=1994-01-01, end=2023-12-31", "fallback_used": false, "sha256": "e4e07f9fdf8b8b5e"}
+  s2: {"ok": true, "gates": [], "summary": "n_records=10957, n_duplicates=0, completeness_pct=100.0", "fallback_used": false, "sha256": "e9ecaa1598dda775"}
+  s3: {"ok": true, "gates": [{"check": "not_empty", "passed": true, "detail": "'return_levels' is present"}], "summary": "column=value, distribution=gev, confidence_level=0.95, n_years=30", "fallback_used": false, "sha256": "a39912ddc8f0ddd8"}
+  s4: {"ok": true, "gates": [{"check": "not_empty", "passed": true, "detail": "'return_levels' is present"}], "summary": "column=value, distribution=lp3, confidence_level=0.95, n_years=30", "fallback_used": false, "sha256": "a67dc4315e15561e"}
+  s5: {"ok": true, "gates": [{"check": "not_empty", "passed": true, "detail": "'percentiles' is present"}], "summary": "column=value, n=10957", "fallback_used": false, "sha256": "89826ea3f36c433f"}

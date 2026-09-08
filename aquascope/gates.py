@@ -215,7 +215,7 @@ def _run_check(name: str, gate: dict[str, Any], payload: Any) -> tuple[bool, str
         if years is None or factor is None:
             return False, f"no record length at {path!r} to compare the return period with"
         if rp is None:
-            return False, "the gate names no return_period"
+            return True, "no return period asked, nothing to compare (not applicable)"
         cap = factor * years
         ok = rp <= cap
         return ok, (

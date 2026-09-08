@@ -1,0 +1,25 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# A health verdict over every hazard, sampled or not, is beyond any index over sampled parameters: declined.
+id: wq_health_verdict_declined_potomac
+playbook: water_quality
+title: A safe-to-drink verdict asked of an index over sampled parameters (declined)
+brief: >-
+  Is the Potomac water at the Little Falls intake safe to drink, yes or no? I want a verdict, not a score.
+intake:
+  use: drinking
+  years: 5
+  health_verdict: true
+site:
+  name: Potomac River near Washington, DC (Little Falls pump station)
+  lat: 38.94978
+  lon: -77.12764
+  source: usgs
+  station_id: USGS-01646500
+  years: 96.5
+  recon: potomac_little_falls
+decline: true
+decline_kind: declined
+rationale: >-
+  Whether the water is safe to drink is a judgement over every hazard present, including the pathogens, pesticides
+  and metals that were never sampled at the station; an index over the sampled parameters cannot make it. The
+  right plan declines the verdict and offers the index (see wq_drinking_potomac).

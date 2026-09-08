@@ -16,7 +16,7 @@ from typing import Any
 
 from aquascope.studio.workspace import Dataset, Inventory, Workspace
 
-__all__ = ["scout", "upload_dataset"]
+__all__ = ["choose_column", "scout", "upload_dataset"]
 
 ERA5_START = "1940-01-01"
 
@@ -66,9 +66,28 @@ def _resolution(index: Any) -> str:
     return f"{days:.0f} d"
 
 
-def upload_dataset(dataset_id: str, csv: str) -> Dataset:
+def choose_column(df: Any, mapping: Any, value_column: str | None) -> Any:
+    """The ingest mapping with ``value_column`` as the record (the client named it): guessed again over the
+    datetime column and that column alone, so the variable and the unit follow the column; the plain
+    override when that guess fails."""
+    from aquascope import ingest
+
+    if not value_column or value_column not in df.columns or value_column == mapping.value_column:
+        return mapping
+    try:
+        narrowed = ingest.guess_mapping(df[[mapping.datetime_column, value_column]])
+        if narrowed.value_column == value_column:
+            return narrowed
+    except (ValueError, TypeError, KeyError):
+        pass
+    mapping.value_column = value_column
+    return mapping
+
+
+def upload_dataset(dataset_id: str, csv: str, *, value_column: str | None = None) -> Dataset:
     """One upload as a dataset: the ingest mapping and QA when the table is a datetime/value series, the
-    column list and the row count when it is not (sample rows a workbench step can still take)."""
+    column list and the row count when it is not (sample rows a workbench step can still take).
+    ``value_column`` is the column the client named at intake."""
     import pandas as pd
 
     from aquascope import ingest
@@ -77,7 +96,7 @@ def upload_dataset(dataset_id: str, csv: str) -> Dataset:
     df.columns = [str(c).strip() for c in df.columns]
     columns = list(df.columns)
     try:
-        mapping = ingest.guess_mapping(df)
+        mapping = choose_column(df, ingest.guess_mapping(df), value_column)
         raw = ingest.apply_mapping(df, mapping)
         series, qa = ingest.qa_series(raw, n_rows_in=len(df))
     except (ValueError, TypeError, KeyError) as exc:
@@ -134,9 +153,10 @@ def scout(ws: Workspace) -> Inventory:
         note="precipitation, temperature and FAO-56 ET0 for a 9 km cell, any point on land; GloFAS modelled "
              "discharge for the same point, indicative",
     ))
+    chosen = ws.brief.intake.get("value_column")
     for dataset_id, csv in ws.tables.items():
         try:
-            ds = upload_dataset(dataset_id, csv)
+            ds = upload_dataset(dataset_id, csv, value_column=str(chosen) if chosen else None)
         except Exception as exc:  # noqa: BLE001 - a table that cannot be read is still listed
             ds = Dataset(id=dataset_id, kind="upload", source="upload", name=dataset_id,
                          quality={"verdict": "unreadable", "reason": f"{type(exc).__name__}: {exc}"})

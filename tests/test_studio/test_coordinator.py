@@ -50,10 +50,12 @@ def test_questions_round_trip_to_a_plan(studio_factory):
     s, calls = studio_factory()
     r = s.say("Can the river supply the town with 3 ML/day reliably?")
     assert r.kind == "questions" and s.workspace.status == "intake"
-    assert [q["id"] for q in r.questions] == ["demand_m3s"] and "just go" in r.text
+    assert [q["id"] for q in r.questions] == ["decision"] and "just go" in r.text, \
+        "the demand is in the text; what is decided is not"
     r2 = s.say("just go")
     assert r2.kind == "plan" and s.workspace.brief.playbook == "supply_reliability"
     assert s.workspace.brief.intake["demand_ml_day"] == 3.0 and s.workspace.brief.intake["use"] == "municipal"
+    assert s.workspace.brief.decision is None, "no default is invented for the decision"
     r3 = s.approve()
     assert r3.kind == "report" and [c[0] for c in calls][-1] == "supply_reliability"
     assert "reliable" in r3.text or any(k["label"] == "Verdict" for k in r3.payload["report"]["key_numbers"])

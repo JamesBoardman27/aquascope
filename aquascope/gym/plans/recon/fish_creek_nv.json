@@ -1,0 +1,292 @@
+{
+ "site": {
+  "lat": 40.1714111111111,
+  "lon": -117.207858333333,
+  "source": "usgs",
+  "station_id": "USGS-10326800",
+  "name": "FISH CK NR BATTLE MOUNTAIN, NV",
+  "country": "USA",
+  "variables": [
+   "discharge"
+  ],
+  "period_start": "1977-03-16",
+  "period_end": "1985-09-29",
+  "years": 8.5
+ },
+ "captured": "2026-09-07",
+ "command": "aquascope.explore.assess_site(40.1714111111111, -117.207858333333)",
+ "recon": {
+  "point": {
+   "lat": 40.17141,
+   "lon": -117.20786
+  },
+  "stations": [
+   {
+    "source": "usgs",
+    "station_id": "USGS-10326800",
+    "name": "FISH CK NR BATTLE MOUNTAIN, NV",
+    "distance_km": 0.0,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1977-03-16",
+    "period_end": "1985-09-29",
+    "years": 8.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/10326800/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-10326700",
+    "name": "REESE RV NR AUSTIN, NV",
+    "distance_km": 26.8,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1963-10-01",
+    "period_end": "1968-09-29",
+    "years": 5.0,
+    "url": "https://waterdata.usgs.gov/monitoring-location/10326700/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-402025116403501",
+    "name": "INDIAN CK AT CRESCENT VALLEY, NV",
+    "distance_km": 48.8,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "2025-04-30",
+    "period_end": "2026-08-29",
+    "years": 1.3,
+    "url": "https://waterdata.usgs.gov/monitoring-location/402025116403501/"
+   }
+  ],
+  "catchment": {
+   "hybas_id": 7120537040,
+   "area_km2": 190.0,
+   "upstream_area_km2": 190.0,
+   "n_sub_basins": 1,
+   "elevation_m": 1821.0,
+   "precipitation_mm_yr": 278.0,
+   "aridity": 0.24,
+   "dams": 0.0,
+   "source": "BasinATLAS (HydroATLAS v1.0)"
+  },
+  "context": {
+   "years_by_variable": {
+    "discharge": 8.5
+   },
+   "resolution_by_variable": {
+    "discharge": "daily"
+   },
+   "area_km2": 190.0,
+   "return_period": null,
+   "donors": 10,
+   "available": [
+    "forcing",
+    "glofas",
+    "temperature"
+   ],
+   "ungauged": false
+  },
+  "sufficiency": [
+   {
+    "method": "baseflow_separation",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Baseflow separation and baseflow index",
+    "tool": "baseflow",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "crop_water_requirement",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Crop water requirement (single or dual Kc)",
+    "tool": "crop_water_demand",
+    "station": null
+   },
+   {
+    "method": "fao56_et0",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "FAO-56 Penman-Monteith reference evapotranspiration",
+    "tool": "reference_et",
+    "station": null
+   },
+   {
+    "method": "flow_duration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow duration curve and Q95",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "glofas_cross_check",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GloFAS modelled discharge as an independent check",
+    "tool": "anywhere",
+    "station": null
+   },
+   {
+    "method": "gr4j_calibration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GR4J rainfall-runoff calibration",
+    "tool": "gr4j",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "regionalize_signatures",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow signatures transferred from donors",
+    "tool": "regionalize_signatures",
+    "station": null
+   },
+   {
+    "method": "spei_reanalysis",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "SPI and SPEI from ERA5 reanalysis for the cell (no rain gauge)",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "low_flow_frequency",
+    "status": "marginal",
+    "reason": "8.5 years of record, 10 wanted",
+    "label": "Low-flow frequency (annual minima)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "similar_basins",
+    "status": "marginal",
+    "reason": "meant for an ungauged point; a gauge is available here",
+    "label": "Donor gauges by catchment similarity",
+    "tool": "similar_basins",
+    "station": null
+   },
+   {
+    "method": "supply_reliability",
+    "status": "marginal",
+    "reason": "8.5 years of record, 10 wanted",
+    "label": "Run-of-river supply reliability against a demand (flow-duration screening)",
+    "tool": "supply_reliability",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "at_site_flood_frequency",
+    "status": "not_defensible",
+    "reason": "8.5 years of discharge, below the 10-year floor",
+    "label": "At-site flood frequency (GEV, LP3 / Bulletin 17C)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "climate_projection",
+    "status": "not_defensible",
+    "reason": "needs gcms of at least 3, not available here",
+    "label": "CMIP6 ensemble change factors on the baseline statistic",
+    "tool": "climate",
+    "station": null
+   },
+   {
+    "method": "groundwater_trend",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Groundwater-level trend (m/yr) with confidence interval",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "iwqi",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Irrigation water quality (SAR, sodium percentage, RSC, FAO 29 restriction)",
+    "tool": "iwqi",
+    "station": null
+   },
+   {
+    "method": "recharge_wtf",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Recharge by water-table fluctuation",
+    "tool": "recharge",
+    "station": null
+   },
+   {
+    "method": "sgi",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Standardized Groundwater Index",
+    "tool": "sgi_drought",
+    "station": null
+   },
+   {
+    "method": "spei",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation-Evapotranspiration Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "spi",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "trend_mann_kendall",
+    "status": "not_defensible",
+    "reason": "8.5 years of record, below the 10-year floor",
+    "label": "Mann-Kendall trend with Sen's slope",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-10326800"
+    }
+   },
+   {
+    "method": "water_quality_index",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Water quality index against guideline values (CCME WQI 1.0, NSF WQI)",
+    "tool": "wqi",
+    "station": null
+   }
+  ],
+  "notes": [
+   "Nearest water quality gauge is HUMBOLDT RV NR RYE PATCH, NV (usgs/USGS-10335000) at 99 km, beyond the 50 km radius; not counted.",
+   "Record resolution is not in the catalog; daily is assumed for every variable.",
+   "The discharge record at FISH CK NR BATTLE MOUNTAIN, NV (usgs/USGS-10326800) ends in 1985.",
+   "10 donor gauges from a pool of 37,053 gauged catchments.",
+   "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+   "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted."
+  ]
+ }
+}
