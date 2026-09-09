@@ -167,8 +167,16 @@ def _parse_historical_xml(xml_text: str) -> list[dict]:
     except ET.ParseError:
         return []
 
+    # The .asmx DataSet serialisation nests the rows two levels below the
+    # document root: <DataTable> holds <xs:schema> and <diffgr:diffgram>, and
+    # the <SerieHistorica> rows sit under <DocumentElement> inside the
+    # diffgram. Iterating the root's direct children therefore yields the
+    # schema and the diffgram themselves, not data, so walk the whole tree and
+    # take the row elements by name (verified against a live response).
     rows = []
-    for elem in root:
+    for elem in root.iter():
+        if _local_tag(elem) != "SerieHistorica":
+            continue
         row = {_local_tag(child): child.text for child in elem}
         if row:
             rows.append(row)

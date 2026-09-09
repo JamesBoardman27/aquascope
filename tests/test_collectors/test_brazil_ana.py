@@ -314,6 +314,38 @@ class TestBrazilANAHelpers:
 # Field names/structure below are transcribed from community-documented
 # HidroSerieHistorica usage, not a live response (see module docstring).
 
+# Captured from a live HidroSerieHistorica response (station 58235100,
+# tipoDados=1, 2000), trimmed to two rows. ASP.NET serialises the DataSet as a
+# diffgram, so the rows sit four levels down: DataTable > diffgram >
+# DocumentElement > SerieHistorica. A parser that reads the root's direct
+# children sees only the schema and the diffgram and returns no data.
+REAL_HISTORICAL_XML_DIFFGRAM = """<?xml version="1.0" encoding="utf-8"?>
+<DataTable xmlns="http://MRCS/">
+  <xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" \
+xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:MainDataTable="SerieHistorica" />
+  </xs:schema>
+  <diffgr:diffgram xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" \
+xmlns:diffgr="urn:schemas-microsoft-com:xml-diffgram-v1">
+    <DocumentElement xmlns="">
+      <SerieHistorica diffgr:id="SerieHistorica1" msdata:rowOrder="0">
+        <EstacaoCodigo>58235100</EstacaoCodigo>
+        <NivelConsistencia>2</NivelConsistencia>
+        <DataHora>2000-12-01 00:00:00</DataHora>
+        <Cota01>188</Cota01>
+        <Cota02>203</Cota02>
+      </SerieHistorica>
+      <SerieHistorica diffgr:id="SerieHistorica2" msdata:rowOrder="1">
+        <EstacaoCodigo>58235100</EstacaoCodigo>
+        <NivelConsistencia>1</NivelConsistencia>
+        <DataHora>2000-11-01 00:00:00</DataHora>
+        <Cota01>156</Cota01>
+      </SerieHistorica>
+    </DocumentElement>
+  </diffgr:diffgram>
+</DataTable>
+"""
+
 FAKE_HISTORICAL_XML_TWO_LEVELS = """<?xml version="1.0" encoding="utf-8"?>
 <DocumentElement>
   <SerieHistorica>
@@ -542,3 +574,20 @@ class TestBrazilANANormaliseHistorical:
         collector = BrazilANACollector(client=MagicMock())
         rows = [{"_mode": "historical", "_station_id": "1", "_variable": "discharge", "Vazao01": "5.0"}]
         assert collector.normalise(rows) == []
+
+
+def test_the_diffgram_shape_the_live_service_actually_returns_is_parsed():
+    """The real .asmx response nests rows under diffgram/DocumentElement.
+
+    Reading only the root's direct children yields the <xs:schema> and the
+    <diffgr:diffgram> wrapper instead of data, which is how this path returned
+    nothing against the live endpoint while the mocked suite stayed green.
+    """
+    rows = _parse_historical_xml(REAL_HISTORICAL_XML_DIFFGRAM)
+
+    assert len(rows) == 2, "the two SerieHistorica rows should be found four levels down"
+    assert rows[0]["EstacaoCodigo"] == "58235100"
+    assert rows[0]["DataHora"] == "2000-12-01 00:00:00"
+    assert rows[0]["Cota01"] == "188"
+    # the schema and diffgram wrappers must not be mistaken for rows
+    assert all("EstacaoCodigo" in r for r in rows)
