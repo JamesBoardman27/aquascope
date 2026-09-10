@@ -240,7 +240,7 @@ def test_strict_flags_integrity_failures() -> None:
 
 def test_build_results_friendly_error_when_metadata_missing(tmp_path, monkeypatch) -> None:
     """Missing committed metadata fails cleanly instead of tracebacking."""
-    monkeypatch.setattr(cb, "CATCHMENTS_FILE", tmp_path / "daily_catchments.json")
+    monkeypatch.setattr(cb, "DAILY_CATCHMENTS_FILE", tmp_path / "daily_catchments.json")
     monkeypatch.setattr(cb, "FFA_REFERENCE_FILE", tmp_path / "ffa_reference.json")
     monkeypatch.setattr(cb, "BENCHMARK_DIR", tmp_path)
     with pytest.raises(RuntimeError, match="daily_catchments.json and ffa_reference.json"):

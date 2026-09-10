@@ -28,7 +28,7 @@ from aquascope.hydrology.signatures import compute_signatures
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BENCHMARK_DIR = ROOT / "data" / "camels_benchmark"
 DAILY_DIR = BENCHMARK_DIR / "daily"
-CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
+DAILY_CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
 
 # ── tolerances ────────────────────────────────────────────────────────
 REL_TOL = 0.25  # ±25 % relative
@@ -39,7 +39,7 @@ PEAK_MONTH_TOL = 2  # ±2 calendar months (circular)
 # ── helpers ───────────────────────────────────────────────────────────
 
 def _load_catchments() -> list[dict]:
-    with open(CATCHMENTS_FILE) as f:
+    with open(DAILY_CATCHMENTS_FILE) as f:
         return json.load(f)
 
 

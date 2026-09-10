@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 HERE = pathlib.Path(__file__).resolve().parent
-CATCHMENTS_FILE = HERE / "daily_catchments.json"
+DAILY_CATCHMENTS_FILE = HERE / "daily_catchments.json"
 DAILY_DIR = HERE / "daily"
 
 N_YEARS = 10
@@ -113,7 +113,7 @@ def main() -> None:
     """Generate CSV files for all benchmark catchments."""
     rng = np.random.default_rng(42)
 
-    with open(CATCHMENTS_FILE) as f:
+    with open(DAILY_CATCHMENTS_FILE) as f:
         catchments = json.load(f)
 
     print(f"Generating synthetic data for {len(catchments)} catchments …\n")

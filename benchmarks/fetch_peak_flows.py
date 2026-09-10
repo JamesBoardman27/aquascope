@@ -45,7 +45,7 @@ import pandas as pd
 
 BASE = pathlib.Path(__file__).resolve().parent
 BENCHMARK_DIR = BASE.parent / "data" / "camels_benchmark"
-CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
+DAILY_CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
 PEAKS_DIR = BENCHMARK_DIR / "peaks"
 REFERENCE_FILE = BENCHMARK_DIR / "ffa_reference.json"
 
@@ -318,7 +318,7 @@ def _write_artifacts(peak_frames: dict[str, pd.DataFrame], reference: dict) -> N
 
 def main() -> None:
     """Fetch peak flows and compute reference quantiles for all gauges."""
-    with open(CATCHMENTS_FILE) as f:
+    with open(DAILY_CATCHMENTS_FILE) as f:
         catchments = json.load(f)
 
     reference: dict = {
