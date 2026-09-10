@@ -113,7 +113,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 01013500 | 0.011 | 0.011 | 0.022 | 0.045 |
+| 01013500 | 0.017 | 0.013 | 0.024 | 0.054 |
 
 ### 01664000 - Rappahannock River near Fredericksburg, VA (humid continental)
 
@@ -183,7 +183,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 01664000 | 0.012 | 0.015 | 0.024 | 0.051 |
+| 01664000 | 0.01 | 0.013 | 0.024 | 0.047 |
 
 ### 02231000 - St. Marys River near Macclenny, FL (subtropical)
 
@@ -253,7 +253,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 02231000 | 0.01 | 0.011 | 0.027 | 0.048 |
+| 02231000 | 0.012 | 0.011 | 0.022 | 0.045 |
 
 ### 03451500 - French Broad River at Asheville, NC (humid Appalachian)
 
@@ -323,7 +323,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 03451500 | 0.011 | 0.013 | 0.026 | 0.05 |
+| 03451500 | 0.011 | 0.014 | 0.02 | 0.045 |
 
 ### 06803500 - Salt Creek at Roca, NE (semi-arid Great Plains)
 
@@ -393,7 +393,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 06803500 | 0.01 | 0.009 | 0.023 | 0.042 |
+| 06803500 | 0.009 | 0.01 | 0.024 | 0.043 |
 
 ### 07056000 - Buffalo River near St. Joe, AR (humid interior)
 
@@ -463,7 +463,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 07056000 | 0.009 | 0.016 | 0.025 | 0.05 |
+| 07056000 | 0.009 | 0.011 | 0.023 | 0.044 |
 
 ### 08181500 - Medina River at San Antonio, TX (semi-arid)
 
@@ -533,7 +533,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 08181500 | 0.01 | 0.01 | 0.02 | 0.039 |
+| 08181500 | 0.008 | 0.01 | 0.018 | 0.036 |
 
 ### 09510200 - Cave Creek near Cave Creek, AZ (arid)
 
@@ -603,7 +603,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 09510200 | 0.01 | 0.013 | 0.025 | 0.047 |
+| 09510200 | 0.011 | 0.013 | 0.025 | 0.05 |
 
 ### 11532500 - Smith River near Crescent City, CA (Pacific Northwest rain)
 
@@ -673,7 +673,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 11532500 | 0.009 | 0.011 | 0.026 | 0.047 |
+| 11532500 | 0.01 | 0.012 | 0.026 | 0.048 |
 
 ### 14301000 - Nehalem River near Foss, OR (Pacific Northwest rain)
 
@@ -743,7 +743,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 14301000 | 0.011 | 0.012 | 0.019 | 0.041 |
+| 14301000 | 0.011 | 0.01 | 0.021 | 0.041 |
 
 ## Execution timings
 
@@ -753,18 +753,18 @@ Wall-clock seconds per stage, per catchment. Recorded and reported; never assert
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 01013500 | 0.011 | 0.011 | 0.022 | 0.045 |
-| 01664000 | 0.012 | 0.015 | 0.024 | 0.051 |
-| 02231000 | 0.01 | 0.011 | 0.027 | 0.048 |
-| 03451500 | 0.011 | 0.013 | 0.026 | 0.05 |
-| 06803500 | 0.01 | 0.009 | 0.023 | 0.042 |
-| 07056000 | 0.009 | 0.016 | 0.025 | 0.05 |
-| 08181500 | 0.01 | 0.01 | 0.02 | 0.039 |
-| 09510200 | 0.01 | 0.013 | 0.025 | 0.047 |
-| 11532500 | 0.009 | 0.011 | 0.026 | 0.047 |
-| 14301000 | 0.011 | 0.012 | 0.019 | 0.041 |
+| 01013500 | 0.017 | 0.013 | 0.024 | 0.054 |
+| 01664000 | 0.01 | 0.013 | 0.024 | 0.047 |
+| 02231000 | 0.012 | 0.011 | 0.022 | 0.045 |
+| 03451500 | 0.011 | 0.014 | 0.02 | 0.045 |
+| 06803500 | 0.009 | 0.01 | 0.024 | 0.043 |
+| 07056000 | 0.009 | 0.011 | 0.023 | 0.044 |
+| 08181500 | 0.008 | 0.01 | 0.018 | 0.036 |
+| 09510200 | 0.011 | 0.013 | 0.025 | 0.05 |
+| 11532500 | 0.01 | 0.012 | 0.026 | 0.048 |
+| 14301000 | 0.011 | 0.01 | 0.021 | 0.041 |
 
-- **Total runtime (s):** 0.46 s
+- **Total runtime (s):** 0.453 s
 ## Data and methods
 
 Discharge: synthetic daily series calibrated to CAMELS; peaks: USGS NWIS annual peak series, one value per USGS water year, screened for qualifier codes and censored values. Reference quantiles: GEV-MLE and LP3 via scipy, GEV-L-moments via lmoments3 (Hosking 1997). Full provenance per catchment in results.json.
