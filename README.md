@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21903143.svg)](https://doi.org/10.5281/zenodo.21903143)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-2500%2B%20passing-brightgreen.svg)](#)
 [![Live Explorer Demo – Runs in Your Browser](https://img.shields.io/badge/%F0%9F%8C%8A%20Live%20Demo-AquaScope%20Explorer-blue)](https://rekin226-aquascope-explorer.static.hf.space/)
 
 [![GitHub stars](https://img.shields.io/github/stars/Rekin226/aquascope?style=social)](https://github.com/Rekin226/aquascope/stargazers)
@@ -36,7 +36,7 @@
 
 ---
 
-AquaScope unifies **33 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 1,000+ tests.
+AquaScope unifies **33 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 2,500+ tests.
 
 ---
 
@@ -327,7 +327,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 
 ## 🧪 Scientifically validated
 
-- **1,000+ tests** — covering every collector, hydrology method, and pipeline (spatial and ARIMA tests require the optional `[all]` / `[ml]` extras)
+- **2,500+ tests** — covering every collector, hydrology method, and pipeline (spatial and ARIMA tests require the optional `[all]` / `[ml]` extras)
 - **CAMELS benchmark** — a 10-catchment validation subset of the [CAMELS dataset](https://ral.ucar.edu/solutions/products/camels) ships with the repo at `data/camels_benchmark/` and runs as part of CI
 - **Every method cited** — equations, decision trees, and DOI references for all 26 methodologies live in the [theory guide](docs/theory.md)
 - **JOSS paper in preparation** — see [`paper.md`](paper.md) and [`paper.bib`](paper.bib)

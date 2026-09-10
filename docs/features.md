@@ -92,7 +92,7 @@ For when-to-use-which guidance, see the [methodology matrix](methodology_matrix.
 
 ## Infrastructure
 
-- **1,000+ tests** with CAMELS benchmark validation
+- **2,500+ tests** with CAMELS benchmark validation
 - **Interactive dashboard** — 10-page Streamlit app
 - **29 CLI commands** — `collect`, `recommend`, `eda`, `quality`, `run`, `completion`, `list-methods`, `list-sources`, `stations`, `harvest`, `ask`, `ingest`, `basins`, `assess`, `gym`, `caravan`, `mcp`, `playbooks`, `solve`, `studio`, `studio-showcase`, `forecast`, `plot`, `dashboard`, `agri`, `alerts`, `groundwater`, `climate`, `hydro`
 - **[Theory guide](theory.md)** — mathematical equations, DOI citations, decision trees

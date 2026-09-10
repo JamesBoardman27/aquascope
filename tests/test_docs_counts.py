@@ -61,6 +61,24 @@ CROP_COUNT_PATTERNS = {
     "docs/features.md": [r"\*\*Crop water requirements\*\* — (\d+) crops"],
 }
 
+# The test total is a "N+" floor, not an exact count, so it cannot be derived
+# from a collection that is already running. What CI can check is that every
+# copy of it states the same floor. Re-derive the floor from a full run
+# (`python -m pytest -q | tail -1`) and round down, as the release pass does.
+TEST_FLOOR_PATTERNS = {
+    "README.md": [
+        r"tests-(\d+)%2B%20passing",
+        r"CAMELS benchmark with ([\d,]+)\+ tests",
+        r"\*\*([\d,]+)\+ tests\*\* — covering",
+    ],
+    "docs/index.md": [
+        r"tests-(\d+)%2B%20passing",
+        r"CAMELS benchmark with ([\d,]+)\+ tests",
+        r"\*\*([\d,]+)\+ tests\*\* across",
+    ],
+    "docs/features.md": [r"\*\*([\d,]+)\+ tests\*\* with"],
+}
+
 SIGNATURE_COUNT_PATTERNS = {
     "README.md": [r"(\d+) hydrological signatures"],
     "docs/index.md": [r"(\d+) hydrological signatures"],
@@ -110,6 +128,18 @@ def test_crop_counts_match_the_kc_table():
 
 def test_signature_counts_match_the_report():
     _check(SIGNATURE_COUNT_PATTERNS, len(dataclasses.fields(SignatureReport)), "signatures")
+
+
+def test_the_test_floor_is_stated_the_same_everywhere():
+    """The badge and the prose copies drifted apart before (1,000+ against 820+)."""
+    stated = {}
+    for relative, patterns in TEST_FLOOR_PATTERNS.items():
+        text = _read(relative)
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            assert match is not None, f"{relative} no longer contains the phrase for {pattern!r}"
+            stated[f"{relative}: {pattern}"] = int(match.group(1).replace(",", ""))
+    assert len(set(stated.values())) == 1, f"the stated test floor disagrees across files: {stated}"
 
 
 def test_cli_counts_match_the_parser():
