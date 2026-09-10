@@ -1,0 +1,444 @@
+{
+  "metadata": {
+    "generated": "2026-09-05",
+    "source": "USGS NWIS peak-flow service",
+    "return_periods": [
+      2,
+      5,
+      10,
+      25,
+      50,
+      100
+    ],
+    "note": "Reference quantiles computed independently of AquaScope: GEV-MLE and LP3 via scipy, GEV-LMoments via lmoments3 (Hosking 1997), on USGS annual peak series. Rows carrying USGS qualifier codes 3/4/8 (dam failure / censored), plus non-positive, sentinel, undated, or duplicate-water-year records, are excluded; see each catchment's data_quality for row counts. Serves as a cross-check, not ground truth."
+  },
+  "catchments": {
+    "01013500": {
+      "name": "Fish River near Fort Kent, ME",
+      "num_records": 101,
+      "start_year": 1904,
+      "end_year": 2025,
+      "mle_stable": true,
+      "scipy_gev": {
+        "2": 168.23,
+        "5": 289.81,
+        "10": 348.4,
+        "25": 404.24,
+        "50": 435.62,
+        "100": 460.28
+      },
+      "scipy_gev_lmoments": {
+        "2": 234.33,
+        "5": 302.09,
+        "10": 345.01,
+        "25": 397.15,
+        "50": 434.37,
+        "100": 470.12
+      },
+      "scipy_lp3": {
+        "2": 237.52,
+        "5": 305.4,
+        "10": 345.06,
+        "25": 390.37,
+        "50": 421.21,
+        "100": 449.93
+      },
+      "data_quality": {
+        "rows_downloaded": 101,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 101,
+        "qualifiers_seen": {},
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 101
+      }
+    },
+    "01664000": {
+      "name": "Rappahannock River near Fredericksburg, VA",
+      "num_records": 104,
+      "start_year": 1885,
+      "end_year": 2025,
+      "mle_stable": true,
+      "scipy_gev": {
+        "2": 363.87,
+        "5": 616.63,
+        "10": 837.47,
+        "25": 1197.06,
+        "50": 1537.54,
+        "100": 1953.77
+      },
+      "scipy_gev_lmoments": {
+        "2": 357.12,
+        "5": 607.37,
+        "10": 833.59,
+        "25": 1213.8,
+        "50": 1584.8,
+        "100": 2050.22
+      },
+      "scipy_lp3": {
+        "2": 362.58,
+        "5": 632.82,
+        "10": 862.92,
+        "25": 1218.92,
+        "50": 1536.13,
+        "100": 1901.89
+      },
+      "data_quality": {
+        "rows_downloaded": 104,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 104,
+        "qualifiers_seen": {
+          "1": 1,
+          "2": 23,
+          "O": 2
+        },
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 104
+      }
+    },
+    "02231000": {
+      "name": "St. Marys River near Macclenny, FL",
+      "num_records": 99,
+      "start_year": 1927,
+      "end_year": 2025,
+      "mle_stable": false,
+      "scipy_gev": {
+        "2": 22.84,
+        "5": 131.66,
+        "10": 2142.81,
+        "25": 89150.44,
+        "50": 1426846.68,
+        "100": 22378490.24
+      },
+      "scipy_gev_lmoments": {
+        "2": 156.65,
+        "5": 304.6,
+        "10": 439.47,
+        "25": 667.92,
+        "50": 892.47,
+        "100": 1175.97
+      },
+      "scipy_lp3": {
+        "2": 151.66,
+        "5": 311.16,
+        "10": 461.16,
+        "25": 711.23,
+        "50": 948.1,
+        "100": 1234.16
+      },
+      "data_quality": {
+        "rows_downloaded": 99,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 99,
+        "qualifiers_seen": {},
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 99
+      }
+    },
+    "03451500": {
+      "name": "French Broad River at Asheville, NC",
+      "num_records": 130,
+      "start_year": 1896,
+      "end_year": 2025,
+      "mle_stable": true,
+      "scipy_gev": {
+        "2": 406.72,
+        "5": 632.18,
+        "10": 823.28,
+        "25": 1125.83,
+        "50": 1404.73,
+        "100": 1737.92
+      },
+      "scipy_gev_lmoments": {
+        "2": 403.98,
+        "5": 633.25,
+        "10": 834.22,
+        "25": 1162.44,
+        "50": 1474.1,
+        "100": 1856.02
+      },
+      "scipy_lp3": {
+        "2": 396.96,
+        "5": 634.52,
+        "10": 843.85,
+        "25": 1180.33,
+        "50": 1492.36,
+        "100": 1865.46
+      },
+      "data_quality": {
+        "rows_downloaded": 140,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 10,
+        "rows_kept": 130,
+        "qualifiers_seen": {
+          "9": 2
+        },
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 130
+      }
+    },
+    "06803500": {
+      "name": "Salt Creek at Roca, NE",
+      "num_records": 76,
+      "start_year": 1950,
+      "end_year": 2025,
+      "mle_stable": false,
+      "scipy_gev": {
+        "2": 26.26,
+        "5": 539.57,
+        "10": 7705.97,
+        "25": 229913.58,
+        "50": 2859415.12,
+        "100": 34908723.47
+      },
+      "scipy_gev_lmoments": {
+        "2": 242.4,
+        "5": 423.63,
+        "10": 558.15,
+        "25": 746.69,
+        "50": 901.32,
+        "100": 1068.49
+      },
+      "scipy_lp3": {
+        "2": 242.36,
+        "5": 444.32,
+        "10": 579.75,
+        "25": 742.87,
+        "50": 855.89,
+        "100": 960.79
+      },
+      "data_quality": {
+        "rows_downloaded": 76,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 76,
+        "qualifiers_seen": {
+          "5": 5,
+          "6": 58
+        },
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 76
+      }
+    },
+    "07056000": {
+      "name": "Buffalo River near St. Joe, AR",
+      "num_records": 86,
+      "start_year": 1940,
+      "end_year": 2024,
+      "mle_stable": true,
+      "scipy_gev": {
+        "2": 1056.78,
+        "5": 1812.23,
+        "10": 2429.17,
+        "25": 3372.97,
+        "50": 4214.94,
+        "100": 5192.99
+      },
+      "scipy_gev_lmoments": {
+        "2": 1082.33,
+        "5": 1835.04,
+        "10": 2409.02,
+        "25": 3233.54,
+        "50": 3926.03,
+        "100": 4689.97
+      },
+      "scipy_lp3": {
+        "2": 1071.61,
+        "5": 1874.98,
+        "10": 2471.25,
+        "25": 3277.57,
+        "50": 3907.88,
+        "100": 4558.02
+      },
+      "data_quality": {
+        "rows_downloaded": 86,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 86,
+        "qualifiers_seen": {
+          "R": 11
+        },
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 86
+      }
+    },
+    "08181500": {
+      "name": "Medina River at San Antonio, TX",
+      "num_records": 86,
+      "start_year": 1940,
+      "end_year": 2025,
+      "mle_stable": false,
+      "scipy_gev": {
+        "2": 122.83,
+        "5": 312.97,
+        "10": 551.79,
+        "25": 1100.02,
+        "50": 1816.25,
+        "100": 2973.25
+      },
+      "scipy_gev_lmoments": {
+        "2": 137.58,
+        "5": 314.42,
+        "10": 491.29,
+        "25": 818.13,
+        "50": 1166.92,
+        "100": 1639.58
+      },
+      "scipy_lp3": {
+        "2": 129.23,
+        "5": 331.92,
+        "10": 541.91,
+        "25": 912.06,
+        "50": 1275.15,
+        "100": 1722.37
+      },
+      "data_quality": {
+        "rows_downloaded": 86,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 86,
+        "qualifiers_seen": {
+          "2": 2,
+          "5": 1,
+          "6": 86
+        },
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 86
+      }
+    },
+    "09510200": {
+      "name": "Cave Creek near Cave Creek, AZ",
+      "num_records": 56,
+      "start_year": 1959,
+      "end_year": 2015,
+      "mle_stable": false,
+      "scipy_gev": {
+        "2": 62.15,
+        "5": 186.05,
+        "10": 361.38,
+        "25": 813.18,
+        "50": 1469.68,
+        "100": 2633.6
+      },
+      "scipy_gev_lmoments": {
+        "2": 81.09,
+        "5": 190.9,
+        "10": 291.4,
+        "25": 462.27,
+        "50": 630.84,
+        "100": 844.31
+      },
+      "scipy_lp3": {
+        "2": 70.86,
+        "5": 207.94,
+        "10": 337.33,
+        "25": 534.18,
+        "50": 698.02,
+        "100": 871.32
+      },
+      "data_quality": {
+        "rows_downloaded": 56,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 56,
+        "qualifiers_seen": {},
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 56
+      }
+    },
+    "11532500": {
+      "name": "Smith River near Crescent City, CA",
+      "num_records": 94,
+      "start_year": 1932,
+      "end_year": 2024,
+      "mle_stable": false,
+      "scipy_gev": {
+        "2": 344.75,
+        "5": 2079.62,
+        "10": 147787.61,
+        "25": 40338648.09,
+        "50": 2592319741.95,
+        "100": 161550980185.42
+      },
+      "scipy_gev_lmoments": {
+        "2": 2141.46,
+        "5": 3045.72,
+        "10": 3637.22,
+        "25": 4376.5,
+        "50": 4919.16,
+        "100": 5452.99
+      },
+      "scipy_lp3": {
+        "2": 2210.75,
+        "5": 3126.37,
+        "10": 3629.65,
+        "25": 4162.27,
+        "50": 4495.51,
+        "100": 4783.45
+      },
+      "data_quality": {
+        "rows_downloaded": 94,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 94,
+        "qualifiers_seen": {},
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 94
+      }
+    },
+    "14301000": {
+      "name": "Nehalem River near Foss, OR",
+      "num_records": 84,
+      "start_year": 1939,
+      "end_year": 2022,
+      "mle_stable": true,
+      "scipy_gev": {
+        "2": 781.82,
+        "5": 1040.32,
+        "10": 1197.97,
+        "25": 1383.01,
+        "50": 1510.75,
+        "100": 1630.06
+      },
+      "scipy_gev_lmoments": {
+        "2": 787.15,
+        "5": 1035.37,
+        "10": 1180.32,
+        "25": 1344.0,
+        "50": 1452.79,
+        "100": 1551.19
+      },
+      "scipy_lp3": {
+        "2": 796.03,
+        "5": 1047.19,
+        "10": 1181.89,
+        "25": 1323.61,
+        "50": 1412.45,
+        "100": 1489.66
+      },
+      "data_quality": {
+        "rows_downloaded": 84,
+        "rows_removed_qualifier": 0,
+        "rows_removed_bad_value": 0,
+        "rows_kept": 84,
+        "qualifiers_seen": {
+          "2": 1
+        },
+        "rows_removed_missing_date": 0,
+        "rows_removed_duplicate": 0,
+        "water_years": 84
+      }
+    }
+  }
+}

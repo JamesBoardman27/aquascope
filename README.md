@@ -36,7 +36,7 @@
 
 ---
 
-AquaScope unifies **29 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 1,000+ tests.
+AquaScope unifies **30 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 1,000+ tests.
 
 ---
 
@@ -81,7 +81,7 @@ For the full capability list see [docs/features.md](docs/features.md).
 | Non-stationary GEV | ✅ | — | partial | — |
 | Baseflow separation (Lyne-Hollick, Eckhardt) | ✅ | — | — | — |
 | FAO-56 Penman-Monteith ET₀ + crop water | ✅ | — | — | — |
-| 29 unified data collectors | ✅ | — | — | per-source |
+| 30 unified data collectors | ✅ | — | — | per-source |
 | AI methodology recommender (OpenAI / Groq / HF / Ollama) | ✅ | — | — | — |
 | Interactive Streamlit dashboard | ✅ | — | — | — |
 | Free, MIT, Python-native | ✅ | partial | ✅ | varies |
@@ -148,7 +148,7 @@ print(sig.flashiness_index)    # Richards-Baker flashiness index
 
 22 signatures across magnitude, variability, timing, recession, and flashiness — see [docs/features.md](docs/features.md#hydrological-analysis).
 
-### 3. Collect data from any of the 29 sources
+### 3. Collect data from any of the 30 sources
 
 ```python
 from aquascope import find_stations
@@ -314,7 +314,7 @@ Run `aquascope --help` for the full command list.
 
 ## 🌍 Data sources at a glance
 
-29 data collectors spanning four regions (highlights below, full list in the [docs](docs/data_sources.md)):
+30 data collectors spanning four regions (highlights below, full list in the [docs](docs/data_sources.md)):
 
 - 🌎 **Americas** — USGS (streamflow + WQ), NOAA NWPS (US streamflow), Water Quality Portal (400+ agencies), CAMELS-CL (Chile), CAMELS-BR (Brazil)
 - 🌍 **Europe** — EU Water Framework Directive, Copernicus ERA5, France Hub'Eau, Germany PEGELONLINE, England's Environment Agency
@@ -339,7 +339,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 | Resource | What it covers |
 | :--- | :--- |
 | [Features](docs/features.md) | Full capability list — hydrology, agriculture, ML, spatial, I/O |
-| [Data sources](docs/data_sources.md) | All 29 sources, endpoints, API-key requirements |
+| [Data sources](docs/data_sources.md) | All 30 sources, endpoints, API-key requirements |
 | [Theory guide](docs/theory.md) | Equations, DOI citations, decision trees for every method |
 | [Methodology matrix](docs/methodology_matrix.md) | When to use which method |
 | [Architecture](docs/guides/architecture.md) | How AquaScope is structured internally |
@@ -422,7 +422,7 @@ Thanks to these wonderful people who make AquaScope possible ([emoji key](CONTRI
       <td align="center" valign="top" width="20%"><a href="http://harikp.com"><img src="https://avatars.githubusercontent.com/u/64578610?v=4?s=100" width="100px;" alt="hari"/><br /><sub><b>hari</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=Mr-Neutr0n" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=Mr-Neutr0n" title="Tests">⚠️</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="20%"><a href="https://github.com/leatke"><img src="https://avatars.githubusercontent.com/u/147705788?v=4?s=100" width="100px;" alt="leatke"/><br /><sub><b>leatke</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=leatke" title="Code">💻</a></td>
+      <td align="center" valign="top" width="20%"><a href="https://github.com/leatke"><img src="https://avatars.githubusercontent.com/u/147705788?v=4?s=100" width="100px;" alt="leatke"/><br /><sub><b>leatke</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=leatke" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=leatke" title="Documentation">📖</a> <a href="#research-leatke" title="Research">🔬</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/taliapulsifer"><img src="https://avatars.githubusercontent.com/u/70988138?v=4?s=100" width="100px;" alt="Talia Pulsifer"/><br /><sub><b>Talia Pulsifer</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=taliapulsifer" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=taliapulsifer" title="Tests">⚠️</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/mikemikimike"><img src="https://avatars.githubusercontent.com/u/186855910?v=4?s=100" width="100px;" alt="mikemikimike"/><br /><sub><b>mikemikimike</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=mikemikimike" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=mikemikimike" title="Tests">⚠️</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/jddrtn"><img src="https://avatars.githubusercontent.com/u/202679891?v=4?s=100" width="100px;" alt="Jade"/><br /><sub><b>Jade</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=jddrtn" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=jddrtn" title="Tests">⚠️</a> <a href="#data-jddrtn" title="Data">🔣</a></td>
