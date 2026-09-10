@@ -429,6 +429,9 @@ Thanks to these wonderful people who make AquaScope possible ([emoji key](CONTRI
       <td align="center" valign="top" width="20%"><a href="https://github.com/jddrtn"><img src="https://avatars.githubusercontent.com/u/202679891?v=4?s=100" width="100px;" alt="Jade"/><br /><sub><b>Jade</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=jddrtn" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=jddrtn" title="Tests">⚠️</a> <a href="#data-jddrtn" title="Data">🔣</a></td>
       <td align="center" valign="top" width="20%"><a href="https://github.com/be-student"><img src="https://avatars.githubusercontent.com/u/80899085?v=4?s=100" width="100px;" alt="송은우"/><br /><sub><b>송은우</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=be-student" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=be-student" title="Tests">⚠️</a> <a href="https://github.com/Rekin226/aquascope/commits?author=be-student" title="Documentation">📖</a></td>
     </tr>
+    <tr>
+      <td align="center" valign="top" width="20%"><a href="https://github.com/mohanasrujana"><img src="https://avatars.githubusercontent.com/u/59142214?v=4?s=100" width="100px;" alt="Satya Srujana Pilli"/><br /><sub><b>Satya Srujana Pilli</b></sub></a><br /><a href="https://github.com/Rekin226/aquascope/commits?author=mohanasrujana" title="Code">💻</a> <a href="https://github.com/Rekin226/aquascope/commits?author=mohanasrujana" title="Tests">⚠️</a></td>
+    </tr>
   </tbody>
 </table>
 
