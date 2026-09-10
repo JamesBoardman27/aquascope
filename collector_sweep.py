@@ -35,6 +35,7 @@ PARAMS = {
                             "startdate": d30, "enddate": str(today)}, 300, ""),
     "noaa_nwps":          ({"lid": "ANAW1"}, 240, ""),
     "ireland_opw":        ({"max_stations": 3}, 300, ""),
+    "greece_hydroscope":  ({"variable": "discharge", "max_stations": 2}, 300, "historic archive, ends 2010"),
     "pegelonline":        ({"days": 2}, 300, ""),
     "camels_cl":          ({"station_ids": ["1001001"], "start": "2000-01-01", "end": "2000-12-31"}, 900, "~275MB first download"),
     "camels_br":          ({"station_ids": ["10500000"], "start": "2000-01-01", "end": "2000-03-31"}, 600, "~62MB, may be cached"),

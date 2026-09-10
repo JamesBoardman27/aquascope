@@ -3,13 +3,16 @@
 from aquascope.collectors.aquastat import AquastatCollector
 from aquascope.collectors.base import BaseCollector
 from aquascope.collectors.bom import BOMCollector
+from aquascope.collectors.brazil_ana import BrazilANACollector
 from aquascope.collectors.camels_br import CAMELSBRCollector
 from aquascope.collectors.camels_cl import CAMELSCLCollector
+from aquascope.collectors.colorado_cdss import ColoradoCDSSCollector
 from aquascope.collectors.copernicus import CopernicusCollector
 from aquascope.collectors.eu_wfd import EUWFDCollector
 from aquascope.collectors.france_hubeau import HubeauHydrometrieCollector
 from aquascope.collectors.gemstat import GEMStatCollector
 from aquascope.collectors.grdc import GRDCCollector
+from aquascope.collectors.greece_hydroscope import GreeceHydroscopeCollector
 from aquascope.collectors.india_wris import IndiaWRISCollector
 from aquascope.collectors.ireland_opw import IrelandOPWCollector
 from aquascope.collectors.japan_mlit import JapanMLITCollector
@@ -39,12 +42,14 @@ __all__ = [
     "AquastatCollector",
     "BaseCollector",
     "BOMCollector",
+    "BrazilANACollector",
     "CAMELSCLCollector",
     "CAMELSBRCollector",
     "CopernicusCollector",
     "EUWFDCollector",
     "GEMStatCollector",
     "GRDCCollector",
+    "GreeceHydroscopeCollector",
     "HubeauHydrometrieCollector",
     "IndiaWRISCollector",
     "JapanMLITCollector",
@@ -68,4 +73,5 @@ __all__ = [
     "WaPORCollector",
     "WQPCollector",
     "IrelandOPWCollector",
+    "ColoradoCDSSCollector",
 ]

@@ -262,6 +262,16 @@
         "test",
         "doc"
       ]
+    },
+    {
+      "login": "mohanasrujana",
+      "name": "Satya Srujana Pilli",
+      "avatar_url": "https://avatars.githubusercontent.com/u/59142214?v=4",
+      "profile": "https://github.com/mohanasrujana",
+      "contributions": [
+        "code",
+        "test"
+      ]
     }
   ],
   "commitType": "docs"

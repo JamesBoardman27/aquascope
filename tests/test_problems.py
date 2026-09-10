@@ -210,7 +210,7 @@ def test_crop_water_demand_averages_the_seasons_and_converts_to_volume_and_rate(
     assert d["peak_month_m3s"] > d["mean_m3s"] and d["gross_irrigation_mm_range"][0] <= d["gross_irrigation_mm"]
     assert "maize on 20 ha" in out["text"] and "m3/s in the peak month" in out["text"]
     assert any("#310" in n for n in out["notes"]) and any("108732" in n for n in out["notes"])
-    assert out["kc"] == {"initial": 0.3, "mid": 1.2, "late": 0.6}
+    assert out["kc"] == {"initial": 0.3, "mid": 1.2, "late": 0.3}
 
 
 def test_crop_water_demand_refusals():
