@@ -5,6 +5,7 @@ from aquascope.collectors.base import BaseCollector
 from aquascope.collectors.bom import BOMCollector
 from aquascope.collectors.camels_br import CAMELSBRCollector
 from aquascope.collectors.camels_cl import CAMELSCLCollector
+from aquascope.collectors.colorado_cdss import ColoradoCDSSCollector
 from aquascope.collectors.copernicus import CopernicusCollector
 from aquascope.collectors.eu_wfd import EUWFDCollector
 from aquascope.collectors.france_hubeau import HubeauHydrometrieCollector
@@ -68,4 +69,5 @@ __all__ = [
     "WaPORCollector",
     "WQPCollector",
     "IrelandOPWCollector",
+    "ColoradoCDSSCollector",
 ]

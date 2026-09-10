@@ -39,6 +39,7 @@ _API_KEY_SOURCES: dict[str, tuple[str, str]] = {
 _REQUIRED_FETCH_FIELDS: dict[str, dict[str, str]] = {
     "pegelonline": {"station_id": "Station UUID"},
     "bom": {"station_id": "AWRC station number"},
+    "colorado_cdss": {"abbrev": "Station abbreviation"},
 }
 
 # Sources needing at least one of several fields, rather than all of them.
@@ -741,6 +742,23 @@ def _source_form(source_key: str, ctor: dict, fetch: dict) -> None:  # noqa: C90
         if bbox_str.strip():
             fetch["bbox"] = bbox_str.strip()
         fetch["days"] = st.slider("Days of history", 1, 30, 7)
+
+    elif source_key == "colorado_cdss":
+        st.caption(
+            "Colorado DWR/CDSS — original-timestep discharge observations "
+            "from state telemetry stations."
+        )
+        abbrev = st.text_input(
+            "Station abbreviation",
+            placeholder="e.g. PLAKERCO",
+        )
+        if abbrev.strip():
+            fetch["abbrev"] = abbrev.strip()
+
+        fetch["parameter"] = st.text_input(
+            "Telemetry parameter",
+            value="DISCHRG",
+        ).strip()
 
 
 def _records_to_df(records: list) -> pd.DataFrame:
