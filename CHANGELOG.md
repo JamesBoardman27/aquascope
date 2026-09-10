@@ -16,6 +16,7 @@ All notable changes to AquaScope are documented here.
 - **Colorado DWR/CDSS telemetry collector** (#319). Collects state-gauge discharge observations from Colorado's Decision Support Systems, handles the CDSS `ResultList` response envelope, converts cfs to m³/s, and exposes the source through the registry and dashboard.
 
 ### Changed
+- **Verified FAO-56 crop coefficients against the revised 2025 edition and updated citations** (#310). Cross-checked single ($K_c$, Table 12) and basal ($K_{cb}$, Table 17) coefficients across all 26 crops in `aquascope.agri.crop_water` against the 2025 second revised edition (FAO-56 Rev.1, Pereira et al. 2025, doi:10.4060/cd6621en), updated module and function docstring references alongside historical 1998 citations, and updated `aquascope.methods` preconditions.
 
 ### Fixed
 
