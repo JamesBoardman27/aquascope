@@ -103,7 +103,9 @@ the run rather than being written to disk. The committed
 `benchmarks/results.schema.json` is a *derived artifact* of those models
 regenerated on shape changes and guarded by a drift test — external consumers validate
 against it, while the Python types stay the single source of truth. `--from-json`
-refuses to render a file the models reject. Consumers can validate any results file:
+refuses to render a file the models reject. Consumers can validate any results file.
+Try running the script below - if an AssertionError is not raised, the results are
+valid against the schema.
 
 ```python
 from benchmarks import camels_benchmark as cb
@@ -156,8 +158,9 @@ comparisons).
 
 ### How the peaks reach the fits
 
-The cached peak series is one value per **USGS water year**. AquaScope's
-`flood_analysis` resamples a dated input to calendar-year annual maxima, which
+The cached peak series is one value per **USGS water year**
+(starts October 1st,ends September 30th).
+AquaScope's `flood_analysis` resamples a dated input to calendar-year annual maxima, which
 would silently collapse peaks that share a calendar year across two water years
 (e.g. a Jan peak in WY2000 and a Dec peak in WY2001). The harness passes the
 series on a synthetic unique-year index so the resampler is a no-op and the fits
@@ -167,7 +170,7 @@ per-gauge `data_quality` block on the reference side recording what was screened
 ## Reference generation (flood-frequency data)
 
 ```bash
-pip install "aquascope[benchmarks]"      # dataretrieval + lmoments3
+pip install "aquascope[benchmarks]"      # installs dataretrieval + lmoments3
 python benchmarks/fetch_peak_flows.py
 ```
 
