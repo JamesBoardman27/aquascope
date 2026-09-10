@@ -42,6 +42,7 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | [Greece Hydroscope](https://hydroscope.gr) | Greece | Daily river stage, monthly discharge, rainfall (1904-2019) | Enhydris REST | ✅ |
 | [Environment Agency (England)](https://environment.data.gov.uk) | England (UK) | River and groundwater levels, river flow, rainfall data | REST | ✅ |
 | [BOM Water Data Online](http://www.bom.gov.au/waterdata/) | Australia | Streamflow, water level, storage, groundwater level | KISTERS WISKI (KiWIS) | ✅ |
+| [Colorado DWR/CDSS](https://dwr.state.co.us/Rest/GET/Help) | Colorado, USA | State telemetry streamflow observations | REST | ✅ |
 
 ---
 
@@ -69,6 +70,7 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | Greece Hydroscope | No | Open access via hydroscope.gr |
 | Environment Agency (England) | No | Open access |
 | BOM Water Data Online | No | Open access |
+| Colorado DWR/CDSS | No | Open access |
 
 ---
 
