@@ -304,7 +304,7 @@ METHODS: dict[str, MethodPrecondition] = {
             tool="crop_water_demand",
             problems=("irrigation",),
             citation="Allen et al. (1998); FAO (2025) revised edition, doi:10.4060/cd6621en",
-            note="Kc from the FAO-56 (1998) tables pending the 2025 revision (#310); reanalysis-forced ET0 carries "
+            note="Kc from the FAO-56 (1998/2025) tables; reanalysis-forced ET0 carries "
             "bias (Agric. Water Manage. 2024, doi:10.1016/j.agwat.2024.108732).",
         ),
         MethodPrecondition(

@@ -4,11 +4,11 @@ Complete capability reference for AquaScope. For installation and a quick exampl
 
 ---
 
-## Data Collection (33 sources)
+## Data Collection (34 sources)
 
 - **Taiwan** — MOENV water quality, WRA levels / reservoirs / groundwater (annual and daily) / FHY / IoT, CWA climate, Civil IoT sensors, data.gov.tw
 - **Americas** — USGS streamflow, NOAA NWPS, Colorado DWR/CDSS, Water Quality Portal (400+ agencies), CAMELS-CL, CAMELS-BR, ANA Hidroweb
-- **Europe** — EU Water Framework Directive, France Hub'Eau, Germany PEGELONLINE, England's Environment Agency, Ireland OPW
+- **Europe** — EU Water Framework Directive, France Hub'Eau, Germany PEGELONLINE, England's Environment Agency, Ireland OPW, Greece Hydroscope
 - **Asia-Pacific** — Japan MLIT, Korea WAMIS, India WRIS, Australia BOM
 - **Global** — GEMStat (170 countries), GRDC river discharge, UN SDG 6, OpenMeteo weather, Copernicus climate
 - **FAO** — AQUASTAT country-level water use, WaPOR satellite evapotranspiration
