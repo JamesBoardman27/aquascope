@@ -45,7 +45,7 @@ import pandas as pd
 
 BASE = pathlib.Path(__file__).resolve().parent
 BENCHMARK_DIR = BASE.parent / "data" / "camels_benchmark"
-CATCHMENTS_FILE = BENCHMARK_DIR / "catchments.json"
+CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
 PEAKS_DIR = BENCHMARK_DIR / "peaks"
 REFERENCE_FILE = BENCHMARK_DIR / "ffa_reference.json"
 

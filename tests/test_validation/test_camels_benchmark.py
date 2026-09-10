@@ -27,7 +27,8 @@ from aquascope.hydrology.signatures import compute_signatures
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BENCHMARK_DIR = ROOT / "data" / "camels_benchmark"
-CATCHMENTS_FILE = BENCHMARK_DIR / "catchments.json"
+DAILY_DIR = BENCHMARK_DIR / "daily"
+CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
 
 # ── tolerances ────────────────────────────────────────────────────────
 REL_TOL = 0.25  # ±25 % relative
@@ -44,7 +45,7 @@ def _load_catchments() -> list[dict]:
 
 def _load_series(gauge_id: str) -> tuple[pd.Series, pd.Series]:
     """Return (discharge, precipitation) Series with DatetimeIndex."""
-    df = pd.read_csv(BENCHMARK_DIR / f"{gauge_id}.csv", parse_dates=["date"])
+    df = pd.read_csv(DAILY_DIR / f"{gauge_id}_daily.csv", parse_dates=["date"])
     df = df.set_index("date")
     return df["discharge_cms"], df["precipitation_mm"]
 

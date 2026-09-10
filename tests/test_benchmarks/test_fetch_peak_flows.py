@@ -421,10 +421,10 @@ def test_main_writes_expected_outputs(tmp_path, monkeypatch) -> None:
         {"gauge_id": "11111111", "name": "Catchment One"},
         {"gauge_id": "22222222", "name": "Catchment Two"},
     ]
-    json.dump(catchments, open(tmp_path / "catchments.json", "w"))
+    json.dump(catchments, open(tmp_path / "daily_catchments.json", "w"))
     years = list(range(1990, 2020))
 
-    monkeypatch.setattr(fpf, "CATCHMENTS_FILE", tmp_path / "catchments.json")
+    monkeypatch.setattr(fpf, "CATCHMENTS_FILE", tmp_path / "daily_catchments.json")
     monkeypatch.setattr(fpf, "PEAKS_DIR", tmp_path / "peaks")
     monkeypatch.setattr(fpf, "REFERENCE_FILE", tmp_path / "ffa_reference.json")
 
@@ -489,10 +489,10 @@ def test_main_writes_nothing_when_a_later_gauge_fails(tmp_path, monkeypatch) -> 
         {"gauge_id": "11111111", "name": "Catchment One"},
         {"gauge_id": "22222222", "name": "Catchment Two"},
     ]
-    json.dump(catchments, open(tmp_path / "catchments.json", "w"))
+    json.dump(catchments, open(tmp_path / "daily_catchments.json", "w"))
     years = list(range(1990, 2020))
 
-    monkeypatch.setattr(fpf, "CATCHMENTS_FILE", tmp_path / "catchments.json")
+    monkeypatch.setattr(fpf, "CATCHMENTS_FILE", tmp_path / "daily_catchments.json")
     monkeypatch.setattr(fpf, "PEAKS_DIR", tmp_path / "peaks")
     monkeypatch.setattr(fpf, "REFERENCE_FILE", tmp_path / "ffa_reference.json")
 
