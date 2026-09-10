@@ -16,8 +16,10 @@ All notable changes to AquaScope are documented here.
 - **Colorado DWR/CDSS telemetry collector** (#319). Collects state-gauge discharge observations from Colorado's Decision Support Systems, handles the CDSS `ResultList` response envelope, converts cfs to m³/s, and exposes the source through the registry and dashboard.
 
 ### Changed
+- **The data-source table now maps one to one onto the registry.** `docs/data_sources.md` gained a `--source` column carrying each registry key, a row for the daily Taiwan WRA groundwater source, and separate rows for WRA water level and WRA reservoirs, which the table had been counting as one. `tests/test_docs_counts.py` asserts the table lists exactly the ids in `aquascope.registry.SOURCES`, so a collector that ships without a docs row now fails CI.
 
 ### Fixed
+- **Stale counts across the README and its mirrors.** The registry held 33 sources while the README said 31, `docs/index.md` 29, `docs/features.md` 20, `docs/i18n/README.fr.md` 21 and the `CITATION.cff` abstract 20. Crops read 23 against 26 in `KC_TABLE`, `docs/features.md` claimed 21 hydrological signatures against 22 and 820+ tests against the 1,000+ stated everywhere else, and the French README still advertised a 19-command CLI. Every count is now derived from the code, and the drift guard checks each mirror by name instead of the README alone. The stale source lists (the "Pull water data" bullet, the regional bullets, the `docs/features.md` collection list) gained the collectors added since they were last written: NOAA NWPS, Colorado DWR/CDSS, ANA Hidroweb, Ireland OPW, PEGELONLINE, England's Environment Agency, Australia BOM, CAMELS-BR and Taiwan CWA.
 
 ## [0.15.1] - 2026-09-07
 
