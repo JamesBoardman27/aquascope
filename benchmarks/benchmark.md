@@ -85,6 +85,8 @@ Flags:
   ```bash
   python -m benchmarks.camels_benchmark --output-dir examples/camels_benchmark
   ```
+  Note that every run records wall-clock `seconds` per stage, which varies from
+  run to run, so regenerating the committed examples also churns those timings.
 
 ### Reports derive from the JSON
 
@@ -151,8 +153,8 @@ false failure.
 Each catchment also carries an `integrity` block recording internal invariants
 on AquaScope's own signature object — `q5 < median < q95`, runoff ratio in
 (0, 1), positive recession constant, finite negative FDC slope, all fields
-populated. These are the checks the legacy `examples/validation/validate_camels.py`
-covered separately; they are surfaced in the report as software defects and are
+populated. These are the checks the legacy `examples/validation` suite covered
+separately; they are surfaced in the report as software defects and are
 **never** folded into the headline gates (which stay about published-value
 comparisons).
 
@@ -164,8 +166,10 @@ AquaScope's `flood_analysis` resamples a dated input to calendar-year annual max
 would silently collapse peaks that share a calendar year across two water years
 (e.g. a Jan peak in WY2000 and a Dec peak in WY2001). The harness passes the
 series on a synthetic unique-year index so the resampler is a no-op and the fits
-run on exactly the same annual-maxima set as the reference. `results.json` has a
-per-gauge `data_quality` block on the reference side recording what was screened.
+run on exactly the same annual-maxima set as the reference. The committed
+`ffa_reference.json` records a per-gauge `data_quality` block
+(`rows_downloaded`, `rows_kept`, why rows were removed, and every qualifier
+code seen) so screen provenance is available without re-running the fetch.
 
 ## Reference generation (flood-frequency data)
 

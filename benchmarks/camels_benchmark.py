@@ -52,19 +52,17 @@ from aquascope.analysis.metrics import r2 as r2_score
 from aquascope.api import baseflow_analysis, compute_all_signatures, flood_analysis
 from aquascope.hydrology.flow_duration import flow_duration_curve
 from aquascope.reporting.builder import ReportBuilder
-from benchmarks.results_models import Results as ResultsModel
+from benchmarks import _paths
+from benchmarks.results_models import RETURN_PERIODS, SCHEMA_VERSION, Results as ResultsModel
 
 BASE = pathlib.Path(__file__).resolve().parent
-BENCHMARK_DIR = BASE.parent / "data" / "camels_benchmark"
-DAILY_CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
-PEAKS_DIR = BENCHMARK_DIR / "peaks"
-DAILY_DIR = BENCHMARK_DIR / "daily"
-FFA_REFERENCE_FILE = BENCHMARK_DIR / "ffa_reference.json"
+BENCHMARK_DIR = _paths.BENCHMARK_DIR
+DAILY_CATCHMENTS_FILE = _paths.DAILY_CATCHMENTS_FILE
+DAILY_DIR = _paths.DAILY_DIR
+PEAKS_DIR = _paths.PEAKS_DIR
+FFA_REFERENCE_FILE = _paths.FFA_REFERENCE_FILE
 SCHEMA_FILE = BASE / "results.schema.json"
 
-RETURN_PERIODS = [2, 5, 10, 25, 50, 100]
-
-SCHEMA_VERSION = "1.0"
 DEFAULT_OUTPUT_DIR = "benchmark-output"
 
 # ---------------------------------------------------------------------------
@@ -90,9 +88,9 @@ FFA_REL_TOL = 0.20
 #: Headline aggregate gates, expressed as percentages.
 Q_MEAN_NRMSE_TOL = 25.0  # RMSE / mean(published q_mean) across gauges
 BFI_PBIAS_TOL = 25.0  # PBIAS(%) across gauges
-FFA_MEAN_REL_TOL = 0.20  # mean relative error (fraction) of dependable cross-checks
+FFA_MEAN_REL_TOL = 20.0  # mean relative error (%) of dependable cross-checks
 
-#: Reference JSON keys a gap.
+#: Reference JSON keys per AquaScope method name.
 _FFA_REFERENCE_KEYS = {
     "gev": "scipy_gev",
     "gev_lmoments": "scipy_gev_lmoments",
@@ -102,6 +100,7 @@ _FFA_REFERENCE_KEYS = {
 TOLERANCES: dict[str, dict] = {
     "signature_relative": {
         "value": SIGNATURE_REL_TOL,
+        "unit": "fraction",
         "rationale": (
             "Synthetic daily series are calibrated to approximate the published "
             "CAMELS attributes; they are not measurements of them."
@@ -109,6 +108,7 @@ TOLERANCES: dict[str, dict] = {
     },
     "baseflow_absolute": {
         "value": BFI_ABS_TOL,
+        "unit": "fraction",
         "rationale": (
             "Published CAMELS baseflow index comes from a different separation "
             "algorithm than AquaScope's Lyne-Hollick/Eckhardt digital filters."
@@ -116,10 +116,12 @@ TOLERANCES: dict[str, dict] = {
     },
     "peak_month_circular": {
         "value": PEAK_MONTH_TOL,
+        "unit": "months",
         "rationale": "Peak month is month-of-year and circular (Jan == Dec + 1 month).",
     },
     "ffa_relative": {
         "value": FFA_REL_TOL,
+        "unit": "fraction",
         "rationale": (
             "Wider than the +/-10% used in the Potomac federal-standard "
             "validation because several benchmark gauges are semi-arid or "
@@ -128,14 +130,17 @@ TOLERANCES: dict[str, dict] = {
     },
     "q_mean_nrmse_gate": {
         "value": Q_MEAN_NRMSE_TOL,
+        "unit": "%",
         "rationale": "Aggregate q_mean gate: normalized RMSE (%) across the 10 gauges.",
     },
     "bfi_pbias_gate": {
         "value": BFI_PBIAS_TOL,
+        "unit": "%",
         "rationale": "Aggregate baseflow gate: PBIAS (%) across the 10 gauges.",
     },
     "ffa_gate": {
         "value": FFA_MEAN_REL_TOL,
+        "unit": "%",
         "rationale": (
             "Aggregate flood-frequency gate over the dependable reference cross-checks "
             "(GEV-L-moments and LP3); GEV-MLE mismatches are reported separately as "
@@ -229,12 +234,15 @@ def _check(metric: str, computed: float, published: float, error_type: str, tole
         error = _circular_month_diff(computed, published)
     else:
         raise ValueError(f"Unknown error_type {error_type!r}")
+    error = round(float(error), 6)
+    computed = round(float(computed), 6)
+    published = round(float(published), 6)
     return {
         "metric": metric,
-        "computed": round(float(computed), 6),
-        "published": round(float(published), 6),
+        "computed": computed,
+        "published": published,
         "error_type": error_type,
-        "error": round(float(error), 6),
+        "error": error,
         "tolerance": tolerance,
         "check_passes": bool(np.isfinite(error) and error <= tolerance),
     }
@@ -350,7 +358,7 @@ def run_baseflow(discharge: pd.Series, catchment: dict) -> dict:
             "bfi": round(float(result.bfi), 6),
             "published_bfi": round(float(catchment["published_baseflow_index"]), 6),
             "seconds": seconds,
-            **_check(
+            "check": _check(
                 f"bfi_{method}",
                 result.bfi,
                 catchment["published_baseflow_index"],
@@ -362,7 +370,7 @@ def run_baseflow(discharge: pd.Series, catchment: dict) -> dict:
     return results
 
 
-def run_flood_frequency(peaks: pd.Series, reference_entry: dict, gauge_id: str) -> dict:
+def run_flood_frequency(peaks: pd.Series, reference_entry: dict) -> dict:
     """Fit each distribution and compare quantiles to the flood-frequency reference."""
     series = _annual_maxima_series(peaks.values)
     results: dict = {"methods": {}, "seconds": 0.0}
@@ -424,12 +432,8 @@ def run_flood_frequency(peaks: pd.Series, reference_entry: dict, gauge_id: str) 
 _SIGNATURE_KEYS = ["q_mean", "q5", "q95", "runoff_ratio", "fdc_slope"]
 
 
-def _aggregate(catchment_results: dict[str, dict], reference: dict) -> dict:
+def _aggregate(catchment_results: dict[str, dict], catchments: dict[str, dict]) -> dict:
     """Cross-catchment metrics and headline gates."""
-    published = {}
-    for entry in load_catchments():
-        published[entry["gauge_id"]] = entry
-
     aggregate: dict[str, dict] = {}
     for key in _SIGNATURE_KEYS:
         computed_vec: list[float] = []
@@ -439,7 +443,7 @@ def _aggregate(catchment_results: dict[str, dict], reference: dict) -> dict:
             if value is None or not np.isfinite(value):
                 continue
             computed_vec.append(value)
-            published_vec.append(published[gid][f"published_{key}"])
+            published_vec.append(catchments[gid][f"published_{key}"])
         aggregate[key] = _metrics_pair(computed_vec, published_vec)
 
     for method in ("lyne_hollick", "eckhardt"):
@@ -452,12 +456,12 @@ def _aggregate(catchment_results: dict[str, dict], reference: dict) -> dict:
     # aggregate table and the summary's check count stay in step.
     aggregate["bfi_signatures"] = _metrics_pair(
         [r["signatures"]["values"]["baseflow_index"] for r in catchment_results.values()],
-        [published[gid]["published_baseflow_index"] for gid in catchment_results],
+        [catchments[gid]["published_baseflow_index"] for gid in catchment_results],
     )
 
     # Headline gates
     q_mean_rmse = aggregate["q_mean"]["rmse"]
-    q_mean_published = [published[gid]["published_q_mean"] for gid in catchment_results]
+    q_mean_published = [catchments[gid]["published_q_mean"] for gid in catchment_results]
     q_mean_nrmse_pct = q_mean_rmse / np.mean(q_mean_published) * 100 if q_mean_published else None
 
     bfi_pbias_pct = aggregate["bfi_lyne_hollick"]["pbias"]
@@ -465,20 +469,18 @@ def _aggregate(catchment_results: dict[str, dict], reference: dict) -> dict:
     ffa_errors: list[float] = []
     for res in catchment_results.values():
         for method in ("gev_lmoments", "lp3"):
-            ffa_errors.extend(
-                [fit["relative_error_pct"] / 100 for fit in res["flood_frequency"]["methods"][method]["fits"]]
-            )
-    ffa_mean_rel = float(np.mean(ffa_errors)) if ffa_errors else float("nan")
+            ffa_errors.extend([fit["relative_error_pct"] for fit in res["flood_frequency"]["methods"][method]["fits"]])
+    ffa_mean_rel_pct = float(np.mean(ffa_errors)) if ffa_errors else float("nan")
 
     # Every published-value comparison is counted once: the seven signature checks, the
-    # two baseflow-filter checks (per catchment), and each FFA fit. The redundant
-    # single-criterion checks that pure a fit would revisit are not counted twice --
-    # one unmet finding per comparison, matching what the report tables render.
+    # two baseflow-filter checks, and the signature object's own BFI (per catchment),
+    # plus each FFA fit. The single-criterion per-fit classification is a labelling of
+    # the same fit, not an extra finding, so it is not counted twice.
     n_unmet = sum(
         1
         for res in catchment_results.values()
-        for check in res["signatures"]["checks"] + [m for bf in res["baseflow"]["methods"].values() for m in [bf]]
-if not check["check_passes"]
+        for check in res["signatures"]["checks"] + [m["check"] for m in res["baseflow"]["methods"].values()]
+        if not check["check_passes"]
     )
     n_unmet += sum(
         1
@@ -517,9 +519,9 @@ if not check["check_passes"]
             "bfi_pbias_pct": round(bfi_pbias_pct, 2),
             "bfi_pbias_tolerance_pct": BFI_PBIAS_TOL,
             "bfi_gate_met": bool(abs(bfi_pbias_pct) <= BFI_PBIAS_TOL),
-            "ffa_cross_method_mean_relative_error_pct": round(ffa_mean_rel * 100, 2),
-            "ffa_tolerance_pct": FFA_MEAN_REL_TOL * 100,
-            "ffa_gate_met": bool(ffa_mean_rel <= FFA_MEAN_REL_TOL),
+            "ffa_cross_method_mean_relative_error_pct": round(ffa_mean_rel_pct, 2),
+            "ffa_tolerance_pct": FFA_MEAN_REL_TOL,
+            "ffa_gate_met": bool(ffa_mean_rel_pct <= FFA_MEAN_REL_TOL),
         },
         "aggregate": aggregate,
         "timings": {"total_seconds": round(total_s, 3)},
@@ -601,7 +603,7 @@ def build_results(gauge_ids: list[str] | None = None) -> dict:
 
         signatures = run_signatures(discharge, precipitation, c)
         baseflow = run_baseflow(discharge, c)
-        flood_frequency = run_flood_frequency(peaks, reference_entry, gid)
+        flood_frequency = run_flood_frequency(peaks, reference_entry)
 
         catchment_results[gid] = {
             "name": c["name"],
@@ -617,7 +619,7 @@ def build_results(gauge_ids: list[str] | None = None) -> dict:
             },
         }
 
-    summary = _aggregate(catchment_results, reference)
+    summary = _aggregate(catchment_results, {c["gauge_id"]: c for c in catchments})
 
     builder = _report_builder({"metadata": {"schema_version": SCHEMA_VERSION}})
     software = {
@@ -677,32 +679,13 @@ def _report_builder(results: dict) -> ReportBuilder:
     return builder
 
 
-def _jsonable(value):
-    """Recursively convert numpy scalar/array values to JSON-serialisable types."""
-    if isinstance(value, dict):
-        return {k: _jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_jsonable(v) for v in value]
-    if isinstance(value, np.bool_):
-        return bool(value)
-    if isinstance(value, np.integer):
-        return int(value)
-    if isinstance(value, np.floating):
-        return float(value)
-    if isinstance(value, np.ndarray):
-        return _jsonable(value.tolist())
-    if value is pd.NA:
-        return None
-    return value
-
-
 def _write_json_atomic(data: dict, path: pathlib.Path) -> None:
-    """Write ``data`` to ``path`` via a staged temp file and atomic replace."""
+    """Write ``data`` (a JSON-serialisable dict) to ``path`` atomically."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = pathlib.Path(str(path) + ".tmp")
     try:
         with open(tmp, "w") as f:
-            json.dump(_jsonable(data), f, indent=2)
+            json.dump(data, f, indent=2)
         tmp.replace(path)
     finally:
         if tmp.exists():
@@ -714,7 +697,7 @@ def _write_json_atomic(data: dict, path: pathlib.Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _check_rows(kind: str, checks: list[dict]) -> pd.DataFrame:
+def _check_rows(checks: list[dict]) -> pd.DataFrame:
     rows = [
         {
             "Metric": c["metric"],
@@ -793,7 +776,7 @@ def _populate_report(builder: ReportBuilder, results: dict) -> None:
     builder.add_heading("Tolerances and rationale", level=2)
     tol_df = pd.DataFrame(
         [
-            {"Check": name, "Value": value["value"], "Rationale": value["rationale"]}
+            {"Check": name, "Value": value["value"], "Unit": value["unit"], "Rationale": value["rationale"]}
             for name, value in metadata["tolerances"].items()
         ]
     )
@@ -810,7 +793,7 @@ def _populate_report(builder: ReportBuilder, results: dict) -> None:
     builder.add_heading("Per-catchment results", level=2)
     for gid, res in results["catchments"].items():
         builder.add_heading(f"{gid} - {res['name']} ({res['climate']})", level=3)
-        builder.add_dataframe(_check_rows("signatures", res["signatures"]["checks"]), caption=f"{gid} signatures")
+        builder.add_dataframe(_check_rows(res["signatures"]["checks"]), caption=f"{gid} signatures")
 
         integrity_rows = [
             {"Metric": c["metric"], "Detail": c["detail"], "Passes": "yes" if c["check_passes"] else "no"}
@@ -823,8 +806,8 @@ def _populate_report(builder: ReportBuilder, results: dict) -> None:
                 "Method": method,
                 "BFI": bf["bfi"],
                 "Published": bf["published_bfi"],
-                "Error": bf["error"],
-                "Meets tolerance": "yes" if bf["check_passes"] else "no",
+                "Error": bf["check"]["error"],
+                "Meets tolerance": "yes" if bf["check"]["check_passes"] else "no",
             }
             for method, bf in res["baseflow"]["methods"].items()
         ]

@@ -109,7 +109,7 @@ def test_findings_are_surfaced_not_hidden() -> None:
 def test_results_are_json_serialisable() -> None:
     """numpy scalars from the pipeline never leak into the JSON."""
     results = cb.build_results(gauge_ids=["03451500"])
-    json.dumps(cb._jsonable(results))
+    json.dumps(results)
 
 
 def test_annual_maxima_series_is_a_noop() -> None:
@@ -280,7 +280,7 @@ def test_committed_schema_matches_generated_models() -> None:
 def test_validate_results_rejects_corrupt_structure() -> None:
     """Schema validation flags shape drift, not just type drift."""
     results = _full_results()
-    broken = json.loads(json.dumps(cb._jsonable(results)))
+    broken = json.loads(json.dumps(results))
     assert cb.validate_results(broken) == []
     broken["summary"]["n_catchments"] = "ten"
     del broken["software"]["doi"]

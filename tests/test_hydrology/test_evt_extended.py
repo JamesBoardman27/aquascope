@@ -327,7 +327,7 @@ class TestRegionalFrequency:
             rp: float(stats.genextreme.ppf(1 - 1 / rp, c_true, loc=loc, scale=scale)) / mean for rp in (10, 100)
         }
         for rp in (10, 100):
-            assert growth[rp] == pytest.approx(analytical[rp], rel=0.10), (
+            assert growth[rp] == pytest.approx(analytical[rp], rel=0.05), (
                 f"RP{rp}: regional growth {growth[rp]:.3f} vs analytical {analytical[rp]:.3f}"
             )
 

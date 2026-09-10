@@ -15,7 +15,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-_SCHEMA_VERSION = Literal["1.0"]
+SCHEMA_VERSION = "1.1"
+SchemaVersion = Literal[SCHEMA_VERSION]
+
+RETURN_PERIODS = [2, 5, 10, 25, 50, 100]
+ReturnPeriod = Literal[2, 5, 10, 25, 50, 100]
 
 JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
@@ -28,11 +32,12 @@ class _Base(BaseModel):
 
 class Tolerance(_Base):
     value: float
+    unit: str
     rationale: str
 
 
 class BenchmarkMetadata(_Base):
-    schema_version: _SCHEMA_VERSION
+    schema_version: SchemaVersion
     generated: date
     aquascope_version: str
     note: str
@@ -79,13 +84,7 @@ class BaseflowMethod(_Base):
     bfi: float
     published_bfi: float
     seconds: float = Field(ge=0)
-    metric: Literal["bfi_lyne_hollick", "bfi_eckhardt"]
-    computed: float
-    published: float
-    error_type: Literal["absolute"]
-    error: float
-    tolerance: float
-    check_passes: bool
+    check: PublishedCheck
 
 
 class BaseflowMethods(_Base):
@@ -99,7 +98,7 @@ class Baseflow(_Base):
 
 
 class Fit(_Base):
-    return_period: Literal[2, 5, 10, 25, 50, 100]
+    return_period: ReturnPeriod
     computed_m3s: float
     reference_m3s: float
     relative_error_pct: float

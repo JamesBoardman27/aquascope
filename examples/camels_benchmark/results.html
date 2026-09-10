@@ -141,7 +141,7 @@ hr {
 <strong>Date:</strong> 2026-09-10<br>
 <strong>Description:</strong> Flood frequency, baseflow and signature verification over 10 CAMELS catchments.<br>
 <strong>Data Sources:</strong> Synthetic daily series (data/camels_benchmark/daily), USGS annual peaks (data/camels_benchmark/peaks), CAMELS attributes (Addor et al., 2017), Flood-frequency reference quantiles (ffa_reference.json)<br>
-<strong>Version:</strong> 1.0</div>
+<strong>Version:</strong> 1.1</div>
 <h2 id="summary">Summary</h2>
 <div class="metric"><div class="metric-value">10</div><div class="metric-name">Catchments</div></div>
 <div class="metric"><div class="metric-value">0.0</div><div class="metric-name">Q mean normalized RMSE (%)</div><span class="metric-unit">%</span></div>
@@ -154,41 +154,49 @@ hr {
 <thead><tr>
   <th>Check</th>
   <th>Value</th>
+  <th>Unit</th>
   <th>Rationale</th>
 </tr></thead><tbody>
 <tr>
   <td>signature_relative</td>
   <td>0.25</td>
+  <td>fraction</td>
   <td>Synthetic daily series are calibrated to approximate the published CAMELS attributes; they are not measurements of them.</td>
 </tr>
 <tr>
   <td>baseflow_absolute</td>
   <td>0.15</td>
+  <td>fraction</td>
   <td>Published CAMELS baseflow index comes from a different separation algorithm than AquaScope&#x27;s Lyne-Hollick/Eckhardt digital filters.</td>
 </tr>
 <tr>
   <td>peak_month_circular</td>
   <td>2.0</td>
+  <td>months</td>
   <td>Peak month is month-of-year and circular (Jan == Dec + 1 month).</td>
 </tr>
 <tr>
   <td>ffa_relative</td>
   <td>0.2</td>
+  <td>fraction</td>
   <td>Wider than the +/-10% used in the Potomac federal-standard validation because several benchmark gauges are semi-arid or heavy-tailed, where MLE vs L-moments spread is larger.</td>
 </tr>
 <tr>
   <td>q_mean_nrmse_gate</td>
   <td>25.0</td>
+  <td>%</td>
   <td>Aggregate q_mean gate: normalized RMSE (%) across the 10 gauges.</td>
 </tr>
 <tr>
   <td>bfi_pbias_gate</td>
   <td>25.0</td>
+  <td>%</td>
   <td>Aggregate baseflow gate: PBIAS (%) across the 10 gauges.</td>
 </tr>
 <tr>
   <td>ffa_gate</td>
-  <td>0.2</td>
+  <td>20.0</td>
+  <td>%</td>
   <td>Aggregate flood-frequency gate over the dependable reference cross-checks (GEV-L-moments and LP3); GEV-MLE mismatches are reported separately as data-limitation findings, not folded into the implementation gate.</td>
 </tr>
 </tbody></table>
@@ -564,10 +572,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>01013500</td>
-  <td>0.017</td>
-  <td>0.013</td>
-  <td>0.024</td>
-  <td>0.054</td>
+  <td>0.016</td>
+  <td>0.018</td>
+  <td>0.048</td>
+  <td>0.081</td>
 </tr>
 </tbody></table>
 <h3 id="01664000---rappahannock-river-near-fredericksburg-va-humid-continental">01664000 - Rappahannock River near Fredericksburg, VA (humid continental)</h3>
@@ -884,9 +892,9 @@ hr {
 <tr>
   <td>01664000</td>
   <td>0.01</td>
-  <td>0.013</td>
-  <td>0.024</td>
-  <td>0.047</td>
+  <td>0.014</td>
+  <td>0.022</td>
+  <td>0.046</td>
 </tr>
 </tbody></table>
 <h3 id="02231000---st-marys-river-near-macclenny-fl-subtropical">02231000 - St. Marys River near Macclenny, FL (subtropical)</h3>
@@ -1202,10 +1210,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>02231000</td>
-  <td>0.012</td>
   <td>0.011</td>
-  <td>0.022</td>
-  <td>0.045</td>
+  <td>0.014</td>
+  <td>0.027</td>
+  <td>0.052</td>
 </tr>
 </tbody></table>
 <h3 id="03451500---french-broad-river-at-asheville-nc-humid-appalachian">03451500 - French Broad River at Asheville, NC (humid Appalachian)</h3>
@@ -1521,10 +1529,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>03451500</td>
-  <td>0.011</td>
   <td>0.014</td>
-  <td>0.02</td>
-  <td>0.045</td>
+  <td>0.015</td>
+  <td>0.024</td>
+  <td>0.052</td>
 </tr>
 </tbody></table>
 <h3 id="06803500---salt-creek-at-roca-ne-semi-arid-great-plains">06803500 - Salt Creek at Roca, NE (semi-arid Great Plains)</h3>
@@ -1840,10 +1848,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>06803500</td>
-  <td>0.009</td>
-  <td>0.01</td>
-  <td>0.024</td>
-  <td>0.043</td>
+  <td>0.011</td>
+  <td>0.013</td>
+  <td>0.029</td>
+  <td>0.053</td>
 </tr>
 </tbody></table>
 <h3 id="07056000---buffalo-river-near-st-joe-ar-humid-interior">07056000 - Buffalo River near St. Joe, AR (humid interior)</h3>
@@ -2159,10 +2167,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>07056000</td>
-  <td>0.009</td>
   <td>0.011</td>
-  <td>0.023</td>
-  <td>0.044</td>
+  <td>0.013</td>
+  <td>0.029</td>
+  <td>0.053</td>
 </tr>
 </tbody></table>
 <h3 id="08181500---medina-river-at-san-antonio-tx-semi-arid">08181500 - Medina River at San Antonio, TX (semi-arid)</h3>
@@ -2478,10 +2486,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>08181500</td>
-  <td>0.008</td>
-  <td>0.01</td>
-  <td>0.018</td>
-  <td>0.036</td>
+  <td>0.013</td>
+  <td>0.013</td>
+  <td>0.023</td>
+  <td>0.049</td>
 </tr>
 </tbody></table>
 <h3 id="09510200---cave-creek-near-cave-creek-az-arid">09510200 - Cave Creek near Cave Creek, AZ (arid)</h3>
@@ -2797,10 +2805,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>09510200</td>
-  <td>0.011</td>
-  <td>0.013</td>
-  <td>0.025</td>
-  <td>0.05</td>
+  <td>0.012</td>
+  <td>0.014</td>
+  <td>0.031</td>
+  <td>0.057</td>
 </tr>
 </tbody></table>
 <h3 id="11532500---smith-river-near-crescent-city-ca-pacific-northwest-rain">11532500 - Smith River near Crescent City, CA (Pacific Northwest rain)</h3>
@@ -3118,8 +3126,8 @@ hr {
   <td>11532500</td>
   <td>0.01</td>
   <td>0.012</td>
-  <td>0.026</td>
-  <td>0.048</td>
+  <td>0.027</td>
+  <td>0.049</td>
 </tr>
 </tbody></table>
 <h3 id="14301000---nehalem-river-near-foss-or-pacific-northwest-rain">14301000 - Nehalem River near Foss, OR (Pacific Northwest rain)</h3>
@@ -3435,10 +3443,10 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>14301000</td>
-  <td>0.011</td>
+  <td>0.009</td>
   <td>0.01</td>
   <td>0.021</td>
-  <td>0.041</td>
+  <td>0.04</td>
 </tr>
 </tbody></table>
 <h2 id="execution-timings">Execution timings</h2>
@@ -3454,76 +3462,76 @@ hr {
 </tr></thead><tbody>
 <tr>
   <td>01013500</td>
-  <td>0.017</td>
-  <td>0.013</td>
-  <td>0.024</td>
-  <td>0.054</td>
+  <td>0.016</td>
+  <td>0.018</td>
+  <td>0.048</td>
+  <td>0.081</td>
 </tr>
 <tr>
   <td>01664000</td>
   <td>0.01</td>
-  <td>0.013</td>
-  <td>0.024</td>
-  <td>0.047</td>
+  <td>0.014</td>
+  <td>0.022</td>
+  <td>0.046</td>
 </tr>
 <tr>
   <td>02231000</td>
-  <td>0.012</td>
   <td>0.011</td>
-  <td>0.022</td>
-  <td>0.045</td>
+  <td>0.014</td>
+  <td>0.027</td>
+  <td>0.052</td>
 </tr>
 <tr>
   <td>03451500</td>
-  <td>0.011</td>
   <td>0.014</td>
-  <td>0.02</td>
-  <td>0.045</td>
+  <td>0.015</td>
+  <td>0.024</td>
+  <td>0.052</td>
 </tr>
 <tr>
   <td>06803500</td>
-  <td>0.009</td>
-  <td>0.01</td>
-  <td>0.024</td>
-  <td>0.043</td>
+  <td>0.011</td>
+  <td>0.013</td>
+  <td>0.029</td>
+  <td>0.053</td>
 </tr>
 <tr>
   <td>07056000</td>
-  <td>0.009</td>
   <td>0.011</td>
-  <td>0.023</td>
-  <td>0.044</td>
+  <td>0.013</td>
+  <td>0.029</td>
+  <td>0.053</td>
 </tr>
 <tr>
   <td>08181500</td>
-  <td>0.008</td>
-  <td>0.01</td>
-  <td>0.018</td>
-  <td>0.036</td>
+  <td>0.013</td>
+  <td>0.013</td>
+  <td>0.023</td>
+  <td>0.049</td>
 </tr>
 <tr>
   <td>09510200</td>
-  <td>0.011</td>
-  <td>0.013</td>
-  <td>0.025</td>
-  <td>0.05</td>
+  <td>0.012</td>
+  <td>0.014</td>
+  <td>0.031</td>
+  <td>0.057</td>
 </tr>
 <tr>
   <td>11532500</td>
   <td>0.01</td>
   <td>0.012</td>
-  <td>0.026</td>
-  <td>0.048</td>
+  <td>0.027</td>
+  <td>0.049</td>
 </tr>
 <tr>
   <td>14301000</td>
-  <td>0.011</td>
+  <td>0.009</td>
   <td>0.01</td>
   <td>0.021</td>
-  <td>0.041</td>
+  <td>0.04</td>
 </tr>
 </tbody></table>
-<div class="metric"><div class="metric-value">0.453</div><div class="metric-name">Total runtime (s)</div><span class="metric-unit">s</span></div>
+<div class="metric"><div class="metric-value">0.532</div><div class="metric-name">Total runtime (s)</div><span class="metric-unit">s</span></div>
 <h2 id="data-and-methods">Data and methods</h2>
 <p>Discharge: synthetic daily series calibrated to CAMELS; peaks: USGS NWIS annual peak series, one value per USGS water year, screened for qualifier codes and censored values. Reference quantiles: GEV-MLE and LP3 via scipy, GEV-L-moments via lmoments3 (Hosking 1997). Full provenance per catchment in results.json.</p>
 <h2 id="cite-this-software">Cite this software</h2>

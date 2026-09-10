@@ -36,51 +36,15 @@
           "title": "Seconds",
           "type": "number"
         },
-        "metric": {
-          "enum": [
-            "bfi_lyne_hollick",
-            "bfi_eckhardt"
-          ],
-          "title": "Metric",
-          "type": "string"
-        },
-        "computed": {
-          "title": "Computed",
-          "type": "number"
-        },
-        "published": {
-          "title": "Published",
-          "type": "number"
-        },
-        "error_type": {
-          "const": "absolute",
-          "title": "Error Type",
-          "type": "string"
-        },
-        "error": {
-          "title": "Error",
-          "type": "number"
-        },
-        "tolerance": {
-          "title": "Tolerance",
-          "type": "number"
-        },
-        "check_passes": {
-          "title": "Check Passes",
-          "type": "boolean"
+        "check": {
+          "$ref": "#/$defs/PublishedCheck"
         }
       },
       "required": [
         "bfi",
         "published_bfi",
         "seconds",
-        "metric",
-        "computed",
-        "published",
-        "error_type",
-        "error",
-        "tolerance",
-        "check_passes"
+        "check"
       ],
       "title": "BaseflowMethod",
       "type": "object"
@@ -106,7 +70,7 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "const": "1.0",
+          "const": "1.1",
           "title": "Schema Version",
           "type": "string"
         },
@@ -734,6 +698,10 @@
           "title": "Value",
           "type": "number"
         },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
         "rationale": {
           "title": "Rationale",
           "type": "string"
@@ -741,6 +709,7 @@
       },
       "required": [
         "value",
+        "unit",
         "rationale"
       ],
       "title": "Tolerance",

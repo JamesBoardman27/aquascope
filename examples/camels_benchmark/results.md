@@ -4,7 +4,7 @@
 **Date:** 2026-09-10  
 **Description:** Flood frequency, baseflow and signature verification over 10 CAMELS catchments.  
 **Data Sources:** Synthetic daily series (data/camels_benchmark/daily), USGS annual peaks (data/camels_benchmark/peaks), CAMELS attributes (Addor et al., 2017), Flood-frequency reference quantiles (ffa_reference.json)  
-**Version:** 1.0  
+**Version:** 1.1  
 
 ## Summary
 
@@ -18,15 +18,15 @@
 
 *Decided up front; not loosened when a check fails.*
 
-| Check | Value | Rationale |
-| --- | --- | --- |
-| signature_relative | 0.25 | Synthetic daily series are calibrated to approximate the published CAMELS attributes; they are not measurements of them. |
-| baseflow_absolute | 0.15 | Published CAMELS baseflow index comes from a different separation algorithm than AquaScope's Lyne-Hollick/Eckhardt digital filters. |
-| peak_month_circular | 2.0 | Peak month is month-of-year and circular (Jan == Dec + 1 month). |
-| ffa_relative | 0.2 | Wider than the +/-10% used in the Potomac federal-standard validation because several benchmark gauges are semi-arid or heavy-tailed, where MLE vs L-moments spread is larger. |
-| q_mean_nrmse_gate | 25.0 | Aggregate q_mean gate: normalized RMSE (%) across the 10 gauges. |
-| bfi_pbias_gate | 25.0 | Aggregate baseflow gate: PBIAS (%) across the 10 gauges. |
-| ffa_gate | 0.2 | Aggregate flood-frequency gate over the dependable reference cross-checks (GEV-L-moments and LP3); GEV-MLE mismatches are reported separately as data-limitation findings, not folded into the implementation gate. |
+| Check | Value | Unit | Rationale |
+| --- | --- | --- | --- |
+| signature_relative | 0.25 | fraction | Synthetic daily series are calibrated to approximate the published CAMELS attributes; they are not measurements of them. |
+| baseflow_absolute | 0.15 | fraction | Published CAMELS baseflow index comes from a different separation algorithm than AquaScope's Lyne-Hollick/Eckhardt digital filters. |
+| peak_month_circular | 2.0 | months | Peak month is month-of-year and circular (Jan == Dec + 1 month). |
+| ffa_relative | 0.2 | fraction | Wider than the +/-10% used in the Potomac federal-standard validation because several benchmark gauges are semi-arid or heavy-tailed, where MLE vs L-moments spread is larger. |
+| q_mean_nrmse_gate | 25.0 | % | Aggregate q_mean gate: normalized RMSE (%) across the 10 gauges. |
+| bfi_pbias_gate | 25.0 | % | Aggregate baseflow gate: PBIAS (%) across the 10 gauges. |
+| ffa_gate | 20.0 | % | Aggregate flood-frequency gate over the dependable reference cross-checks (GEV-L-moments and LP3); GEV-MLE mismatches are reported separately as data-limitation findings, not folded into the implementation gate. |
 
 ## Aggregate performance (across 10 catchments)
 
@@ -113,7 +113,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 01013500 | 0.017 | 0.013 | 0.024 | 0.054 |
+| 01013500 | 0.016 | 0.018 | 0.048 | 0.081 |
 
 ### 01664000 - Rappahannock River near Fredericksburg, VA (humid continental)
 
@@ -183,7 +183,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 01664000 | 0.01 | 0.013 | 0.024 | 0.047 |
+| 01664000 | 0.01 | 0.014 | 0.022 | 0.046 |
 
 ### 02231000 - St. Marys River near Macclenny, FL (subtropical)
 
@@ -253,7 +253,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 02231000 | 0.012 | 0.011 | 0.022 | 0.045 |
+| 02231000 | 0.011 | 0.014 | 0.027 | 0.052 |
 
 ### 03451500 - French Broad River at Asheville, NC (humid Appalachian)
 
@@ -323,7 +323,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 03451500 | 0.011 | 0.014 | 0.02 | 0.045 |
+| 03451500 | 0.014 | 0.015 | 0.024 | 0.052 |
 
 ### 06803500 - Salt Creek at Roca, NE (semi-arid Great Plains)
 
@@ -393,7 +393,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 06803500 | 0.009 | 0.01 | 0.024 | 0.043 |
+| 06803500 | 0.011 | 0.013 | 0.029 | 0.053 |
 
 ### 07056000 - Buffalo River near St. Joe, AR (humid interior)
 
@@ -463,7 +463,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 07056000 | 0.009 | 0.011 | 0.023 | 0.044 |
+| 07056000 | 0.011 | 0.013 | 0.029 | 0.053 |
 
 ### 08181500 - Medina River at San Antonio, TX (semi-arid)
 
@@ -533,7 +533,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 08181500 | 0.008 | 0.01 | 0.018 | 0.036 |
+| 08181500 | 0.013 | 0.013 | 0.023 | 0.049 |
 
 ### 09510200 - Cave Creek near Cave Creek, AZ (arid)
 
@@ -603,7 +603,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 09510200 | 0.011 | 0.013 | 0.025 | 0.05 |
+| 09510200 | 0.012 | 0.014 | 0.031 | 0.057 |
 
 ### 11532500 - Smith River near Crescent City, CA (Pacific Northwest rain)
 
@@ -673,7 +673,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 11532500 | 0.01 | 0.012 | 0.026 | 0.048 |
+| 11532500 | 0.01 | 0.012 | 0.027 | 0.049 |
 
 ### 14301000 - Nehalem River near Foss, OR (Pacific Northwest rain)
 
@@ -743,7 +743,7 @@
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 14301000 | 0.011 | 0.01 | 0.021 | 0.041 |
+| 14301000 | 0.009 | 0.01 | 0.021 | 0.04 |
 
 ## Execution timings
 
@@ -753,18 +753,18 @@ Wall-clock seconds per stage, per catchment. Recorded and reported; never assert
 
 | Gauge | signatures_s | baseflow_s | flood_frequency_s | total_s |
 | --- | --- | --- | --- | --- |
-| 01013500 | 0.017 | 0.013 | 0.024 | 0.054 |
-| 01664000 | 0.01 | 0.013 | 0.024 | 0.047 |
-| 02231000 | 0.012 | 0.011 | 0.022 | 0.045 |
-| 03451500 | 0.011 | 0.014 | 0.02 | 0.045 |
-| 06803500 | 0.009 | 0.01 | 0.024 | 0.043 |
-| 07056000 | 0.009 | 0.011 | 0.023 | 0.044 |
-| 08181500 | 0.008 | 0.01 | 0.018 | 0.036 |
-| 09510200 | 0.011 | 0.013 | 0.025 | 0.05 |
-| 11532500 | 0.01 | 0.012 | 0.026 | 0.048 |
-| 14301000 | 0.011 | 0.01 | 0.021 | 0.041 |
+| 01013500 | 0.016 | 0.018 | 0.048 | 0.081 |
+| 01664000 | 0.01 | 0.014 | 0.022 | 0.046 |
+| 02231000 | 0.011 | 0.014 | 0.027 | 0.052 |
+| 03451500 | 0.014 | 0.015 | 0.024 | 0.052 |
+| 06803500 | 0.011 | 0.013 | 0.029 | 0.053 |
+| 07056000 | 0.011 | 0.013 | 0.029 | 0.053 |
+| 08181500 | 0.013 | 0.013 | 0.023 | 0.049 |
+| 09510200 | 0.012 | 0.014 | 0.031 | 0.057 |
+| 11532500 | 0.01 | 0.012 | 0.027 | 0.049 |
+| 14301000 | 0.009 | 0.01 | 0.021 | 0.04 |
 
-- **Total runtime (s):** 0.453 s
+- **Total runtime (s):** 0.532 s
 ## Data and methods
 
 Discharge: synthetic daily series calibrated to CAMELS; peaks: USGS NWIS annual peak series, one value per USGS water year, screened for qualifier codes and censored values. Reference quantiles: GEV-MLE and LP3 via scipy, GEV-L-moments via lmoments3 (Hosking 1997). Full provenance per catchment in results.json.
