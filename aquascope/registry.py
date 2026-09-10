@@ -134,6 +134,33 @@ SOURCES: dict[str, SourceMeta] = {
         license="CC-BY-4.0", redistributable=True,
         attribution="Chagas et al. (2020), CAMELS-BR",
     ),
+    "colorado_cdss": _s(
+        key="colorado_cdss",
+        label="Colorado DWR/CDSS",
+        region="United States",
+        description="Colorado state telemetry-station discharge observations",
+        agency="Colorado Division of Water Resources",
+        country="USA",
+        homepage="https://dwr.state.co.us/Rest/GET/Help",
+        variables=("discharge",),
+        supports_bbox=False,
+        supports_station_lookup=False,
+        output_model="StreamflowReading",
+        license="unknown",
+        redistributable=False,
+        attribution="Colorado Division of Water Resources",
+    ),
+    "brazil_ana": _s(
+        key="brazil_ana", label="ANA Hidroweb", region="Brazil",
+        description="Telemetric streamflow, stage and rainfall from Brazil's national hydrological network",
+        agency="Agência Nacional de Águas e Saneamento Básico (ANA)", country="BRA",
+        homepage="https://www.snirh.gov.br/hidroweb/",
+        variables=("discharge", "water_level", "precipitation"),
+        supports_station_lookup=True,
+        output_model="StreamflowReading | WaterLevelReading | ClimateReading",
+        license="unknown", redistributable=False,
+        attribution="Agência Nacional de Águas e Saneamento Básico (ANA), Hidroweb",
+    ),
     # ── Europe ──────────────────────────────────────────────────────────
     "uk_ea": _s(
         key="uk_ea", label="Environment Agency (England)", region="United Kingdom",
@@ -475,8 +502,12 @@ def build_collector(source_key: str, api_key: str | None = None, **ctor_kwargs):
         "pegelonline": lambda: c.PegelonlineCollector(),
         "camels_cl": lambda: c.CAMELSCLCollector(),
         "camels_br": lambda: c.CAMELSBRCollector(),
+        "brazil_ana": lambda: c.BrazilANACollector(
+            identificador=ctor_kwargs.get("identificador"), senha=ctor_kwargs.get("senha")
+        ),
         "uk_ea": lambda: c.UKEACollector(),
         "bom": lambda: c.BOMCollector(),
+        "colorado_cdss": lambda: c.ColoradoCDSSCollector(api_key=api_key),
     }
     if source_key not in factories:
         raise ValueError(f"Unknown source {source_key!r}. Available: {source_keys()}")
