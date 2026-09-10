@@ -11,6 +11,7 @@ from aquascope.collectors.france_hubeau import HubeauHydrometrieCollector
 from aquascope.collectors.gemstat import GEMStatCollector
 from aquascope.collectors.grdc import GRDCCollector
 from aquascope.collectors.greece_hydroscope import GreeceHydroscopeCollector
+from aquascope.collectors.greece_openhi import GreeceOpenhiCollector
 from aquascope.collectors.india_wris import IndiaWRISCollector
 from aquascope.collectors.ireland_opw import IrelandOPWCollector
 from aquascope.collectors.japan_mlit import JapanMLITCollector
@@ -47,6 +48,7 @@ __all__ = [
     "GEMStatCollector",
     "GRDCCollector",
     "GreeceHydroscopeCollector",
+    "GreeceOpenhiCollector",
     "HubeauHydrometrieCollector",
     "IndiaWRISCollector",
     "JapanMLITCollector",
