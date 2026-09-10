@@ -36,7 +36,8 @@ logger = logging.getLogger(__name__)
 SERVER_NAME = "aquascope"
 INSTRUCTIONS = (
     "AquaScope gives you the world's public water gauges (USGS, UK EA, Hub'Eau, PEGELONLINE, Ireland OPW, "
-    "Taiwan CWA and more) behind one schema. Start with find_stations (no agency call), then get_timeseries or "
+    "Greece Hydroscope, Taiwan CWA and more) behind one schema. Start with find_stations (no agency call), "
+    "then get_timeseries or "
     "analyze_station for a specific station. For a place or a station, assess_site(lat, lon) first says which "
     "methods the record there supports; do not run one it marks not_defensible. Flood frequency needs at least "
     "10 complete years of daily flow. Always show the licence/attribution returned with the data."

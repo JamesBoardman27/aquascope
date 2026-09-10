@@ -1,6 +1,6 @@
 # Data Sources
 
-AquaScope ships **31 collectors** that normalise water data into typed Pydantic records. One API call per source, one schema across the toolkit.
+AquaScope ships **32 collectors** that normalise water data into typed Pydantic records. One API call per source, one schema across the toolkit.
 
 Most sources emit point observations and share the unified `water_data` schema (`WaterQualitySample`, `WaterLevelReading`, `ReservoirStatus`). Three aggregate/gridded sources use purpose-built record types that match their data shape: **FAO AQUASTAT** returns country-level `AquastatRecord`, **UN SDG 6** returns `SDG6Indicator`, and **FAO WaPOR** returns gridded `WaPORObservation`.
 
@@ -40,6 +40,7 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | [CAMELS-BR](https://doi.org/10.5281/zenodo.3709337) | Brazil | Daily observed streamflow, catchment attributes | ZIP / CSV | ✅ |
 | [ANA Hidroweb](https://www.snirh.gov.br/hidroweb/) | Brazil | Telemetric streamflow, stage, rainfall | REST | ✅ |
 | [Ireland OPW](https://waterlevel.ie) | Ireland | River / lake water level (15-min resolution) | GeoJSON / CSV | ✅ |
+| [Greece Hydroscope](https://hydroscope.gr) | Greece | Daily river stage, monthly discharge, rainfall (1904-2019) | Enhydris REST | ✅ |
 | [Environment Agency (England)](https://environment.data.gov.uk) | England (UK) | River and groundwater levels, river flow, rainfall data | REST | ✅ |
 | [BOM Water Data Online](http://www.bom.gov.au/waterdata/) | Australia | Streamflow, water level, storage, groundwater level | KISTERS WISKI (KiWIS) | ✅ |
 | [Colorado DWR/CDSS](https://dwr.state.co.us/Rest/GET/Help) | Colorado, USA | State telemetry streamflow observations | REST | ✅ |
@@ -67,6 +68,7 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | CAMELS-CL | No | Open access |
 | CAMELS-BR | No | Open access via Zenodo |
 | Ireland OPW | No | Open access via waterlevel.ie |
+| Greece Hydroscope | No | Open access via hydroscope.gr |
 | Environment Agency (England) | No | Open access |
 | BOM Water Data Online | No | Open access |
 | Colorado DWR/CDSS | No | Open access |
