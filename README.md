@@ -43,7 +43,8 @@ AquaScope unifies **35 global water-data sources** behind one Python schema, the
 ## 🌍 Try it without installing anything
 
 **[AquaScope Explorer](https://rekin226-aquascope-explorer.static.hf.space/)**: every public gauge we can reach on one map
-(45,919 stations from USGS, UK EA, Hub'Eau, PEGELONLINE, Ireland OPW and Taiwan CWA). Click one and get the observed record,
+(62,613 stations from USGS, Australia BOM, UK EA, Hub'Eau, Taiwan CWA, PEGELONLINE and Ireland OPW;
+Greece and Brazil land with the next weekly rebuild). Click one and get the observed record,
 flood frequency with confidence limits, flow duration and trend, computed in your browser by aquascope on Pyodide.
 The catalog behind it is an open GeoParquet dataset, [`Rekin226/aquascope-gauges`](https://huggingface.co/datasets/Rekin226/aquascope-gauges), harvested weekly.
 Press **Ask ✨** to type a question in plain language (bring your own key, Groq and Hugging Face are free): the model picks the
@@ -63,7 +64,7 @@ MCP client) `find_stations`, `get_timeseries`, `analyze_station` and `flood_freq
 
 ## ✨ What you can do
 
-- 🌊 **Pull water data** from USGS, NOAA NWPS, Colorado DWR/CDSS, US Water Quality Portal, England's Environment Agency, France Hub'Eau, Germany PEGELONLINE, Ireland OPW, Greece Hydroscope, EU WFD, Taiwan MOENV/WRA/CWA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, Australia BOM, Brazil ANA Hidroweb, CAMELS-CL and CAMELS-BR, GRDC, GEMStat, Copernicus ERA5, OpenMeteo, FAO AQUASTAT, FAO WaPOR and UN SDG 6 — **one unified Python API**.
+- 🌊 **Pull water data** from USGS, NOAA NWPS, Colorado DWR/CDSS, US Water Quality Portal, England's Environment Agency, France Hub'Eau, Germany PEGELONLINE, Ireland OPW, Greece Hydroscope and OpenHi.net, EU WFD, Taiwan MOENV/WRA/CWA/Civil IoT/DataGov, Japan MLIT, Korea WAMIS, India WRIS, Australia BOM, Brazil ANA Hidroweb, CAMELS-CL and CAMELS-BR, GRDC, GEMStat, Copernicus ERA5, OpenMeteo, FAO AQUASTAT, FAO WaPOR and UN SDG 6 — **one unified Python API**.
 - 📈 **Run hydrological analyses** — Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, 22 hydrological signatures.
 - 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 26 crops, irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
@@ -318,7 +319,7 @@ Run `aquascope --help` for the full command list.
 35 data collectors spanning four regions (highlights below, full list in the [docs](docs/data_sources.md)):
 
 - 🌎 **Americas** — USGS (streamflow + WQ), NOAA NWPS (US streamflow), Colorado DWR/CDSS, Water Quality Portal (400+ agencies), CAMELS-CL (Chile), CAMELS-BR and ANA Hidroweb (Brazil)
-- 🌍 **Europe** — EU Water Framework Directive, Copernicus ERA5, France Hub'Eau, Germany PEGELONLINE, England's Environment Agency, Ireland OPW, Greece Hydroscope
+- 🌍 **Europe** — EU Water Framework Directive, Copernicus ERA5, France Hub'Eau, Germany PEGELONLINE, England's Environment Agency, Ireland OPW, Greece Hydroscope (national archive) and OpenHi.net (live telemetry)
 - 🌏 **Asia-Pacific** — Taiwan MOENV / WRA / CWA / Civil IoT / DataGov, Japan MLIT, Korea WAMIS, India WRIS, Australia BOM
 - 🌐 **Global** — GEMStat (170 countries), UN SDG 6, OpenMeteo, FAO AQUASTAT, FAO WaPOR, GRDC (river discharge)
 
