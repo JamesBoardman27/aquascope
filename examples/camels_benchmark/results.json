@@ -1,8 +1,8 @@
 {
   "metadata": {
     "schema_version": "1.1",
-    "generated": "2026-09-10",
-    "aquascope_version": "0.15.1",
+    "generated": "2026-09-11",
+    "aquascope_version": "0.16.0",
     "note": "AquaScope's own implementations compared against published CAMELS attributes and the flood-frequency reference quantiles. Per-catchment integrity checks record internal invariants on the signature object and are surfaced in the report but never folded into the gates. results.md and results.html are renderings of this file. This file is validated against benchmarks/results.schema.json, generated from the Pydantic models in benchmarks/results_models.py. Execution times are recorded and reported, never asserted.",
     "timings_not_asserted": true,
     "tolerances": {
@@ -151,14 +151,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.015919408000172552
+        "seconds": 0.009725332000016351
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.559321,
             "published_bfi": 0.59,
-            "seconds": 0.011182136000115861,
+            "seconds": 0.007348210999907678,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.559321,
@@ -172,7 +172,7 @@
           "eckhardt": {
             "bfi": 0.542497,
             "published_bfi": 0.59,
-            "seconds": 0.006543187999795919,
+            "seconds": 0.002503693999983625,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.542497,
@@ -184,7 +184,7 @@
             }
           }
         },
-        "seconds": 0.01772532399991178
+        "seconds": 0.009851904999891303
       },
       "flood_frequency": {
         "methods": {
@@ -194,7 +194,7 @@
             "mean_relative_error_pct": 8.27,
             "max_relative_error_pct": 40.3,
             "warnings": [],
-            "seconds": 0.042852930999742966,
+            "seconds": 0.014514186000042173,
             "fits": [
               {
                 "return_period": 2,
@@ -252,7 +252,7 @@
             "mean_relative_error_pct": 0.01,
             "max_relative_error_pct": 0.02,
             "warnings": [],
-            "seconds": 0.0018389799997748923,
+            "seconds": 0.0013170859999718232,
             "fits": [
               {
                 "return_period": 2,
@@ -310,7 +310,7 @@
             "mean_relative_error_pct": 0.1,
             "max_relative_error_pct": 0.23,
             "warnings": [],
-            "seconds": 0.0030465760000879527,
+            "seconds": 0.0018642310000132056,
             "fits": [
               {
                 "return_period": 2,
@@ -363,13 +363,13 @@
             ]
           }
         },
-        "seconds": 0.04773848699960581
+        "seconds": 0.017695503000027202
       },
       "timings": {
-        "signatures_s": 0.016,
-        "baseflow_s": 0.018,
-        "flood_frequency_s": 0.048,
-        "total_s": 0.081
+        "signatures_s": 0.01,
+        "baseflow_s": 0.01,
+        "flood_frequency_s": 0.018,
+        "total_s": 0.037
       }
     },
     "01664000": {
@@ -479,14 +479,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.009774685999673238
+        "seconds": 0.0076329820000182735
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.537086,
             "published_bfi": 0.44,
-            "seconds": 0.010233879999759665,
+            "seconds": 0.00694519700005003,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.537086,
@@ -500,7 +500,7 @@
           "eckhardt": {
             "bfi": 0.523422,
             "published_bfi": 0.44,
-            "seconds": 0.0036542120001286094,
+            "seconds": 0.0024196279999841863,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.523422,
@@ -512,7 +512,7 @@
             }
           }
         },
-        "seconds": 0.013888091999888275
+        "seconds": 0.009364825000034216
       },
       "flood_frequency": {
         "methods": {
@@ -522,7 +522,7 @@
             "mean_relative_error_pct": 0.0,
             "max_relative_error_pct": 0.0,
             "warnings": [],
-            "seconds": 0.017529980999825057,
+            "seconds": 0.013068946999965192,
             "fits": [
               {
                 "return_period": 2,
@@ -580,7 +580,7 @@
             "mean_relative_error_pct": 0.03,
             "max_relative_error_pct": 0.07,
             "warnings": [],
-            "seconds": 0.00203745999988314,
+            "seconds": 0.0012282430000141176,
             "fits": [
               {
                 "return_period": 2,
@@ -638,7 +638,7 @@
             "mean_relative_error_pct": 0.18,
             "max_relative_error_pct": 0.42,
             "warnings": [],
-            "seconds": 0.00230011400026342,
+            "seconds": 0.0016044320000219159,
             "fits": [
               {
                 "return_period": 2,
@@ -691,13 +691,13 @@
             ]
           }
         },
-        "seconds": 0.021867554999971617
+        "seconds": 0.015901622000001225
       },
       "timings": {
-        "signatures_s": 0.01,
-        "baseflow_s": 0.014,
-        "flood_frequency_s": 0.022,
-        "total_s": 0.046
+        "signatures_s": 0.008,
+        "baseflow_s": 0.009,
+        "flood_frequency_s": 0.016,
+        "total_s": 0.033
       }
     },
     "02231000": {
@@ -807,14 +807,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.011094934000084322
+        "seconds": 0.007665137999993021
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.514691,
             "published_bfi": 0.65,
-            "seconds": 0.010753941999610106,
+            "seconds": 0.006984445000057349,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.514691,
@@ -828,7 +828,7 @@
           "eckhardt": {
             "bfi": 0.504979,
             "published_bfi": 0.65,
-            "seconds": 0.003075825999985682,
+            "seconds": 0.002378975000056016,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.504979,
@@ -840,7 +840,7 @@
             }
           }
         },
-        "seconds": 0.013829767999595788
+        "seconds": 0.009363420000113365
       },
       "flood_frequency": {
         "methods": {
@@ -850,7 +850,7 @@
             "mean_relative_error_pct": 182.59,
             "max_relative_error_pct": 585.59,
             "warnings": [],
-            "seconds": 0.02026591300000291,
+            "seconds": 0.013724002000003566,
             "fits": [
               {
                 "return_period": 2,
@@ -908,7 +908,7 @@
             "mean_relative_error_pct": 0.04,
             "max_relative_error_pct": 0.07,
             "warnings": [],
-            "seconds": 0.00224599200009834,
+            "seconds": 0.001215426999920055,
             "fits": [
               {
                 "return_period": 2,
@@ -966,7 +966,7 @@
             "mean_relative_error_pct": 0.18,
             "max_relative_error_pct": 0.42,
             "warnings": [],
-            "seconds": 0.00442524299978686,
+            "seconds": 0.001572528999986389,
             "fits": [
               {
                 "return_period": 2,
@@ -1019,13 +1019,13 @@
             ]
           }
         },
-        "seconds": 0.02693714799988811
+        "seconds": 0.01651195799991001
       },
       "timings": {
-        "signatures_s": 0.011,
-        "baseflow_s": 0.014,
-        "flood_frequency_s": 0.027,
-        "total_s": 0.052
+        "signatures_s": 0.008,
+        "baseflow_s": 0.009,
+        "flood_frequency_s": 0.017,
+        "total_s": 0.034
       }
     },
     "03451500": {
@@ -1135,14 +1135,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.013508404000276641
+        "seconds": 0.011462602999927185
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.577274,
             "published_bfi": 0.52,
-            "seconds": 0.00928452300013305,
+            "seconds": 0.011807059999910052,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.577274,
@@ -1156,7 +1156,7 @@
           "eckhardt": {
             "bfi": 0.555522,
             "published_bfi": 0.52,
-            "seconds": 0.005738182000186498,
+            "seconds": 0.0037409850000358347,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.555522,
@@ -1168,7 +1168,7 @@
             }
           }
         },
-        "seconds": 0.015022705000319547
+        "seconds": 0.015548044999945887
       },
       "flood_frequency": {
         "methods": {
@@ -1178,7 +1178,7 @@
             "mean_relative_error_pct": 0.0,
             "max_relative_error_pct": 0.0,
             "warnings": [],
-            "seconds": 0.019776269999965734,
+            "seconds": 0.01384264799992252,
             "fits": [
               {
                 "return_period": 2,
@@ -1236,7 +1236,7 @@
             "mean_relative_error_pct": 0.04,
             "max_relative_error_pct": 0.08,
             "warnings": [],
-            "seconds": 0.0019121609998364875,
+            "seconds": 0.0015265199999703327,
             "fits": [
               {
                 "return_period": 2,
@@ -1294,7 +1294,7 @@
             "mean_relative_error_pct": 0.26,
             "max_relative_error_pct": 0.63,
             "warnings": [],
-            "seconds": 0.001972958999886032,
+            "seconds": 0.0017518450000579833,
             "fits": [
               {
                 "return_period": 2,
@@ -1347,13 +1347,13 @@
             ]
           }
         },
-        "seconds": 0.023661389999688254
+        "seconds": 0.017121012999950835
       },
       "timings": {
-        "signatures_s": 0.014,
-        "baseflow_s": 0.015,
-        "flood_frequency_s": 0.024,
-        "total_s": 0.052
+        "signatures_s": 0.011,
+        "baseflow_s": 0.016,
+        "flood_frequency_s": 0.017,
+        "total_s": 0.044
       }
     },
     "06803500": {
@@ -1463,14 +1463,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.011095521999777702
+        "seconds": 0.007712826000101813
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.550469,
             "published_bfi": 0.7,
-            "seconds": 0.010242278999612608,
+            "seconds": 0.0069967079999742054,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.550469,
@@ -1484,7 +1484,7 @@
           "eckhardt": {
             "bfi": 0.533633,
             "published_bfi": 0.7,
-            "seconds": 0.002467187000092963,
+            "seconds": 0.002374903000031736,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.533633,
@@ -1496,7 +1496,7 @@
             }
           }
         },
-        "seconds": 0.012709465999705571
+        "seconds": 0.009371611000005942
       },
       "flood_frequency": {
         "methods": {
@@ -1506,7 +1506,7 @@
             "mean_relative_error_pct": 202.62,
             "max_relative_error_pct": 800.77,
             "warnings": [],
-            "seconds": 0.0235017479999442,
+            "seconds": 0.016058660999988206,
             "fits": [
               {
                 "return_period": 2,
@@ -1564,7 +1564,7 @@
             "mean_relative_error_pct": 0.03,
             "max_relative_error_pct": 0.06,
             "warnings": [],
-            "seconds": 0.0028627639999285748,
+            "seconds": 0.0010642570000527485,
             "fits": [
               {
                 "return_period": 2,
@@ -1622,7 +1622,7 @@
             "mean_relative_error_pct": 0.81,
             "max_relative_error_pct": 1.73,
             "warnings": [],
-            "seconds": 0.0029243640001368476,
+            "seconds": 0.0015378870000404277,
             "fits": [
               {
                 "return_period": 2,
@@ -1675,13 +1675,13 @@
             ]
           }
         },
-        "seconds": 0.029288876000009623
+        "seconds": 0.018660805000081382
       },
       "timings": {
-        "signatures_s": 0.011,
-        "baseflow_s": 0.013,
-        "flood_frequency_s": 0.029,
-        "total_s": 0.053
+        "signatures_s": 0.008,
+        "baseflow_s": 0.009,
+        "flood_frequency_s": 0.019,
+        "total_s": 0.036
       }
     },
     "07056000": {
@@ -1791,14 +1791,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.011349108000104025
+        "seconds": 0.007394265000016276
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.529711,
             "published_bfi": 0.51,
-            "seconds": 0.0079711190001035,
+            "seconds": 0.007063700999992761,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.529711,
@@ -1812,7 +1812,7 @@
           "eckhardt": {
             "bfi": 0.51613,
             "published_bfi": 0.51,
-            "seconds": 0.004595559999870602,
+            "seconds": 0.0023617509999667163,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.51613,
@@ -1824,7 +1824,7 @@
             }
           }
         },
-        "seconds": 0.012566678999974101
+        "seconds": 0.009425451999959478
       },
       "flood_frequency": {
         "methods": {
@@ -1834,7 +1834,7 @@
             "mean_relative_error_pct": 0.0,
             "max_relative_error_pct": 0.0,
             "warnings": [],
-            "seconds": 0.025069142000120337,
+            "seconds": 0.016297336999969048,
             "fits": [
               {
                 "return_period": 2,
@@ -1892,7 +1892,7 @@
             "mean_relative_error_pct": 0.03,
             "max_relative_error_pct": 0.07,
             "warnings": [],
-            "seconds": 0.001816895000047225,
+            "seconds": 0.001186367000059363,
             "fits": [
               {
                 "return_period": 2,
@@ -1950,7 +1950,7 @@
             "mean_relative_error_pct": 0.21,
             "max_relative_error_pct": 0.47,
             "warnings": [],
-            "seconds": 0.0020055459999639424,
+            "seconds": 0.0016619160001027922,
             "fits": [
               {
                 "return_period": 2,
@@ -2003,13 +2003,13 @@
             ]
           }
         },
-        "seconds": 0.028891583000131504
+        "seconds": 0.019145620000131203
       },
       "timings": {
-        "signatures_s": 0.011,
-        "baseflow_s": 0.013,
-        "flood_frequency_s": 0.029,
-        "total_s": 0.053
+        "signatures_s": 0.007,
+        "baseflow_s": 0.009,
+        "flood_frequency_s": 0.019,
+        "total_s": 0.036
       }
     },
     "08181500": {
@@ -2119,14 +2119,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.012543794000066555
+        "seconds": 0.007861251999997876
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.364938,
             "published_bfi": 0.38,
-            "seconds": 0.010200665999946068,
+            "seconds": 0.007053763000044455,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.364938,
@@ -2140,7 +2140,7 @@
           "eckhardt": {
             "bfi": 0.372659,
             "published_bfi": 0.38,
-            "seconds": 0.0031808899998395646,
+            "seconds": 0.0024042679999638494,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.372659,
@@ -2152,7 +2152,7 @@
             }
           }
         },
-        "seconds": 0.013381555999785633
+        "seconds": 0.009458031000008305
       },
       "flood_frequency": {
         "methods": {
@@ -2162,7 +2162,7 @@
             "mean_relative_error_pct": 21.62,
             "max_relative_error_pct": 44.86,
             "warnings": [],
-            "seconds": 0.017008963000080257,
+            "seconds": 0.013425438000012946,
             "fits": [
               {
                 "return_period": 2,
@@ -2220,7 +2220,7 @@
             "mean_relative_error_pct": 0.01,
             "max_relative_error_pct": 0.01,
             "warnings": [],
-            "seconds": 0.0025657470000624016,
+            "seconds": 0.001281435999999303,
             "fits": [
               {
                 "return_period": 2,
@@ -2278,7 +2278,7 @@
             "mean_relative_error_pct": 0.03,
             "max_relative_error_pct": 0.08,
             "warnings": [],
-            "seconds": 0.0036690639999505947,
+            "seconds": 0.0015508980000049633,
             "fits": [
               {
                 "return_period": 2,
@@ -2331,13 +2331,13 @@
             ]
           }
         },
-        "seconds": 0.023243774000093254
+        "seconds": 0.016257772000017212
       },
       "timings": {
-        "signatures_s": 0.013,
-        "baseflow_s": 0.013,
-        "flood_frequency_s": 0.023,
-        "total_s": 0.049
+        "signatures_s": 0.008,
+        "baseflow_s": 0.009,
+        "flood_frequency_s": 0.016,
+        "total_s": 0.034
       }
     },
     "09510200": {
@@ -2447,14 +2447,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.011911036999663338
+        "seconds": 0.007753539000077581
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.396684,
             "published_bfi": 0.25,
-            "seconds": 0.01037043399992399,
+            "seconds": 0.007285485000011249,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.396684,
@@ -2468,7 +2468,7 @@
           "eckhardt": {
             "bfi": 0.4015,
             "published_bfi": 0.25,
-            "seconds": 0.003632380999988527,
+            "seconds": 0.003015215999994325,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.4015,
@@ -2480,7 +2480,7 @@
             }
           }
         },
-        "seconds": 0.014002814999912516
+        "seconds": 0.010300701000005574
       },
       "flood_frequency": {
         "methods": {
@@ -2490,7 +2490,7 @@
             "mean_relative_error_pct": 36.75,
             "max_relative_error_pct": 67.92,
             "warnings": [],
-            "seconds": 0.027704138999979477,
+            "seconds": 0.02223658799994155,
             "fits": [
               {
                 "return_period": 2,
@@ -2548,7 +2548,7 @@
             "mean_relative_error_pct": 0.04,
             "max_relative_error_pct": 0.07,
             "warnings": [],
-            "seconds": 0.0017326369998045266,
+            "seconds": 0.0012899930000003224,
             "fits": [
               {
                 "return_period": 2,
@@ -2606,7 +2606,7 @@
             "mean_relative_error_pct": 1.68,
             "max_relative_error_pct": 3.65,
             "warnings": [],
-            "seconds": 0.00178340999991633,
+            "seconds": 0.0016668580000214206,
             "fits": [
               {
                 "return_period": 2,
@@ -2659,13 +2659,13 @@
             ]
           }
         },
-        "seconds": 0.031220185999700334
+        "seconds": 0.02519343899996329
       },
       "timings": {
-        "signatures_s": 0.012,
-        "baseflow_s": 0.014,
-        "flood_frequency_s": 0.031,
-        "total_s": 0.057
+        "signatures_s": 0.008,
+        "baseflow_s": 0.01,
+        "flood_frequency_s": 0.025,
+        "total_s": 0.043
       }
     },
     "11532500": {
@@ -2775,14 +2775,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.01024181499997212
+        "seconds": 0.008191597999939404
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.489962,
             "published_bfi": 0.47,
-            "seconds": 0.009413346000201273,
+            "seconds": 0.007481956999981776,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.489962,
@@ -2796,7 +2796,7 @@
           "eckhardt": {
             "bfi": 0.481301,
             "published_bfi": 0.47,
-            "seconds": 0.002416511999854265,
+            "seconds": 0.002447567000103845,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.481301,
@@ -2808,7 +2808,7 @@
             }
           }
         },
-        "seconds": 0.011829858000055538
+        "seconds": 0.009929524000085621
       },
       "flood_frequency": {
         "methods": {
@@ -2818,7 +2818,7 @@
             "mean_relative_error_pct": 161.74,
             "max_relative_error_pct": 525.65,
             "warnings": [],
-            "seconds": 0.02242546700017556,
+            "seconds": 0.018374648999952115,
             "fits": [
               {
                 "return_period": 2,
@@ -2876,7 +2876,7 @@
             "mean_relative_error_pct": 0.0,
             "max_relative_error_pct": 0.01,
             "warnings": [],
-            "seconds": 0.002459992000240163,
+            "seconds": 0.0011936729999888485,
             "fits": [
               {
                 "return_period": 2,
@@ -2934,7 +2934,7 @@
             "mean_relative_error_pct": 0.42,
             "max_relative_error_pct": 0.88,
             "warnings": [],
-            "seconds": 0.002053827000054298,
+            "seconds": 0.001600884000026781,
             "fits": [
               {
                 "return_period": 2,
@@ -2987,13 +2987,13 @@
             ]
           }
         },
-        "seconds": 0.02693928600047002
+        "seconds": 0.021169205999967744
       },
       "timings": {
-        "signatures_s": 0.01,
-        "baseflow_s": 0.012,
-        "flood_frequency_s": 0.027,
-        "total_s": 0.049
+        "signatures_s": 0.008,
+        "baseflow_s": 0.01,
+        "flood_frequency_s": 0.021,
+        "total_s": 0.039
       }
     },
     "14301000": {
@@ -3103,14 +3103,14 @@
             "check_passes": true
           }
         ],
-        "seconds": 0.00945905499975197
+        "seconds": 0.008026328000028116
       },
       "baseflow": {
         "methods": {
           "lyne_hollick": {
             "bfi": 0.465319,
             "published_bfi": 0.43,
-            "seconds": 0.007194635999894672,
+            "seconds": 0.00721147399997335,
             "check": {
               "metric": "bfi_lyne_hollick",
               "computed": 0.465319,
@@ -3124,7 +3124,7 @@
           "eckhardt": {
             "bfi": 0.461454,
             "published_bfi": 0.43,
-            "seconds": 0.00237070399998629,
+            "seconds": 0.0024429989999816826,
             "check": {
               "metric": "bfi_eckhardt",
               "computed": 0.461454,
@@ -3136,7 +3136,7 @@
             }
           }
         },
-        "seconds": 0.009565339999880962
+        "seconds": 0.009654472999955033
       },
       "flood_frequency": {
         "methods": {
@@ -3146,7 +3146,7 @@
             "mean_relative_error_pct": 0.0,
             "max_relative_error_pct": 0.0,
             "warnings": [],
-            "seconds": 0.017154508999738027,
+            "seconds": 0.013218952999977773,
             "fits": [
               {
                 "return_period": 2,
@@ -3204,7 +3204,7 @@
             "mean_relative_error_pct": 0.02,
             "max_relative_error_pct": 0.04,
             "warnings": [],
-            "seconds": 0.0015084729998307012,
+            "seconds": 0.0011642860000620203,
             "fits": [
               {
                 "return_period": 2,
@@ -3262,7 +3262,7 @@
             "mean_relative_error_pct": 0.32,
             "max_relative_error_pct": 0.69,
             "warnings": [],
-            "seconds": 0.0022165350001159823,
+            "seconds": 0.0015840900000512192,
             "fits": [
               {
                 "return_period": 2,
@@ -3315,13 +3315,13 @@
             ]
           }
         },
-        "seconds": 0.02087951699968471
+        "seconds": 0.015967329000091013
       },
       "timings": {
-        "signatures_s": 0.009,
+        "signatures_s": 0.008,
         "baseflow_s": 0.01,
-        "flood_frequency_s": 0.021,
-        "total_s": 0.04
+        "flood_frequency_s": 0.016,
+        "total_s": 0.034
       }
     }
   },
@@ -3384,13 +3384,13 @@
       }
     },
     "timings": {
-      "total_seconds": 0.532
+      "total_seconds": 0.369
     }
   },
   "software": {
-    "version": "0.15.1",
-    "author": "AquaScope",
-    "doi": "",
-    "citation": "AquaScope (2026). AquaScope: Open-source water data aggregation toolkit (version 0.15.1) [Software]. DOI not yet assigned."
+    "version": "0.16.0",
+    "author": "Abdoul Rachid Ou\u00e9draogo",
+    "doi": "10.5281/zenodo.21903143",
+    "citation": "Abdoul Rachid Ou\u00e9draogo (2026). AquaScope: Open-source water data aggregation toolkit (version 0.16.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.21903143"
   }
 }
