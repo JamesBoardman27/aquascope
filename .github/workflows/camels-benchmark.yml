@@ -1,0 +1,41 @@
+name: CAMELS Benchmark
+
+# Nightly smoke test for the benchmark suite.
+# Runs AquaScope's own methods against the committed CAMELS
+# benchmark data, fully offline (generation-only network scripts are never
+# invoked). Produces results.json -- the single source of truth -- plus its
+# Markdown/HTML renderings, all uploaded as one artifact. The run hard-fails
+# through the Pydantic models if any result no longer validates.
+# Timings are recorded in results.json but never asserted on a shared runner.
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # Nightly at 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install AquaScope (with benchmarks dependencies)
+        run: pip install -e ".[benchmarks]"
+
+      - name: Run the CAMELS benchmark
+        run: python -m benchmarks.camels_benchmark --output-dir benchmark-output --strict
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: camels-benchmark-report
+          path: benchmark-output/
