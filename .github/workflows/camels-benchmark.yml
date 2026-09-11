@@ -5,7 +5,9 @@ name: CAMELS Benchmark
 # benchmark data, fully offline (generation-only network scripts are never
 # invoked). Produces results.json -- the single source of truth -- plus its
 # Markdown/HTML renderings, all uploaded as one artifact. The run hard-fails
-# through the Pydantic models if any result no longer validates.
+# through the Pydantic models if any result no longer validates, and --strict
+# exits non-zero on genuine misses only; the data-limitation findings are
+# recorded and surfaced, but never treated as failures.
 # Timings are recorded in results.json but never asserted on a shared runner.
 
 on:
