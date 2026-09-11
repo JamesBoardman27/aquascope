@@ -356,7 +356,7 @@ def test_cli_from_json_rejects_no_reports(tmp_path) -> None:
 
 
 def test_cli_strict_exits_nonzero_when_unmet(tmp_path) -> None:
-    """--strict fails the run when any recorded check is unmet."""
+    """--strict fails the run on genuine misses (data-limitation is recorded, not failing)."""
     rc = cb.main(["--output-dir", str(tmp_path), "--strict"])
     assert rc == 1
 
@@ -374,6 +374,31 @@ def test_strict_flags_integrity_failures() -> None:
     assert results["summary"]["n_integrity_failures"] == 0
     assert cb._strict_failed(results) is False
     summary = dict(results["summary"], n_integrity_failures=1)
+    assert cb._strict_failed(dict(results, summary=summary)) is True
+
+
+def test_strict_ignores_data_limitation_findings() -> None:
+    """--strict mirrors the gates: a run whose only misses are data-limitation passes."""
+    results = cb.build_results(gauge_ids=[UNSTABLE_GAUGE])
+    assert results["summary"]["n_unmet"] > 0
+    assert results["summary"]["n_unmet"] == results["summary"]["n_data_limitation_findings"]
+    assert all(g for k, g in results["summary"]["gates"].items() if k.endswith("_met"))
+    assert cb._strict_failed(results) is False
+
+
+def test_strict_fails_on_genuine_misses_besides_data_limitation() -> None:
+    """One genuine miss beyond the data-limitation findings still fails --strict."""
+    results = cb.build_results(gauge_ids=["03451500"])
+    summary = dict(results["summary"], n_unmet=3, n_data_limitation_findings=2)
+    assert cb._strict_failed(dict(results, summary=summary)) is True
+
+
+def test_strict_fails_on_gate_unmet_even_clean() -> None:
+    """An unmet aggregate gate fails --strict even with no per-check misses."""
+    results = cb.build_results(gauge_ids=["03451500"])
+    summary = dict(results["summary"])
+    gates = dict(results["summary"]["gates"], q_mean_gate_met=False)
+    summary["gates"] = gates
     assert cb._strict_failed(dict(results, summary=summary)) is True
 
 
