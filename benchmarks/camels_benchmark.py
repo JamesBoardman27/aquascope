@@ -623,6 +623,13 @@ def build_results(gauge_ids: list[str] | None = None) -> dict:
     summary = _aggregate(catchment_results, {c["gauge_id"]: c for c in catchments})
 
     builder = _report_builder({"metadata": {"schema_version": SCHEMA_VERSION}})
+    cff_version, cff_doi, cff_author = _read_citation_cff()
+    if cff_version:
+        builder.metadata.software_version = cff_version
+    if cff_doi:
+        builder.metadata.doi = cff_doi
+    if cff_author:
+        builder.metadata.author = cff_author
     software = {
         "version": builder.metadata.software_version,
         "author": builder.metadata.author,
@@ -663,6 +670,82 @@ def build_results(gauge_ids: list[str] | None = None) -> dict:
     return results
 
 
+_REPO_ROOT = _paths.REPO_ROOT
+
+
+def _read_citation_cff() -> tuple[str | None, str | None, str | None]:
+    """Read ``version``, ``doi`` and ``authors`` from the repo-root ``CITATION.cff``.
+
+    Author names are formatted "given-names name-particle family-names
+    name-suffix" per the CFF conventions; entries with a plain ``name`` are
+    used verbatim.
+
+    Returns:
+        ``(version, doi, author)`` — each may be ``None`` if the file is
+        missing or the field is absent.
+    """
+    cff = _REPO_ROOT / "CITATION.cff"
+    try:
+        text = cff.read_text(encoding="utf-8")
+    except OSError:
+        return None, None, None
+    version = doi = None
+    authors: list[dict[str, str]] = []
+    entry: dict[str, str] | None = None
+    in_authors = False
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(stripped)
+        if indent == 0:
+            if in_authors:
+                authors.append(entry) if entry else None
+            in_authors = stripped.startswith("authors:")
+            entry = None
+            if not in_authors:
+                key, _, val = stripped.partition(":")
+                key = key.strip()
+                val = val.strip().strip('"')
+                if key == "version" and version is None:
+                    version = val
+                elif key == "doi" and doi is None:
+                    doi = val
+            continue
+        if not in_authors:
+            continue
+        if indent == 2 and stripped.startswith("- "):
+            if entry:
+                authors.append(entry)
+            entry = {}
+            item = stripped[2:].strip()
+            if item and ":" in item:
+                key, _, val = item.partition(":")
+                entry[key.strip()] = val.strip().strip('"')
+            continue
+        if entry is not None:
+            key, _, val = stripped.partition(":")
+            entry[key.strip()] = val.strip().strip('"')
+    if entry:
+        authors.append(entry)
+    if authors:
+        author = ", ".join(
+            " ".join(
+                (
+                    a.get("given-names", "") + " "
+                    + a.get("name-particle", "") + " "
+                    + a.get("family-names", "") + " "
+                    + a.get("name-suffix", "")
+                ).split()
+            )
+            if "name" not in a
+            else a["name"]
+            for a in authors
+        )
+        return version, doi, author
+    return version, doi, None
+
+
 def _report_builder(results: dict) -> ReportBuilder:
     """A ReportBuilder configured from a results dict."""
     builder = ReportBuilder(
@@ -677,6 +760,15 @@ def _report_builder(results: dict) -> ReportBuilder:
         "Flood-frequency reference quantiles (ffa_reference.json)",
     ]
     builder.metadata.version = results["metadata"]["schema_version"]
+    # Restore the software identity recorded at run time, so a re-rendered
+    # report (from-json) carries the same version and DOI it was produced under.
+    software = results.get("software") or {}
+    if software.get("author"):
+        builder.metadata.author = software["author"]
+    if software.get("doi"):
+        builder.metadata.doi = software["doi"]
+    if software.get("version"):
+        builder.metadata.software_version = software["version"]
     return builder
 
 

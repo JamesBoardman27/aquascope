@@ -121,6 +121,145 @@ def test_annual_maxima_series_is_a_noop() -> None:
     assert list(series) == list(values)
 
 
+def test_software_block_uses_citation_cff() -> None:
+    """The ``software`` block carries the version, DOI and author from CITATION.cff."""
+    results = cb.build_results(gauge_ids=["01013500"])
+    version, doi, author = cb._read_citation_cff()
+    software = results["software"]
+    assert software["version"] == version
+    assert software["doi"] == doi
+    assert software["author"] == author
+    assert "DOI not yet assigned" not in software["citation"]
+    assert author in software["citation"]
+
+
+def _write_cff(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, body: str) -> pathlib.Path:
+    """Write ``body`` as ``CITATION.cff`` under ``tmp_path`` and point the parser at it."""
+    cff = tmp_path / "CITATION.cff"
+    cff.write_text(body, encoding="utf-8")
+    monkeypatch.setattr(cb, "_REPO_ROOT", tmp_path)
+    return cff
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            "version: 0.16.0\n"
+            "doi: 10.5281/zenodo.21903143\n"
+            "authors:\n"
+            "  - family-names: Ouedraogo\n"
+            "    given-names: Abdoul Rachid\n"
+            "    orcid: \"https://orcid.org/0000-0002-4616-4153\"\n"
+            "    affiliation: \"National Central University, Taiwan\"\n",
+            ("0.16.0", "10.5281/zenodo.21903143", "Abdoul Rachid Ouedraogo"),
+        ),
+        ("version: 0.16.0\n", ("0.16.0", None, None)),
+        ("doi: 10.5281/zenodo.21903143\n", (None, "10.5281/zenodo.21903143", None)),
+        (
+            "authors:\n"
+            "  - given-names: Jane\n"
+            "    family-names: Doe\n",
+            (None, None, "Jane Doe"),
+        ),
+        (
+            "authors:\n"
+            "  - name: AquaScope Team\n",
+            (None, None, "AquaScope Team"),
+        ),
+        (
+            "version: \"1.2.3\"\n"
+            "doi: \"10.5281/zenodo.42\"\n"
+            "authors:\n"
+            "  - family-names: Doe\n"
+            "    given-names: Jane\n",
+            ("1.2.3", "10.5281/zenodo.42", "Jane Doe"),
+        ),
+        (
+            # nested blocks (references / preferred-citation) must not leak
+            # their version / doi / authors into the top-level parse
+            "authors:\n"
+            "  - family-names: Doe\n"
+            "    given-names: Jane\n"
+            "references:\n"
+            "  - type: article\n"
+            "    title: Some paper\n"
+            "    authors:\n"
+            "      - family-names: Other\n"
+            "        given-names: Person\n"
+            "version: 0.1.0\n"
+            "doi: 10.5281/zenodo.1\n"
+            "preferred-citation:\n"
+            "  version: 9.9.9\n"
+            "  doi: 10.5281/zenodo.999\n"
+            "  authors:\n"
+            "    - family-names: Nested\n"
+            "      given-names: Wrong\n",
+            ("0.1.0", "10.5281/zenodo.1", "Jane Doe"),
+        ),
+        (
+            "some-unknown-key: value\n"
+            "version: 0.2\n",
+            ("0.2", None, None),
+        ),
+    ],
+)
+def test_read_citation_cff_variants(body: str, expected: tuple, tmp_path: pathlib.Path,
+                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_read_citation_cff`` tolerates missing fields, quoting and nested blocks."""
+    _write_cff(tmp_path, monkeypatch, body)
+    assert cb._read_citation_cff() == expected
+
+
+def test_read_citation_cff_multiple_authors(tmp_path: pathlib.Path,
+                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    """Multiple CFF author entries are formatted and joined."""
+    _write_cff(
+        tmp_path,
+        monkeypatch,
+        "authors:\n"
+        "  - given-names: Jane\n"
+        "    family-names: Doe\n"
+        "  - name: AquaScope Team\n"
+        "  - family-names: Neumann\n"
+        "    given-names: John\n"
+        "    name-particle: von\n",
+    )
+    assert cb._read_citation_cff()[2] == "Jane Doe, AquaScope Team, John von Neumann"
+
+
+def test_read_citation_cff_missing_file(tmp_path: pathlib.Path,
+                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing ``CITATION.cff`` reads as ``(None, None, None)`` rather than erroring."""
+    monkeypatch.setattr(cb, "_REPO_ROOT", tmp_path)
+    assert cb._read_citation_cff() == (None, None, None)
+
+
+def test_build_results_with_missing_cff_falls_back(tmp_path: pathlib.Path,
+                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """No ``CITATION.cff``: the software block falls back to the package identity."""
+    from aquascope import __version__
+
+    monkeypatch.setattr(cb, "_REPO_ROOT", tmp_path)
+    software = cb.build_results(gauge_ids=["01013500"])["software"]
+    assert software["version"] == str(__version__)
+    assert software["author"] == "AquaScope"
+    assert software["doi"] == ""
+    assert "DOI not yet assigned" in software["citation"]
+    assert "https://doi.org" not in software["citation"]
+
+
+def test_build_results_with_partial_cff_falls_back(tmp_path: pathlib.Path,
+                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only a version recorded: author and DOI fall back to their defaults."""
+    _write_cff(tmp_path, monkeypatch, "version: 9.9.9\n")
+    software = cb.build_results(gauge_ids=["01013500"])["software"]
+    assert software["version"] == "9.9.9"
+    assert software["author"] == "AquaScope"
+    assert software["doi"] == ""
+    assert "DOI not yet assigned" in software["citation"]
+
+
 def test_render_markdown_consumes_results(tmp_path) -> None:
     """The Markdown report derives from the results dict."""
     results = cb.build_results(gauge_ids=["01013500"])
@@ -130,7 +269,7 @@ def test_render_markdown_consumes_results(tmp_path) -> None:
     assert "Tolerances and rationale" in text
     assert "signature integrity" in text
     assert "Cite this software" in text
-    assert "DOI not yet assigned" in text
+    assert f"https://doi.org/{results['software']['doi']}" in text
 
 
 def test_render_html_consumes_results(tmp_path) -> None:

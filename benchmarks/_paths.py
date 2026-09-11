@@ -11,7 +11,8 @@ from __future__ import annotations
 import pathlib
 
 BASE = pathlib.Path(__file__).resolve().parent
-BENCHMARK_DIR = BASE.parent / "data" / "camels_benchmark"
+REPO_ROOT = BASE.parent
+BENCHMARK_DIR = REPO_ROOT / "data" / "camels_benchmark"
 DAILY_CATCHMENTS_FILE = BENCHMARK_DIR / "daily_catchments.json"
 DAILY_DIR = BENCHMARK_DIR / "daily"
 PEAKS_DIR = BENCHMARK_DIR / "peaks"
