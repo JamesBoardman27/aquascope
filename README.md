@@ -36,7 +36,7 @@
 
 ---
 
-AquaScope unifies **34 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 2,500+ tests.
+AquaScope unifies **35 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 2,500+ tests.
 
 ---
 
@@ -81,7 +81,7 @@ For the full capability list see [docs/features.md](docs/features.md).
 | Non-stationary GEV | ✅ | — | partial | — |
 | Baseflow separation (Lyne-Hollick, Eckhardt) | ✅ | — | — | — |
 | FAO-56 Penman-Monteith ET₀ + crop water | ✅ | — | — | — |
-| 34 unified data collectors | ✅ | — | — | per-source |
+| 35 unified data collectors | ✅ | — | — | per-source |
 | AI methodology recommender (OpenAI / Groq / HF / Ollama) | ✅ | — | — | — |
 | Interactive Streamlit dashboard | ✅ | — | — | — |
 | Free, MIT, Python-native | ✅ | partial | ✅ | varies |
@@ -148,15 +148,15 @@ print(sig.flashiness_index)    # Richards-Baker flashiness index
 
 22 signatures across magnitude, variability, timing, recession, and flashiness — see [docs/features.md](docs/features.md#hydrological-analysis).
 
-### 3. Collect data from any of the 34 sources
+### 3. Collect data from any of the 35 sources
 
 ```python
 from aquascope import find_stations
 from aquascope.collectors import USGSCollector, AquastatCollector, WaPORCollector
 
 # Which gauges measure discharge around Greater London? (USGS, UK EA, Hub'Eau,
-# PEGELONLINE, Ireland OPW, Greece Hydroscope and Taiwan CWA expose station
-# catalogs; more coming)
+# PEGELONLINE, Ireland OPW, Greece (Hydroscope + OpenHi.net) and Taiwan CWA
+# expose station catalogs; more coming)
 gauges = find_stations(bbox=(-0.5, 51.3, 0.3, 51.7), variable="discharge")
 print(gauges[0].name, gauges[0].url)
 
@@ -301,7 +301,7 @@ aquascope recommend --parameters DO,BOD5,COD --goal "pollution trend detection" 
 aquascope solve "Design flow for a road crossing, 100-year return period" --lat 51.415 --lon -0.308
 aquascope studio "Design flow for a road crossing, 100-year, and how sure can we be" --lat 51.415 --lon -0.308 --out kingston/   # the crew: brief, plan, run, bundle
 
-# Interactive Streamlit dashboard — multipage workspace with 34 live sources,
+# Interactive Streamlit dashboard — multipage workspace with 35 live sources,
 # smart auto-insights, and fully interactive Plotly charts
 aquascope dashboard
 
@@ -315,7 +315,7 @@ Run `aquascope --help` for the full command list.
 
 ## 🌍 Data sources at a glance
 
-34 data collectors spanning four regions (highlights below, full list in the [docs](docs/data_sources.md)):
+35 data collectors spanning four regions (highlights below, full list in the [docs](docs/data_sources.md)):
 
 - 🌎 **Americas** — USGS (streamflow + WQ), NOAA NWPS (US streamflow), Colorado DWR/CDSS, Water Quality Portal (400+ agencies), CAMELS-CL (Chile), CAMELS-BR and ANA Hidroweb (Brazil)
 - 🌍 **Europe** — EU Water Framework Directive, Copernicus ERA5, France Hub'Eau, Germany PEGELONLINE, England's Environment Agency, Ireland OPW, Greece Hydroscope
@@ -340,7 +340,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 | Resource | What it covers |
 | :--- | :--- |
 | [Features](docs/features.md) | Full capability list — hydrology, agriculture, ML, spatial, I/O |
-| [Data sources](docs/data_sources.md) | All 34 sources, endpoints, API-key requirements |
+| [Data sources](docs/data_sources.md) | All 35 sources, endpoints, API-key requirements |
 | [Theory guide](docs/theory.md) | Equations, DOI citations, decision trees for every method |
 | [Methodology matrix](docs/methodology_matrix.md) | When to use which method |
 | [Architecture](docs/guides/architecture.md) | How AquaScope is structured internally |
