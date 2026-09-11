@@ -1,0 +1,51 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# An 8.5-year record (1977 to 1985) at the point and no longer gauge within 50 km: the at-site fit is below the
+# registry's ten-year floor, so the record is summarised and the estimate is regional, from donors.
+id: flood_short_record_fish_creek
+playbook: flood_risk
+title: Design flow for a culvert at a short, closed gauge, T = 50 years
+brief: >-
+  A ranch road crosses Fish Creek near Battle Mountain at the old USGS gauge. What is the 50-year flow for the
+  culvert? The gauge only ran for about eight years in the late seventies.
+intake:
+  return_period: 50
+  decision: design flow
+site:
+  name: Fish Creek near Battle Mountain, Nevada
+  lat: 40.17139
+  lon: -117.20778
+  source: usgs
+  station_id: USGS-10326800
+  years: 8.5
+  recon: fish_creek_nv
+expected_branch: short_record
+steps:
+  - tool: describe_catchment
+    optional: true
+  - tool: analyze_station
+    method: flow_duration
+    gates:
+      - {check: min_years, path: years}
+      - {check: unit_present, path: unit}
+    note: The record summary and annual maxima, quoted as marginal next to the regional estimate.
+  - tool: similar_basins
+    method: similar_basins
+    gates:
+      - {check: min_donors, path: k}
+  - tool: regionalize_signatures
+    method: regionalize_signatures
+    gates:
+      - {check: not_empty, path: estimates}
+      - {check: not_empty, path: skill}
+  - tool: anywhere
+    method: glofas_cross_check
+    optional: true
+forbidden:
+  tools: [flood_frequency, load_table, return_periods]
+  methods: [at_site_flood_frequency, low_flow_frequency, spi, spei, groundwater_trend]
+rationale: >-
+  Eight and a half years of discharge is below the ten-year floor for an at-site flood frequency fit, so a return
+  level fitted at the gauge is not defensible and the tool that fits it is forbidden here. The record is still
+  worth summarising (maxima, the flow regime) as a marginal check. The estimate comes from donor catchments with the
+  band and the leave-one-out skill quoted, and GloFAS is the indicative cross-check. The record closed in 1985,
+  which the report must say.

@@ -1,0 +1,604 @@
+{
+ "site": {
+  "lat": 47.888428536,
+  "lon": -0.232694487,
+  "source": "hubeau_hydrometrie",
+  "station_id": "M058302010",
+  "name": "La Vègre à Asnières-sur-Vègre",
+  "country": "FRA",
+  "variables": [
+   "discharge",
+   "water_level"
+  ],
+  "period_start": "1980-11-01",
+  "period_end": null,
+  "years": 45.8
+ },
+ "captured": "2026-09-07",
+ "command": "aquascope.explore.assess_site(47.888428536, -0.232694487)",
+ "recon": {
+  "point": {
+   "lat": 47.88843,
+   "lon": -0.23269
+  },
+  "stations": [
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M058302010",
+    "name": "La Vègre à Asnières-sur-Vègre",
+    "distance_km": 0.0,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1980-11-01",
+    "period_end": null,
+    "years": 45.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0583020/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M055603010",
+    "name": "Les Deux Fonts à Avoise [Gué Avezel]",
+    "distance_km": 2.8,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1992-01-01",
+    "period_end": null,
+    "years": 34.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0556030/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M063061010",
+    "name": "La Sarthe à Sablé-sur-Sarthe",
+    "distance_km": 9.3,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2000-01-01",
+    "period_end": null,
+    "years": 26.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0630610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M063301010",
+    "name": "L'Erve à Auvers-le-Hamon [Moulin la Roche]",
+    "distance_km": 9.7,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1972-10-03",
+    "period_end": null,
+    "years": 53.9,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0633010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M065311010",
+    "name": "La Vaige à Bouessay",
+    "distance_km": 11.2,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1980-09-01",
+    "period_end": null,
+    "years": 46.0,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0653110/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M054401010",
+    "name": "La Vézanne à Malicorne-sur-Sarthe",
+    "distance_km": 14.0,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1992-10-27",
+    "period_end": null,
+    "years": 33.9,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0544010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M053501010",
+    "name": "La Gée à Fercé-sur-Sarthe [Planche Augis]",
+    "distance_km": 14.3,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1984-11-01",
+    "period_end": null,
+    "years": 41.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0535010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M068061010",
+    "name": "La Sarthe à Saint-Denis-d'Anjou [Beffes]",
+    "distance_km": 14.9,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1969-12-01",
+    "period_end": null,
+    "years": 56.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0680610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M069000301",
+    "name": "[La Voutonne] à Précigné",
+    "distance_km": 15.8,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1992-12-01",
+    "period_end": null,
+    "years": 33.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0690003/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M067401010",
+    "name": "La Taude à Saint-Brice",
+    "distance_km": 15.8,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1981-12-01",
+    "period_end": null,
+    "years": 44.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0674010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M153451010",
+    "name": "L'Argance à la Chapelle-d'Aligné [La Cheviraye]",
+    "distance_km": 19.1,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1992-11-01",
+    "period_end": null,
+    "years": 33.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M1534510/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M052061010",
+    "name": "La Sarthe à la Suze-sur-Sarthe [écluse]",
+    "distance_km": 19.5,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2011-01-01",
+    "period_end": null,
+    "years": 15.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0520610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M052521010",
+    "name": "L'Orne Champenoise à Voivres-lès-le-Mans",
+    "distance_km": 23.7,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1984-11-01",
+    "period_end": null,
+    "years": 41.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0525210/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M153161010",
+    "name": "Le Loir à Durtal",
+    "distance_km": 24.4,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1960-12-01",
+    "period_end": null,
+    "years": 65.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M1531610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M151161010",
+    "name": "Le Loir à la Flèche [Mairie]",
+    "distance_km": 24.4,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2011-01-01",
+    "period_end": null,
+    "years": 15.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M1511610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M056622010",
+    "name": "Le Berdin à Tennie",
+    "distance_km": 27.3,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1982-08-01",
+    "period_end": null,
+    "years": 44.1,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0566220/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M061301010",
+    "name": "L'Erve à Voutré [La Crousille]",
+    "distance_km": 27.9,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1998-03-05",
+    "period_end": null,
+    "years": 28.5,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0613010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M050061010",
+    "name": "La Sarthe à Spay [Ecluse de Prélandon] - Amont",
+    "distance_km": 28.3,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1952-12-01",
+    "period_end": null,
+    "years": 73.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0500610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M050061020",
+    "name": "La Sarthe à Spay [Ecluse de Prélandon] - Aval",
+    "distance_km": 28.3,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2007-08-07",
+    "period_end": null,
+    "years": 19.1,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0500610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M051401010",
+    "name": "Le Rhonne à Guécélard [La Soufflardière]",
+    "distance_km": 28.7,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1988-01-01",
+    "period_end": null,
+    "years": 38.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0514010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M072061010",
+    "name": "La Sarthe à Châteauneuf-sur-Sarthe",
+    "distance_km": 30.1,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2004-12-01",
+    "period_end": null,
+    "years": 21.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0720610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M050451010",
+    "name": "Le Roule Crotte à Arnage [Gué Gilet]",
+    "distance_km": 32.6,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1993-12-01",
+    "period_end": null,
+    "years": 32.8,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0504510/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M340301010",
+    "name": "La Jouanne à Neau [La Touche]",
+    "distance_km": 34.6,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "1995-01-01",
+    "period_end": null,
+    "years": 31.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M3403010/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M027061020",
+    "name": "La Sarthe au Mans [Yssoir]",
+    "distance_km": 34.6,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2001-01-01",
+    "period_end": null,
+    "years": 25.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0270610/fiche"
+   },
+   {
+    "source": "hubeau_hydrometrie",
+    "station_id": "M044151010",
+    "name": "L'Huisne au Mans [Pontlieue]",
+    "distance_km": 34.7,
+    "variables": [
+     "discharge",
+     "water_level"
+    ],
+    "period_start": "2001-01-01",
+    "period_end": null,
+    "years": 25.7,
+    "url": "https://www.hydro.eaufrance.fr/sitehydro/M0441510/fiche"
+   }
+  ],
+  "catchment": {
+   "hybas_id": 2120485400,
+   "area_km2": 411.2,
+   "upstream_area_km2": 411.2,
+   "n_sub_basins": 3,
+   "elevation_m": 121.0,
+   "precipitation_mm_yr": 740.0,
+   "aridity": 0.88,
+   "dams": 0.0,
+   "source": "BasinATLAS (HydroATLAS v1.0)"
+  },
+  "context": {
+   "years_by_variable": {
+    "discharge": 45.8,
+    "water_level": 45.8
+   },
+   "resolution_by_variable": {
+    "discharge": "daily",
+    "water_level": "daily"
+   },
+   "area_km2": 411.2,
+   "return_period": null,
+   "donors": 10,
+   "available": [
+    "forcing",
+    "glofas",
+    "temperature"
+   ],
+   "ungauged": false
+  },
+  "sufficiency": [
+   {
+    "method": "at_site_flood_frequency",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "At-site flood frequency (GEV, LP3 / Bulletin 17C)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "baseflow_separation",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Baseflow separation and baseflow index",
+    "tool": "baseflow",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "crop_water_requirement",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Crop water requirement (single or dual Kc)",
+    "tool": "crop_water_demand",
+    "station": null
+   },
+   {
+    "method": "fao56_et0",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "FAO-56 Penman-Monteith reference evapotranspiration",
+    "tool": "reference_et",
+    "station": null
+   },
+   {
+    "method": "flow_duration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow duration curve and Q95",
+    "tool": "analyze_station",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "glofas_cross_check",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GloFAS modelled discharge as an independent check",
+    "tool": "anywhere",
+    "station": null
+   },
+   {
+    "method": "gr4j_calibration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GR4J rainfall-runoff calibration",
+    "tool": "gr4j",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "low_flow_frequency",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Low-flow frequency (annual minima)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "regionalize_signatures",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow signatures transferred from donors",
+    "tool": "regionalize_signatures",
+    "station": null
+   },
+   {
+    "method": "spei_reanalysis",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "SPI and SPEI from ERA5 reanalysis for the cell (no rain gauge)",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "supply_reliability",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Run-of-river supply reliability against a demand (flow-duration screening)",
+    "tool": "supply_reliability",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "trend_mann_kendall",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Mann-Kendall trend with Sen's slope",
+    "tool": "analyze_station",
+    "station": {
+     "source": "hubeau_hydrometrie",
+     "station_id": "M058302010"
+    }
+   },
+   {
+    "method": "similar_basins",
+    "status": "marginal",
+    "reason": "meant for an ungauged point; a gauge is available here",
+    "label": "Donor gauges by catchment similarity",
+    "tool": "similar_basins",
+    "station": null
+   },
+   {
+    "method": "climate_projection",
+    "status": "not_defensible",
+    "reason": "needs gcms of at least 3, not available here",
+    "label": "CMIP6 ensemble change factors on the baseline statistic",
+    "tool": "climate",
+    "station": null
+   },
+   {
+    "method": "groundwater_trend",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Groundwater-level trend (m/yr) with confidence interval",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "iwqi",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Irrigation water quality (SAR, sodium percentage, RSC, FAO 29 restriction)",
+    "tool": "iwqi",
+    "station": null
+   },
+   {
+    "method": "recharge_wtf",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Recharge by water-table fluctuation",
+    "tool": "recharge",
+    "station": null
+   },
+   {
+    "method": "sgi",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Standardized Groundwater Index",
+    "tool": "sgi_drought",
+    "station": null
+   },
+   {
+    "method": "spei",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation-Evapotranspiration Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "spi",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "water_quality_index",
+    "status": "not_defensible",
+    "reason": "no water-quality samples here",
+    "label": "Water quality index against guideline values (CCME WQI 1.0, NSF WQI)",
+    "tool": "wqi",
+    "station": null
+   }
+  ],
+  "notes": [
+   "Record resolution is not in the catalog; daily is assumed for every variable.",
+   "10 donor gauges from a pool of 37,053 gauged catchments.",
+   "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+   "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted."
+  ]
+ }
+}

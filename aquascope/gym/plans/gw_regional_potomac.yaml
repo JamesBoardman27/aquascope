@@ -1,0 +1,40 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# No well in the catalog within 50 km (the USGS list carries none): what can be said is regional, the ERA5
+# water balance for the cell, labelled as such; the well methods are not defensible.
+id: gw_regional_potomac
+playbook: groundwater_decline
+title: Groundwater decline asked where no well is within reach
+brief: >-
+  Is the water table around the Little Falls area falling, and how fast? We do not know of any monitored well
+  nearby.
+intake:
+  horizon: 10
+  concern: other
+site:
+  name: Potomac River near Washington, DC (Little Falls pump station)
+  lat: 38.94978
+  lon: -77.12764
+  source: usgs
+  station_id: USGS-01646500
+  years: 96.5
+  recon: potomac_little_falls
+expected_branch: regional
+steps:
+  - tool: anywhere
+    gates:
+      - {check: not_empty, path: climate}
+    note: "ERA5 precipitation against reference evapotranspiration for the cell: the regional water-balance signal."
+  - tool: low_flow_context
+    method: baseflow_separation
+    optional: true
+    note: The baseflow index and its trend at the 96-year gauge are the one local proxy for the aquifer's state.
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [sgi_drought, recharge, aquifer_drawdown, load_table]
+  methods: [groundwater_trend, sgi, recharge_wtf]
+rationale: >-
+  The catalog lists no groundwater level record within 50 km of the point, so the trend, the groundwater drought
+  index and the recharge estimate are all not defensible. What remains is a regional signal for a cell of tens of
+  kilometres (the ERA5 water balance), said plainly to be about the area and not any well; the baseflow of the
+  Potomac at the gauge is the one local proxy worth adding. The right answer is short and honest.

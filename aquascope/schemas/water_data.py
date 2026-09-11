@@ -45,9 +45,13 @@ class DataSource(str, Enum):
     CAMELS_BR = "camels_br"
     IRELAND_OPW = "ireland_opw"
     SOUTH_AFRICA_DWS = "south_africa_dws"
+    GREECE_HYDROSCOPE = "greece_hydroscope"
+    GREECE_OPENHI = "greece_openhi"
 
     PEGELONLINE = "pegelonline"
     BOM = "bom"
+    COLORADO_CDSS = "colorado_cdss"
+    BRAZIL_ANA = "brazil_ana"
 
 
 class GeoLocation(BaseModel):

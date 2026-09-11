@@ -1,22 +1,29 @@
 # CAMELS Benchmark Data
 
 Synthetic daily streamflow series for 10 well-known USGS catchments, generated
-to approximate published CAMELS catchment statistics.
+to approximate published CAMELS catchment statistics, plus cached USGS annual
+peak flows for flood-frequency validation.
 
 ## Purpose
 
 These files serve as **regression tests** for AquaScope's hydrological
 computation modules (`aquascope.hydrology.signatures`, `aquascope.hydrology.baseflow`,
-`aquascope.hydrology.flow_duration`).  They are **not** real observational data
-and must not be used for scientific analysis.
+`aquascope.hydrology.flow_duration`, `aquascope.hydrology.flood_frequency`).
+
+The synthetic daily series are **not** real observational data and must not be
+used for scientific analysis. The peak flow CSVs in `peaks/` **are** real USGS
+data, cached for reproducibility.
 
 ## Contents
 
-| File | Description |
-|------|-------------|
+| File / Directory | Description |
+|------------------|-------------|
 | `catchments.json` | Published attributes for 10 CAMELS catchments |
-| `generate_synthetic.py` | Script that creates the CSV files below |
+| `generate_synthetic.py` | Script that creates the synthetic CSV files below |
 | `<gauge_id>.csv` | Synthetic daily discharge + precipitation (2000–2009) |
+| `peaks/` | Cached USGS annual peak series (real data) |
+| `peaks/<gauge_id>_peaks.csv` | Annual peak flows for one gauge |
+| `ffa_reference.json` | Pre-computed reference quantiles (GEV-MLE, LP3 via scipy; GEV-LMoments via lmoments3) |
 
 ## Catchments
 
@@ -37,11 +44,25 @@ The 10 catchments span diverse US hydroclimates:
 
 ## Regeneration
 
+### Synthetic daily data
+
 ```bash
 python data/camels_benchmark/generate_synthetic.py
 ```
 
-The script uses `np.random.default_rng(42)` so results are fully reproducible.
+Uses `np.random.default_rng(42)` so results are fully reproducible.
+
+### USGS peak flows + reference quantiles
+
+```bash
+pip install "aquascope[benchmarks]"
+python benchmarks/fetch_peak_flows.py
+```
+
+Requires the `dataretrieval` and `lmoments3` packages, exposed via the optional
+`benchmarks` dependency group — neither is a runtime dependency of AquaScope.
+Fetches from USGS NWIS — results depend on the snapshot at fetch time.
+Re-running may produce slightly different records as USGS updates.
 
 ## References
 

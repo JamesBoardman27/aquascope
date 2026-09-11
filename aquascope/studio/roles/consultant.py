@@ -2,11 +2,17 @@
 
 Keyless, the brief comes from the keyword rules that pick a playbook
 (``team.choose_playbook``), the intake hints the text states outright
-(``team.intake_hints``) and the playbook's intake fields that have no default
-and were not inferred, asked as questions (at most three). With a model, one
-call reads the text, the site, a catalog-only reconnaissance and the uploads'
-column names and returns the structured brief with its questions. Answers
-arrive as later calls of :func:`consult`; "just go" proceeds on defaults.
+(``team.intake_hints``), the decision the text names, and the gaps that are
+left asked as questions (at most three): a playbook field with no default,
+the decision when none is stated (with the playbook's options), the return
+period of a flood question, the period of a drought question, the column of
+an upload with two or more numeric columns. "just go" proceeds on the
+defaults and lists them as assumptions. With a model, one call reads the
+text, the site, a catalog-only reconnaissance and the uploads' column names
+and returns the structured brief with its questions. A brief a caller's own
+model wrote (the Explorer's on-device model) arrives as ``proposed`` and is
+merged with the same coercion a model reply gets. Answers arrive as later
+calls of :func:`consult`.
 
 After the report, :func:`classify_follow_up` says whether a follow-up is a
 question (answered from the workspace) or a change (a new intake, a request
@@ -15,7 +21,9 @@ for the Methodologist).
 
 from __future__ import annotations
 
+import csv
 import io
+import itertools
 import re
 from typing import Any
 
@@ -35,8 +43,43 @@ _CHANGE = re.compile(
     r"\b(redo|re-?run|instead|change|switch|add|also (compute|run|check|fit)|extend|repeat|with a|use the|"
     r"another|different|longer|shorter|what about)\b", re.I,
 )
+#: A period the text states for a drought question ("now", "this summer", "the last 12 months", "since 2018").
+_PERIOD = re.compile(
+    r"\b(now|currently|current|today|at present|this (month|season|summer|winter|spring|autumn|year)|"
+    r"(the )?(last|past) (\d+ )?(months?|years?|decade|season|winter|summer)|since \d{4}|\d{4}\s*(to|-)\s*\d{4}|"
+    r"the whole record|on record)\b", re.I,
+)
+#: Two intake fields that ask the same thing: one answered closes the other.
+_ALTERNATES: dict[str, tuple[str, ...]] = {"demand_m3s": ("demand_ml_day",), "demand_ml_day": ("demand_m3s",)}
+#: The intake field that carries the decision, per playbook (its options are the question's).
+_DECISION_FIELDS: dict[str, str] = {
+    "flood_risk": "decision", "irrigation_feasibility": "decision", "ungauged_flow": "purpose",
+    "groundwater_decline": "concern", "water_quality": "use",
+}
+#: The decisions a client names for the playbooks that have no decision field, with the words that name them.
+_DECISION_OPTIONS: dict[str, list[tuple[str, str]]] = {
+    "supply_reliability": [("an abstraction licence", r"licen[cs]e|permit"),
+                           ("the size of the scheme", r"\bsiz(e|ing)\b|capacity|how big"),
+                           ("a screening of the source", r"screen")],
+    "drought_status": [("drought restrictions", r"restrict|hosepipe|\bban\b|declar"),
+                       ("irrigation planning", r"irrigat|plant|sow|harvest|crop"),
+                       ("a situation report", r"\breport\b|briefing|update")],
+}
+#: The words that name an option of a decision field (the option's own words always count).
+_OPTION_WORDS: dict[str, str] = {
+    "design flow": r"design|culvert|bridge|crossing|spillway|levee|embankment|\bsiz(e|ing)\b",
+    "risk screening": r"screen|how risky|at risk|\brisk",
+    "insurance": r"insur",
+    "inundation extent": r"inundat|flood (map|extent)|how deep|which (streets|houses|fields)",
+    "seasonal demand": r"season|how much water|demand|requirement",
+    "daily schedule": r"schedul|when to irrigate|each day",
+}
+_PERIOD_OPTIONS = ["now", "the last 3 months", "the last 12 months", "the whole record"]
+#: Intake keys the Studio itself reads (the table loader's arguments), kept through the coercion.
+_TABLE_INTAKE = ("value_column", "datetime_column")
+_DECISION_TEXT = "What will be decided with the answer?"
 
-__all__ = ["classify_follow_up", "consult", "known_playbooks"]
+__all__ = ["brief_context", "classify_follow_up", "consult", "known_playbooks"]
 
 
 def known_playbooks() -> dict[str, Any]:
@@ -61,11 +104,45 @@ def _columns(ws: Workspace, tables: dict[str, Any] | None) -> dict[str, list[str
         cols = getattr(value, "columns", None)
         if cols is not None:
             out[key] = [str(c) for c in cols]
-    for key, csv in ws.tables.items():
+    for key, text in ws.tables.items():
         if key in out:
             continue
-        head = io.StringIO(csv).readline().strip()
+        head = io.StringIO(text).readline().strip()
         out[key] = [c.strip().strip('"') for c in head.split(",")] if head else []
+    return out
+
+
+def _is_number(text: str) -> bool:
+    try:
+        float(text.replace(",", ""))
+    except ValueError:
+        return False
+    return True
+
+
+def _numeric_columns(ws: Workspace, tables: dict[str, Any] | None) -> dict[str, list[str]]:
+    """The numeric columns of every upload: from the frame's dtypes when a frame is given, else from the first
+    fifty rows of the CSV text (no pandas)."""
+    out: dict[str, list[str]] = {}
+    for key, value in (tables or {}).items():
+        if not hasattr(value, "select_dtypes"):
+            continue
+        try:
+            out[key] = [str(c) for c in value.select_dtypes("number").columns]
+        except Exception:  # noqa: BLE001 - an odd frame is not worth a question
+            out[key] = []
+    for key, text in ws.tables.items():
+        if key in out:
+            continue
+        reader = csv.reader(io.StringIO(text))
+        header = [h.strip() for h in (next(reader, None) or [])]
+        rows = list(itertools.islice(reader, 50))
+        nums: list[str] = []
+        for i, name in enumerate(header):
+            values = [r[i].strip() for r in rows if i < len(r) and r[i].strip()]
+            if values and all(_is_number(v) for v in values):
+                nums.append(name)
+        out[key] = nums
     return out
 
 
@@ -90,21 +167,87 @@ def _intake_schema(pb: Any) -> list[dict[str, Any]]:
             for f in pb.intake]
 
 
-def _rules_questions(pb: Any | None, intake: dict[str, Any], known: dict[str, Any]) -> list[Question]:
-    """The playbook's intake fields without a default and not inferred; or which playbook, when none matched."""
-    if pb is None:
-        return [Question(id="playbook", text="Which kind of problem is this? One of: " + ", ".join(sorted(known))
-                         + ". Say 'just go' to let the crew decide (a model is needed for that).",
-                         options=sorted(known))]
+# ── the keyless questions ───────────────────────────────────────────────────
+
+
+def _decision_options(pb: Any) -> tuple[str | None, list[str], Any, str]:
+    """``(field, options, default, text)`` of the decision question for a playbook: its decision field's (the
+    field's own label when it is a purpose, a concern or a use), or the table's for a playbook that has none."""
+    field = _DECISION_FIELDS.get(pb.id)
+    f = next((x for x in pb.intake if x.name == field), None) if field else None
+    if f is not None:
+        text = _DECISION_TEXT if field == "decision" else f"{f.label or f.name}?"
+        return field, [str(o) for o in f.options], f.default, text
+    return None, [o for o, _ in _DECISION_OPTIONS.get(pb.id, [])], None, _DECISION_TEXT
+
+
+def _set_decision(ws: Workspace, pb: Any, decision: str | None) -> None:
+    """The decision on the brief and, when the playbook has a field for it, in the intake."""
+    if not decision:
+        return
+    ws.brief.decision = decision
+    field = _DECISION_FIELDS.get(pb.id)
+    if field and ws.brief.intake.get(field) is None:
+        ws.brief.intake[field] = decision
+
+
+def _decision_hint(text: str, pb: Any, intake: dict[str, Any]) -> str | None:
+    """The decision the text names: the intake hint for the decision field, an option's own words, or the
+    words the table gives an option."""
+    field, options, _, _ = _decision_options(pb)
+    if field and intake.get(field) is not None:
+        return str(intake[field])
+    words = dict(_DECISION_OPTIONS.get(pb.id, []))
+    for option in options:
+        pat = words.get(option) or _OPTION_WORDS.get(option)
+        if re.search(re.escape(option), text, re.I) or (pat and re.search(pat, text, re.I)):
+            return option
+    return None
+
+
+def _gap_questions(ws: Workspace, pb: Any, tables: dict[str, Any] | None) -> list[Question]:
+    """What the brief and the site leave open, as questions, at most three: the playbook's fields with no
+    default (one of a pair), the decision, the return period of a flood question, the period of a drought
+    question, the value column of an upload with two or more numeric columns."""
+    b = ws.brief
     out: list[Question] = []
     for f in pb.intake:
-        if f.default is not None or intake.get(f.name) is not None:
+        if f.default is not None or b.intake.get(f.name) is not None:
+            continue
+        alternates = _ALTERNATES.get(f.name, ())
+        if any(b.intake.get(a) is not None for a in alternates) or any(q.id in alternates for q in out):
             continue
         text = f.label or f.name
         if f.help:
             text += f" ({f.help})"
         out.append(Question(id=f.name, text=text, options=[str(o) for o in f.options] or None, default=f.default))
+    if not b.decision:
+        field, options, default, text = _decision_options(pb)
+        out.append(Question(id=field or "decision", text=text, options=options or None, default=default))
+    if pb.id == "flood_risk" and b.intake.get("return_period") is None:
+        f = next((x for x in pb.intake if x.name == "return_period"), None)
+        out.append(Question(id="return_period", text=(f.label if f else "Return period (years)"),
+                            default=(f.default if f else 100)))
+    if pb.id == "drought_status" and not b.period:
+        out.append(Question(id="period", text="Which period is the drought question about?", options=_PERIOD_OPTIONS,
+                            default="now"))
+    if b.intake.get("value_column") is None:
+        for key, cols in _numeric_columns(ws, tables).items():
+            if len(cols) >= 2:
+                out.append(Question(id="value_column", text=f"Which column of {key} holds the values to analyse?",
+                                    options=cols, default=cols[0]))
+                break
     return out[:MAX_QUESTIONS]
+
+
+def _rules_questions(pb: Any | None, ws: Workspace, known: dict[str, Any],
+                     tables: dict[str, Any] | None = None) -> list[Question]:
+    """The gaps as questions; or which playbook, when none matched."""
+    if pb is None:
+        return [Question(id="playbook", text="Which kind of problem is this? One of: " + ", ".join(sorted(known))
+                         + ". Say 'just go' to let the crew decide (a model is needed for that).",
+                         options=sorted(known))]
+    return _gap_questions(ws, pb, tables)
 
 
 def _rules_quantities(playbook: str | None, intake: dict[str, Any]) -> list[str]:
@@ -122,10 +265,62 @@ def _rules_quantities(playbook: str | None, intake: dict[str, Any]) -> list[str]
     return table.get(playbook or "", [])
 
 
-def _apply_brief(ws: Workspace, obj: dict[str, Any], known: dict[str, Any]) -> None:
-    """Copy what a model wrote into the brief, kept within what the playbooks and the registry know."""
+def _take_answer(ws: Workspace, q: Question, known: dict[str, Any]) -> None:
+    """Where an answered question lands: the playbook, the decision, the period, or the intake."""
+    b = ws.brief
+    if q.answer is None or q.answer == "":
+        return
+    pb = known.get(b.playbook) if b.playbook else None
+    field = _DECISION_FIELDS.get(pb.id) if pb is not None else None
+    if q.id == "playbook":
+        picked = _match_option(str(q.answer), sorted(known))
+        if picked in known:
+            b.playbook, b.kind = picked, known[picked].problem
+        else:
+            q.answer = None
+        return
+    if q.id == "decision" and field != "decision":
+        b.decision = str(q.answer)
+        return
+    if q.id == field:
+        b.decision = str(q.answer)
+    elif q.id == "period":
+        b.period = str(q.answer)
+        m = re.search(r"(\d+)\s*months?", str(q.answer))
+        scales = b.intake.get("timescales")
+        if m and isinstance(scales, list) and int(m.group(1)) not in [int(s) for s in scales if str(s).isdigit()]:
+            b.intake["timescales"] = [*scales, int(m.group(1))]
+        return
+    b.intake[q.id] = q.answer
+
+
+def _coerce_all(ws: Workspace, known: dict[str, Any], *, keep_unknown: bool) -> None:
+    """The intake through the playbook's coercion; unknown fields kept (a question's answer) or dropped
+    (a model's or a device's brief), the table loader's keys always kept."""
     from aquascope import playbooks as pbk
 
+    b = ws.brief
+    if b.playbook not in known:
+        return
+    coerced = pbk.coerce_intake(known[b.playbook], b.intake)
+    out: dict[str, Any] = {}
+    for k, v in b.intake.items():
+        if k in coerced:
+            continue
+        if v is not None and (keep_unknown or k in _TABLE_INTAKE):
+            out[k] = v
+    for k, v in coerced.items():
+        if v is not None:
+            out[k] = v
+    b.intake = out
+
+
+# ── the model's brief, and a caller's ───────────────────────────────────────
+
+
+def _apply_brief(ws: Workspace, obj: dict[str, Any], known: dict[str, Any], *, questions: bool = True) -> None:
+    """Copy what a model (or a caller's model) wrote into the brief, kept within what the playbooks and the
+    registry know. With ``questions`` False the object's questions are ignored (an answer round)."""
     b = ws.brief
     for key in ("decision", "period", "horizon"):
         v = obj.get(key)
@@ -134,35 +329,44 @@ def _apply_brief(ws: Workspace, obj: dict[str, Any], known: dict[str, Any]) -> N
     for key in ("quantities", "constraints", "assumptions"):
         v = obj.get(key)
         if isinstance(v, list):
-            setattr(b, key, [str(x) for x in v if isinstance(x, (str, int, float))])
+            items = [str(x) for x in v if isinstance(x, (str, int, float))]
+            setattr(b, key, items if questions else list(dict.fromkeys([*getattr(b, key), *items])))
     if isinstance(obj.get("deliverables"), list) and obj["deliverables"]:
         b.deliverables = [str(x) for x in obj["deliverables"]]
     playbook = obj.get("playbook")
+    by_problem = {pb.problem: pid for pid, pb in known.items()}
     if isinstance(playbook, str) and playbook in known:
         b.playbook = playbook
         b.kind = known[playbook].problem
     elif isinstance(obj.get("kind"), str):
         b.kind = obj["kind"]
+        if b.playbook is None and obj["kind"] in by_problem:
+            b.playbook = by_problem[obj["kind"]]
     intake = obj.get("intake")
     if isinstance(intake, dict):
-        if b.playbook in known:
-            coerced = pbk.coerce_intake(known[b.playbook], {**b.intake, **intake})
-            b.intake = {k: v for k, v in coerced.items() if v is not None}
-        else:
-            b.intake.update({k: v for k, v in intake.items() if v is not None})
-    questions: list[Question] = []
+        b.intake.update({k: v for k, v in intake.items() if v is not None})
+        _coerce_all(ws, known, keep_unknown=b.playbook not in known)
+    if not questions:
+        return
+    qs: list[Question] = []
     for q in obj.get("questions") or []:
         if not isinstance(q, dict) or not q.get("text"):
             continue
-        qid = str(q.get("id") or f"q{len(questions) + 1}")
+        qid = str(q.get("id") or f"q{len(qs) + 1}")
         if b.intake.get(qid) is not None:
             continue
         opts = q.get("options")
-        questions.append(Question(id=qid, text=str(q["text"]),
-                                  options=[str(o) for o in opts] if isinstance(opts, list) and opts else None,
-                                  default=q.get("default")))
-    b.questions = questions[:MAX_QUESTIONS]
+        qs.append(Question(id=qid, text=str(q["text"]),
+                           options=[str(o) for o in opts] if isinstance(opts, list) and opts else None,
+                           default=q.get("default")))
+    b.questions = qs[:MAX_QUESTIONS]
     b.ready = not b.questions and bool(obj.get("ready", True))
+
+
+def _proposed_brief(proposed: dict[str, Any] | None) -> tuple[dict[str, Any] | None, str]:
+    if not isinstance(proposed, dict) or not isinstance(proposed.get("brief"), dict):
+        return None, "device"
+    return dict(proposed["brief"]), str(proposed.get("source") or "device")
 
 
 _TABLE_WORDS = re.compile(r"\b(my|own|this|these|attached|uploaded|upload|csv|table|file|record|data)\b", re.I)
@@ -180,7 +384,34 @@ def _note_uploads(ws: Workspace, text: str) -> None:
                 ws.brief.assumptions.append(note)
 
 
-def _open(ws: Workspace, model: Model | None, text: str, tables: dict[str, Any] | None) -> Message:
+def brief_context(ws: Workspace, text: str, tables: dict[str, Any] | None = None) -> tuple[str, dict[str, Any]]:
+    """The system prompt and the context the Consultant sends a model for ``text``: the brief's when no brief
+    is open yet, the answers' when questions are open."""
+    from aquascope.ai_engine.team import choose_playbook, intake_hints
+
+    known = known_playbooks()
+    b = ws.brief
+    if b.problem and b.open_questions:
+        return CONSULTANT_ANSWERS, {
+            "reply": text, "problem": b.problem, "playbook": b.playbook, "intake": dict(b.intake),
+            "questions": [q.to_dict() for q in b.open_questions],
+            "fields": _intake_schema(known[b.playbook]) if b.playbook in known else [],
+        }
+    playbook, ambiguous = choose_playbook(text)
+    playbook = playbook if playbook in known else None
+    return CONSULTANT, {
+        "problem": text, "site": ws.site,
+        "recon": _quick_recon(ws, known[playbook].problem if playbook else None),
+        "uploads": _columns(ws, tables),
+        "intake_given": {**intake_hints(text, playbook), **{k: v for k, v in b.intake.items() if v is not None}},
+        "rules_pick": {"playbook": playbook, "ambiguous": ambiguous},
+        "playbooks": [{"id": pb.id, "problem": pb.problem, "title": pb.title, "intake": _intake_schema(pb)}
+                      for pb in known.values()],
+    }
+
+
+def _open(ws: Workspace, model: Model | None, text: str, tables: dict[str, Any] | None,
+          proposed: dict[str, Any] | None = None) -> Message:
     from aquascope.ai_engine.team import choose_playbook, intake_hints
 
     known = known_playbooks()
@@ -196,29 +427,36 @@ def _open(ws: Workspace, model: Model | None, text: str, tables: dict[str, Any] 
     b.source = "rules"
     ws.event("consultant", "keywords", f"rules pick {playbook or 'nothing'}" + (" (ambiguous)" if ambiguous else ""))
 
-    obj = None
-    if model:
-        obj = model.call_json("consultant", CONSULTANT, {
-            "problem": text, "site": ws.site,
-            "recon": _quick_recon(ws, b.kind),
-            "uploads": _columns(ws, tables),
-            "intake_given": dict(b.intake),
-            "rules_pick": {"playbook": playbook, "ambiguous": ambiguous},
-            "playbooks": [{"id": pb.id, "problem": pb.problem, "title": pb.title, "intake": _intake_schema(pb)}
-                          for pb in known.values()],
-        })
+    obj, source = _proposed_brief(proposed)
+    if obj is None and model:
+        system, context = brief_context(ws, text, tables)
+        obj, source = model.call_json("consultant", system, context), "model"
     if obj:
         _apply_brief(ws, obj, known)
-        b.source = "model"
-        ws.event("consultant", "brief", f"model: playbook {b.playbook or 'none'}, {len(b.questions)} question(s)")
+        b.source = source
+        pb = known.get(b.playbook) if b.playbook else None
+        if source != "model":
+            # A caller's model is read like the crew's, then the gaps it left are asked as the rules would.
+            if pb is not None and not b.decision:
+                _set_decision(ws, pb, _decision_hint(text, pb, b.intake))
+            asked = {q.id for q in b.questions}
+            b.questions = [*b.questions, *[q for q in _rules_questions(pb, ws, known, tables)
+                                           if q.id not in asked]][:MAX_QUESTIONS]
+            b.ready = not b.questions
+        ws.event("consultant", "brief", f"{source}: playbook {b.playbook or 'none'}, {len(b.questions)} question(s)")
     else:
         pb = known.get(playbook) if playbook else None
-        b.questions = _rules_questions(pb, b.intake, known)
-        b.decision = b.decision or (str(b.intake["decision"]) if b.intake.get("decision") else None)
+        if pb is not None and not b.decision:
+            _set_decision(ws, pb, _decision_hint(text, pb, b.intake))
+        if pb is not None and not b.period and pb.id == "drought_status":
+            m = _PERIOD.search(text)
+            b.period = m.group(0).lower() if m else None
+        b.questions = _rules_questions(pb, ws, known, tables)
         b.quantities = b.quantities or _rules_quantities(playbook, b.intake)
         if pb is not None:
+            asked = {q.id for q in b.questions}
             for f in pb.intake:
-                if f.default is not None and b.intake.get(f.name) is None and f.name not in {q.id for q in b.questions}:
+                if f.default is not None and b.intake.get(f.name) is None and f.name not in asked:
                     b.assumptions.append(f"{f.label or f.name}: {f.default} (the playbook's default)")
         b.ready = not b.questions
         ws.event("consultant", "brief", f"rules: playbook {playbook or 'none'}, {len(b.questions)} question(s)")
@@ -226,46 +464,68 @@ def _open(ws: Workspace, model: Model | None, text: str, tables: dict[str, Any] 
     return _message(ws)
 
 
-def _answer(ws: Workspace, model: Model | None, text: str) -> Message:
-    from aquascope import playbooks as pbk
+def _proceed(ws: Workspace, known: dict[str, Any]) -> None:
+    """"just go": every open question takes its default, each one listed as an assumption."""
+    b = ws.brief
+    for q in b.open_questions:
+        q.answer = q.default if q.default is not None else ""
+        if q.answer != "":
+            b.assumptions.append(f"{q.text.split(' (')[0]}: {q.answer} (the default, the client asked to proceed)")
+        _take_answer(ws, q, known)
+    b.assumptions.append("The client asked to proceed on the defaults.")
+    _coerce_all(ws, known, keep_unknown=True)
+    b.ready = True
+
+
+def _answer(ws: Workspace, model: Model | None, text: str, proposed: dict[str, Any] | None = None) -> Message:
     from aquascope.ai_engine.team import intake_hints
 
     known = known_playbooks()
     b = ws.brief
     open_qs = b.open_questions
-    if _PROCEED.match(text):
+    obj, source = _proposed_brief(proposed)
+    if obj is not None:
+        # A caller's model read the reply: what it wrote answers the questions it covers.
+        _apply_brief(ws, obj, known, questions=False)
+        b.source = source
+        field = _DECISION_FIELDS.get(b.playbook or "")
         for q in open_qs:
-            q.answer = q.default if q.default is not None else ""
-        b.assumptions.append("The client asked to proceed on the defaults.")
-        b.ready = True
+            if b.intake.get(q.id) is not None:
+                q.answer = b.intake[q.id]
+            elif q.id in ("decision", field) and b.decision:
+                q.answer = b.decision
+            elif q.id == "period" and b.period:
+                q.answer = b.period
+        open_qs = b.open_questions
+    if _PROCEED.match(text):
+        _proceed(ws, known)
         ws.event("consultant", "answers", "proceed on defaults")
         return _message(ws)
 
-    obj = None
+    reply = None
     if model and open_qs:
-        obj = model.call_json("consultant", CONSULTANT_ANSWERS, {
-            "reply": text, "problem": b.problem, "playbook": b.playbook, "intake": dict(b.intake),
-            "questions": [q.to_dict() for q in open_qs],
-            "fields": _intake_schema(known[b.playbook]) if b.playbook in known else [],
-        })
-    if obj:
-        answers = obj.get("answers") if isinstance(obj.get("answers"), dict) else {}
+        system, context = brief_context(ws, text)
+        reply = model.call_json("consultant", system, context)
+    if reply:
+        answers = reply.get("answers") if isinstance(reply.get("answers"), dict) else {}
         for q in open_qs:
             if answers.get(q.id) is not None:
                 q.answer = answers[q.id]
-        if isinstance(obj.get("intake"), dict):
-            b.intake.update({k: v for k, v in obj["intake"].items() if v is not None})
-        if isinstance(obj.get("assumptions"), list):
-            b.assumptions += [str(a) for a in obj["assumptions"]]
-        if obj.get("ready") is True:
+        if isinstance(reply.get("intake"), dict):
+            b.intake.update({k: v for k, v in reply["intake"].items() if v is not None})
+        if isinstance(reply.get("assumptions"), list):
+            b.assumptions += [str(a) for a in reply["assumptions"]]
+        if reply.get("ready") is True:
             for q in b.open_questions:
                 q.answer = q.default if q.default is not None else ""
-    else:
-        hints = intake_hints(text, b.playbook)
+    elif open_qs and text.strip():
         fields = {f.name: f for f in known[b.playbook].intake} if b.playbook in known else {}
+        hints = {k: v for k, v in intake_hints(text, b.playbook).items() if not fields or k in fields}
         for q in open_qs:
             if q.id in hints:
                 q.answer = hints[q.id]
+            elif any(a in hints for a in _ALTERNATES.get(q.id, ())):
+                q.answer = ""      # the pair's other half was given
         parts = [p.strip() for p in _SPLIT.split(text) if p.strip()]
         if len(parts) == len(open_qs):
             # one part per question, in the order they were asked
@@ -275,30 +535,29 @@ def _answer(ws: Workspace, model: Model | None, text: str) -> Message:
             pairs = list(zip(rest, parts if len(rest) > 1 else [text.strip()]))
         for q, part in pairs:
             if q.answer is None:
-                q.answer = _coerce_answer(part, q, fields.get(q.id))
+                q.answer = _coerce_answer(part, q, fields.get(q.id), playbook=b.playbook)
         for k, v in hints.items():
-            if open_qs:
-                b.intake.setdefault(k, v)
-            else:
-                b.intake[k] = v      # no question open: the text changes the brief
+            b.intake.setdefault(k, v)
+    elif not open_qs:
+        for k, v in intake_hints(text, b.playbook).items():
+            b.intake[k] = v      # no question open: the text changes the brief
 
+    had_playbook = b.playbook
     for q in b.questions:
-        if q.answer is None or q.answer == "":
-            continue
-        if q.id == "playbook":
-            picked = _match_option(str(q.answer), sorted(known))
-            if picked in known:
-                b.playbook, b.kind = picked, known[picked].problem
-            else:
-                q.answer = None
-            continue
-        b.intake[q.id] = q.answer
-    if b.playbook in known:
-        coerced = pbk.coerce_intake(known[b.playbook], b.intake)
-        b.intake = {k: (coerced[k] if k in coerced else v) for k, v in b.intake.items() if v is not None}
-        for k, v in coerced.items():
-            if v is not None and k not in b.intake:
-                b.intake[k] = v
+        _take_answer(ws, q, known)
+    if b.playbook and b.playbook != had_playbook and b.playbook in known:
+        # The playbook was just chosen: the problem text is read again with it, and its gaps asked once.
+        pb = known[b.playbook]
+        for k, v in intake_hints(b.problem, b.playbook).items():
+            b.intake.setdefault(k, v)
+        if not b.decision:
+            _set_decision(ws, pb, _decision_hint(b.problem, pb, b.intake))
+        if pb.id == "drought_status" and not b.period:
+            m = _PERIOD.search(b.problem)
+            b.period = m.group(0).lower() if m else None
+        b.quantities = b.quantities or _rules_quantities(b.playbook, b.intake)
+        b.questions += _gap_questions(ws, pb, None)
+    _coerce_all(ws, known, keep_unknown=True)
     b.ready = not b.open_questions
     ws.event("consultant", "answers", f"{len(open_qs) - len(b.open_questions)} answered, "
              f"{len(b.open_questions)} open")
@@ -308,18 +567,26 @@ def _answer(ws: Workspace, model: Model | None, text: str) -> Message:
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 
-def _coerce_answer(part: str, q: Question, field: Any) -> Any:
+def _coerce_answer(part: str, q: Question, field: Any, *, playbook: str | None = None) -> Any:
     """A free-text answer as the field wants it: the number in "200 years" for an int field, the option a word
-    points at, else the text."""
+    points at (a decision by the words that name it: "a licence", "screening"), else the text."""
     ftype = getattr(field, "type", None)
-    if ftype in ("int", "float"):
+    if ftype in ("int", "float") or (field is None and q.id == "return_period"):
         m = _NUMBER.search(part)
         if m:
             value = float(m.group(0))
-            return int(value) if ftype == "int" and value.is_integer() else value
+            return int(value) if (ftype == "int" or ftype is None) and value.is_integer() else value
         return part
     if q.options:
-        return _match_option(part, q.options)
+        picked = _match_option(part, q.options)
+        if picked in q.options or q.id not in ("decision", *_DECISION_FIELDS.values()):
+            return picked
+        words = {**_OPTION_WORDS, **dict(_DECISION_OPTIONS.get(playbook or "", []))}
+        for option in q.options:
+            pat = words.get(option)
+            if pat and re.search(pat, part, re.I):
+                return option
+        return picked
     return part.strip()
 
 
@@ -361,26 +628,33 @@ def _message(ws: Workspace) -> Message:
 
 
 def consult(ws: Workspace, model: Model | None, text: str, *, site: dict[str, float] | None = None,
-            tables: dict[str, Any] | None = None) -> Message:
+            tables: dict[str, Any] | None = None, proposed: dict[str, Any] | None = None) -> Message:
     """Take the client's message: the first one opens the brief, later ones answer its questions.
 
     Returns the Consultant's message (``kind`` ``questions`` while questions are
     open, ``brief`` when the crew may proceed). ``site`` sets the workspace's
     site; ``tables`` are the uploads as DataFrames (their column names go into
-    the model's context; the Scout reads the tables themselves).
+    the model's context; the Scout reads the tables themselves). ``proposed``
+    is ``{"brief": {...}, "source": "device"}``: a brief a caller's own model
+    wrote from the text, merged with the coercion a model reply gets (the
+    intake through ``coerce_intake``, unknown fields dropped) before the gaps
+    are asked.
     """
-    ws.say("user", text)
+    if text:
+        ws.say("user", text)
     if site:
         ws.site = {"lat": float(site["lat"]), "lon": float(site["lon"])}
     if not ws.brief.problem:
-        return _open(ws, model, text, tables)
-    return _answer(ws, model, text)
+        return _open(ws, model, text, tables, proposed)
+    return _answer(ws, model, text, proposed)
 
 
 def classify_follow_up(ws: Workspace, model: Model | None, text: str) -> dict[str, Any]:
     """A follow-up after the report: ``{"kind": "question", "answer"}`` or ``{"kind": "change", "intake",
     "request"}``. Keyless, a change is recognised by an intake the text states (a return period, a
-    statistic, a crop) or by change words; anything else is answered from the report."""
+    statistic, a crop), by change words, or by a phrase the Methodologist's keyless rules cover (another
+    gauge, the donors, the flow duration curve, a trend, drought indices, baseflow); anything else is
+    answered from the report."""
     from aquascope.ai_engine.team import intake_hints
 
     b = ws.brief
@@ -400,9 +674,13 @@ def classify_follow_up(ws: Workspace, model: Model | None, text: str) -> dict[st
             intake = obj.get("intake") if isinstance(obj.get("intake"), dict) else {}
             return {"kind": "change", "intake": {k: v for k, v in intake.items() if v is not None},
                     "request": str(obj.get("request") or text)}
+    from aquascope.studio.roles.methodologist import FOLLOW_UP_RULES
+
+    known = known_playbooks()
+    fields = {f.name for f in known[b.playbook].intake} if b.playbook in known else None
     hints = intake_hints(text, b.playbook)
-    changed = {k: v for k, v in hints.items() if b.intake.get(k) != v}
-    if changed or _CHANGE.search(text):
+    changed = {k: v for k, v in hints.items() if b.intake.get(k) != v and (fields is None or k in fields)}
+    if changed or _CHANGE.search(text) or any(re.search(pat, text, re.I) for pat, _ in FOLLOW_UP_RULES):
         return {"kind": "change", "intake": changed, "request": text}
     lines = [report.get("answer") or "The study produced no answer."]
     for kn in (report.get("key_numbers") or [])[:8]:

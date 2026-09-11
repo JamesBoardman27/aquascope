@@ -1,0 +1,46 @@
+# HydroGym Phase 2 reference plan; the authoring rules are in _authoring.yaml.
+# Sampled water quality at the Malad River gauge and an irrigation use: the CCME index against FAO 29 and the
+# irrigation suitability indices (SAR, sodium percentage, RSC), as the water_quality irrigation branch.
+id: wq_irrigation_snake_plain
+playbook: water_quality
+title: Is Malad River water fit for irrigation
+brief: >-
+  Is the Malad River water at Gooding fit for irrigating our fields? I am worried about salinity and sodium.
+  Use the last five years of samples at the gauge.
+intake:
+  use: irrigation
+  years: 5
+site:
+  name: Malad River near Gooding, Idaho
+  lat: 42.88639
+  lon: -114.80306
+  source: usgs
+  station_id: USGS-13152500
+  years: 110.4
+  recon: snake_plain_gauge
+expected_branch: irrigation
+steps:
+  - tool: water_quality_samples
+    gates:
+      - {check: not_empty, path: samples}
+  - tool: wqi
+    method: water_quality_index
+    gates:
+      - {check: not_empty, path: ccme.score}
+      - {check: min_samples, path: ccme.sample_counts}
+  - tool: iwqi
+    method: iwqi
+    gates:
+      - {check: not_empty, path: restriction}
+  - tool: who_screen
+    optional: true
+  - tool: describe_catchment
+    optional: true
+forbidden:
+  tools: [load_table, eda, quality]
+  methods: [spi, spei, groundwater_trend, sgi]
+rationale: >-
+  Sampled water quality is listed at the gauge; the samples are fetched, indexed against the FAO 29 thresholds with
+  the CCME WQI 1.0, and the irrigation suitability itself is read: sodium adsorption ratio, sodium percentage and
+  residual sodium carbonate with the FAO degree of restriction, which is what the client's worry about salinity and
+  sodium needs. A parameter that was not sampled is listed as missing, not cleared.

@@ -18,7 +18,8 @@ contract; this page is the user's guide.
    the brief: the decision, the quantities wanted, the playbook it maps to,
    the intake fields it can read off the text. At most three questions come
    back when something the analysis cannot proceed without is missing; say
-   `just go` to proceed on the defaults.
+   `just go` to proceed on the defaults, which are then listed as
+   assumptions.
 2. **Inventory.** The Scout lists what exists: the gauges within reach with
    their record spans, the catchment, the donor pool, the ERA5 cell (any
    point on land), and every table you attached, run through the ingest
@@ -44,8 +45,48 @@ contract; this page is the user's guide.
    when the deliverables package is installed, the figures, the Excel
    workbook, the Word report, the notebook and one zip.
 8. **Follow-up.** A question is answered from the workspace; a change (another
-   return period, another statistic) is planned, run and re-authored, reusing
-   every step whose arguments and gates did not change.
+   return period, another statistic, another gauge, the donors) is planned,
+   run and re-authored, reusing every step whose arguments and gates did not
+   change.
+
+## The keyless Consultant's questions
+
+Without a model the Consultant still asks real questions, from the gaps the
+text and the site leave, at most three in one round:
+
+| Gap | The question |
+| --- | --- |
+| a playbook field with no default (the demand of a supply question) | the field, once for a pair that asks the same thing (`demand_m3s` or `demand_ml_day`) |
+| no decision stated | what will be decided, with the playbook's options: design flow, risk screening, insurance, inundation extent; an abstraction licence, the size of the scheme, a screening; drought restrictions, irrigation planning, a situation report; the purpose, the concern or the use for the other playbooks |
+| a flood question without a return period | the return period, default 100 years |
+| a drought question without a period | now, the last 3 months, the last 12 months, the whole record; default now |
+| an upload with two or more numeric columns | which column holds the values, default the first |
+| no playbook matched | which kind of problem it is; the chosen playbook's gaps are asked once after that |
+
+A decision the text names ("a culvert", "for a licence", "screening") is not
+asked. `just go` takes every default and writes each one down as an
+assumption; a decision with no default stays unstated rather than invented.
+
+## Keyless follow-ups that add steps
+
+After the report, a follow-up without a model can add steps as well as change
+the intake. A rule table maps the words to catalogue steps, appended to the
+plan with ids continuing the sequence, validated like any step, run with the
+earlier results reused, and re-authored:
+
+| You say | The step added |
+| --- | --- |
+| "add the nearest gauge", "also include the upstream gauge" | `analyze_station` on the next gauge of the same variable in the inventory |
+| "compare with the donors" (regional, the neighbours) | `similar_basins` and `regionalize_signatures` at the site |
+| "flow duration", "fdc", "Q95" | `low_flow_context` on the plan's gauge, or `flow_duration` on the attached table |
+| "trend", "Mann-Kendall" | `analyze_station` with the `trend_mann_kendall` method |
+| "SPI", "SPEI", "drought" | `drought_indices` for the ERA5 cell |
+| "baseflow", "BFI" | `low_flow_context` with `baseflow_separation`, or `baseflow` on the attached table |
+| "GloFAS", "ERA5", "cross-check" | `anywhere` at the site |
+| "200-year" | the intake change, the tree planned again; the steps earlier follow-ups added come along |
+
+A request no rule covers gets the honest answer: it cannot be added without a
+model, and the list of what can.
 
 ## The tiers
 
@@ -102,12 +143,49 @@ under `aquascope.studio.roles` (`consult`, `scout`, `plan`, `run`,
 to drive them from another orchestrator; `examples/langgraph_team.py
 --studio` and `examples/crewai_studio.py` show two.
 
+## Bring your own model
+
+Any model you run yourself (Chrome's built-in model, a small model in the
+tab, a client of your own) can do what the crew's model would, and the crew
+treats what it wrote exactly like its own model's output: the same coercion,
+the same validator, the same checks. Three entry points take the reply, three
+give you the prompt and the context to send:
+
+```python
+s = Studio(lat=51.415, lon=-0.308)
+ctx = s.consultant_context("A culvert on the Thames")        # {"system": <prompt>, "problem", "site", "recon", ...}
+r = s.say("A culvert on the Thames", proposed={"brief": your_model(ctx), "source": "device"})
+# the brief is merged (intake through coerce_intake, unknown fields dropped, brief.source = "device");
+# the keyless questions cover what it left open; then the Scout and the plan
+ctx = s.methodologist_context()                              # the plan's context, with the tree as the exemplar
+r = s.approve(plan={**your_model(ctx), "source": "device"})
+# the plan goes through validate_plan with repair (a wrong method replaced or dropped, a guessed gate path
+# corrected), the invalid steps pruned, the tree when nothing valid remains;
+# r.payload["plan_used"] is "proposed" or "tree", r.payload["plan_errors"] the validator's findings,
+# study.plan["author"] the source
+ctx = s.author_context()                                     # the report's context; author_context(issues=...) the fix round
+r = s.narrate(your_model(ctx)["sections"], source="device")
+# every sentence passes the Critic's check first: one whose numbers (or years) are in no tool result is
+# dropped and counted (r.payload["dropped"]); ws.report["written_by"] and the footer say who wrote which
+# section; the deliverables are rebuilt. Sections not given keep the template's text.
+```
+
+`narrate` takes the section ids of `ws.report["sections"]` plus `answer` and
+`recommendations`; `references` and `appendix` are the crew's. The prompts
+the roles use, with the JSON schemas of the three replies (the brief, the
+plan, the sections), ship as `explorer/prompts.json`
+(`python -m aquascope.studio.prompts`, `aquascope.studio.prompts.as_json()`),
+so a page runs the same prompts on a device model.
+
 ## MCP
 
 `studio_start(problem, lat, lon, intake=None, ...)`, `studio_say(workspace,
-text)`, `studio_approve(workspace, edits=None)`, `studio_follow_up(workspace,
-text)`, `studio_export(workspace, out_dir)`. The tools are stateless: each
-returns the reply, a summary and the workspace dict to pass to the next.
+text, proposed=None)`, `studio_approve(workspace, edits=None, plan=None)`,
+`studio_follow_up(workspace, text)`, `studio_narrate(workspace, sections,
+source="device")`, `studio_context(workspace, role, text=None)` (role
+`consultant`, `methodologist` or `author`; the prompt under `system`),
+`studio_export(workspace, out_dir)`. The tools are stateless: each returns
+the reply, a summary and the workspace dict to pass to the next.
 
 ## In the Explorer
 
@@ -132,7 +210,13 @@ board above the input shows one thing at a time:
    why and keeps the plan); **Decline** keeps the input open for a change of
    brief, or start again.
 3. **Running**: the timeline as it happens, one line per event, and the
-   figures as they are drawn. **Stop** abandons the run.
+   figures as they are drawn. **Stop** means stop: Python cannot be
+   interrupted mid-call, so the worker is terminated and boots again (the
+   progress bar as at first load, a few seconds when the runtime is cached).
+   The page keeps its copy of the study, so the board returns to the plan
+   with one line, "stopped; the figures made so far are gone, the plan is
+   kept", and the next Approve rebuilds the study in the fresh worker from
+   that copy. The table open in My data is handed to the new worker again.
 4. **Done**: the answer, the key numbers, the figures, what the study does
    not establish when the Critic listed anything, **Download bundle** (the
    zip) and links for the Word, Excel, Markdown, notebook and `study.yaml`
@@ -143,12 +227,67 @@ board above the input shows one thing at a time:
 
 The tiers are Ask's. Keyless by default, which is a complete study: the
 playbook tree plans, the gates check, templates write. When Ask holds a key,
-one line offers it for the prose and the composed methodology. When Chrome's
-built-in model is already on the device, or Ask has loaded a small model in
-this tab, it reads the first sentence into a brief (the decision, the
-quantities, a return period or drought timescales when stated) before the
-Consultant sees it; nothing is downloaded for that, and a wrong reading costs
-one question, never a wrong number.
+one line offers it for the prose and the composed methodology.
+
+**The device model on the crew.** When Chrome's built-in model is already on
+the device, or Ask has loaded a small model in this tab, it joins the keyless
+crew in three bounded places, and the card says who wrote what:
+
+- the **brief**: it reads the first sentence (the decision, the quantities, a
+  return period or drought timescales when stated) before the Consultant sees
+  it, and a wrong reading costs one question, never a wrong number;
+- the **plan**: at review, the page asks the worker for the Methodologist's
+  context (the same compact JSON the crew's own model would read, with its
+  system prompt) and the exported prompts (`explorer/prompts.json`, or the
+  engine's own when the page has none), the model writes a plan in one call,
+  and the engine's validator checks it before the card shows it. The card
+  then says "planned on this device with Chrome's built-in model", or keeps
+  the tree's plan and says "the playbook's plan (the device model's plan did
+  not pass the validator: ...)" with the first error. Approve sends the
+  device's plan, with any inline edits, and the engine validates it again
+  before running it; the foot of the answer says which plan ran;
+- the **prose**: after the run, the model writes the summary and the
+  recommendations in one call and, while it is quick, one call per result
+  step, four calls at most, and the engine's narrate keeps only what the
+  Critic's checks allow (a sentence with a number the results do not carry
+  is dropped). The line under the answer says "written on this device with
+  Chrome's built-in model; N sentences dropped by the checks".
+
+Every call has the 25 s limit Ask's on-device brief has; on a timeout or a
+reply that is not a plan or a section, the keyless result stands and one
+line says so. Nothing is downloaded for any of this: Study never starts a
+model download, it only uses one that is already there. The device-model
+path cannot run in a headless browser (no WebGPU, no Prompt API), so it is
+tested against a fake model under node and by hand in Chrome.
+
+**Saved studies.** After every reply the workspace (without its bytes) and
+the PNG figures are saved in the browser's IndexedDB, the last five studies
+kept, nothing sent anywhere. Opening Study at a place where a study was made
+(or a `#study=1` link there) offers a **Resume the last study** chip that
+reopens its board in its state, figures included; the documents are remade
+by the next run. A `workspace.json` from a bundle (or from the CLI) dropped
+on the board resumes that study the same way. Where the browser blocks
+storage (a private window, a quota), nothing is saved and nothing is said.
+
+**Tables.** A CSV travels as it is; an `.xlsx` is turned into CSV in the
+worker (pandas, through the same `table` op) before the study starts, so
+every table sits in the workspace the same way and round-trips through the
+bundle. The Scout lists it with its QA next to the gauges, and keyless the
+plan runs on it (`load_table`, then the workbench tools).
+
+**Recorded studies.** The intake board offers the recorded studies as chips
+("See a recorded study"): one opens as its finished board, the thread, the
+answer, the key numbers and the figures as recorded, with one line saying
+who recorded it and that the numbers were computed then. **Re-run live**
+starts the same study at the recorded site in your browser and approves the
+recorded plan, which runs keyless through the validator and the gates
+(the template narrator writes, or the device model when it is there), and
+`#study=<id>` opens a recording directly.
+
+The Study modules (`studio.js`, `intake.js`, `studio-device.js`,
+`studio-recorded.js`, `study-store.js`) load on first use of the Study button, the drawer's
+radio, **Study this place** or a `#study=1` link, not on a first visit that
+runs no study.
 
 The bytes stay in the worker. The page holds the workspace without the
 artifact data; a figure travels as a PNG when it is drawn, a document only
@@ -157,6 +296,50 @@ before the first run and the document libraries before the first bundle,
 once per visit, and never on a visit that runs no study. Nothing is uploaded
 anywhere: the tables you attach are read in your tab and travel inside the
 workspace as CSV text.
+
+## Recorded studies
+
+The keyless tier plans from the playbook tree and writes template prose.
+What the crew does with a model (a methodology composed from the
+catalogue, a Critic with findings, an Author who writes) needs a model
+once, not at every visit. So the maintainer records a dozen studies with a
+model and commits the bundles under `explorer/showcase/studies/`: flood,
+drought, supply, groundwater, ungauged flow, water quality, irrigation and
+a table you bring; gauged sites and bare points; five continents. The Study
+intake offers them as chips.
+
+Opening one shows the recorded study as it was: the brief, the plan, the
+run with its gates, the figures, the report. Two things are true of every
+recording and the page says both:
+
+- **The numbers re-run live.** The plan (`study.yaml`, the version-3 study
+  in `workspace.json`) is handed back to the worker and every step runs
+  again in your browser, keyless, at the same place with the same arguments
+  and gates. Records grow, so a number can differ from the recording; a
+  difference is new observations, not an error.
+- **The prose is a recording.** The Author's text and the Critic's findings
+  were written once by the model named in the label ("recorded on
+  2026-09-07 with claude-sonnet-5, 0.42 USD") and are shown as recorded,
+  never regenerated.
+
+A recording is a directory: `workspace.json` (without the artifact bytes;
+`aquascope studio --resume` picks it up), `report.md`, `study.yaml`
+(`aquascope run study.yaml` replays it with no model), `figures/*.png` and
+`meta.json` (the model, the date, the tokens and the estimated cost, the
+seconds, the gates passed, the headline). `index.json` at the root lists
+them. A declined study is kept as recorded: a decline with its reason is a
+valid worked example.
+
+Recording is a maintainer's command and needs a key:
+
+```bash
+aquascope studio-showcase record --out explorer/showcase/studies [--only kingston-flood] [--max-usd 15]
+aquascope studio-showcase list --out explorer/showcase/studies
+```
+
+Cases fresher than 30 days are skipped (`--refresh-after`), so a run that
+stops halfway tops up rather than starting again, and the run stops at
+`--max-usd`. The cases are `aquascope.studio.showcase.CASES`.
 
 ## The honesty rules
 
@@ -168,4 +351,6 @@ workspace as CSV text.
 - The playbook's caveats are printed verbatim when a playbook applies.
 - The study replays with no model: `aquascope run study.yaml`.
 - The ledger (calls and tokens per role) is in the report's footer, and the
-  plan says who wrote it (`playbook` or `methodologist`).
+  plan says who wrote it (`playbook`, `methodologist`, or the source of a plan
+  you brought, `device` by default); the report says who wrote each section
+  (`written_by`).

@@ -1,0 +1,45 @@
+# HydroGym Phase 2: how a reference plan is written (issue #367, epic #363).
+#
+# One file per case, `<id>.yaml`, read by aquascope.gym.plans; a file whose name starts with `_` (this one) is
+# not a case. The keys of a case:
+#   id               the file name: <problem>_<what>_<site>
+#   playbook         the playbook the brief maps to. The Studio's Consultant would pick it from the words; here it
+#                    is given, so the Methodologist is judged on the plan it writes, not on the classification.
+#   title            one line: what is decided with the answer
+#   brief            the client's words, as a person would say them, with the numbers that matter
+#   intake           the playbook's intake fields the brief fixes; the playbook's defaults fill the rest
+#   site             name, lat, lon, source and station_id (a catalog gauge, or a bare point without them), years,
+#                    and `recon`: the name of the saved reconnaissance under recon/ (assess_site at capture time)
+#   expected_branch  the branch the tree selects on that reconnaissance; informational, the scorer does not read it
+#   steps            the expert plan, in order. Each step: tool (a catalogue entry, aquascope.studio.catalogue),
+#                    method (a registry id the tool applies, aquascope.methods; omitted for a step with none),
+#                    gates ([{check, path}]: the gates the step must carry, the path as the catalogue lists it for
+#                    that check on that tool), optional (true for a step a good plan may add or leave out: it is
+#                    never extraneous and never required), note
+#   forbidden        tools and methods that are not defensible at this site for this brief: the registry's verdict
+#                    on the saved reconnaissance (no record, a record below the floor, a catchment above a lumped
+#                    model's ceiling), or a tool with no input here (a table tool with no table). A plan that uses
+#                    one loses the `clean` part of the score.
+#   decline          true when the data or the brief cannot carry the question; decline_kind then names the kind
+#                    (declined: a playbook rule; refused: the registry; no_branch; intake) and steps is empty
+#   rationale        why this is the plan a hydrologist would write, in a few sentences
+#   tags             off_tree for a brief no single playbook branch covers
+#
+# The rules:
+#   1. The registry decides what is defensible. A required step never names a method the saved reconnaissance calls
+#      not defensible, and every such method a planner for this problem might reach for is listed as forbidden.
+#   2. The playbook branch is the starting point: its required steps and gates are the reference's unless the brief
+#      asks for more or the site says otherwise. Framing steps (describe_catchment) are optional.
+#   3. A step's tool and method are the ones the catalogue lists for that tool (the Studio rewrites a method the
+#      tool does not apply to the tool's first method that serves the problem); where the catalogue offers two
+#      routes to the same quantity, the reference names one and lists the other as an alternative.
+#   4. Gates are the ones that protect the number quoted: record length before a fit, the return-period cap and the
+#      spread between fits before a return level, donors before a transfer, a non-empty payload before an index.
+#   5. Off-tree briefs go beyond the branch: a comparison needs both estimates, a supply question that names a crop
+#      needs the demand before the screening, a drought question that names the well and the river needs the
+#      propagation and the low-flow context as required steps, not optional ones.
+#   6. A decline is a case: the right plan is none, and a plan of any length scores zero.
+#   7. The reconnaissance is saved once per site (recon/<name>.json) and never edited by hand: a case is only as
+#      real as its snapshot. Capture it with aquascope.explore.assess_site(lat, lon) and record the date.
+#   8. `aquascope gym plans validate` must pass before a case is committed.
+schema_version: 1

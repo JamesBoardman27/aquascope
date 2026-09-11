@@ -102,12 +102,12 @@ out (`aquascope.studio.model.Model.call_json`).
 
 | Role | Keyless | With a model | Writes |
 | --- | --- | --- | --- |
-| Consultant | keyword rules (`team.choose_playbook`), intake hints, the playbook's intake fields as questions | the brief from the text, the site, the attached tables and a catalog-only recon; at most three questions in one round; "just go" proceeds on assumptions | `brief`, a `questions` message |
+| Consultant | keyword rules (`team.choose_playbook`), intake hints, the decision the text names, the gaps as questions (a field with no default, the decision with the playbook's options, a flood question's return period, a drought question's period, an upload's value column; at most three); "just go" takes the defaults and lists them | the brief from the text, the site, the attached tables and a catalog-only recon; at most three questions in one round; "just go" proceeds on assumptions | `brief`, a `questions` message |
 | Scout | `assess_site`, the ERA5 and GloFAS reach, uploads through `ingest` | the same (deterministic) | `inventory`, a `Dataset` per row |
-| Methodologist | the playbook tree (`playbooks.plan`) | a version-3 study composed from the catalogue; `validate_plan`; one repair call with the errors; then the tree; then a decline with the errors | `study`, a `plan` message |
+| Methodologist | the playbook tree (`playbooks.plan`); after the report, a rule table from the follow-up's words to catalogue steps appended to the plan (`FOLLOW_UP_RULES`) | a version-3 study composed from the catalogue; `validate_plan`; one repair call with the errors; then the tree; then a decline with the errors | `study`, a `plan` message |
 | Analysts | `run_study` with gates and the bounded replan of `team._execute`; figures per step as results land | the Specialist's fallback proposal after a failed gate, as in Solve | `run`, figure and table artifacts, events |
 | Critic | `verify.verify` on the draft, the gates, the plan's notes | one independent pass over the draft sections and the compact results: issues with a section, a severity and a fix | `critique` |
-| Author | template prose (`team._template_answer` and the sentence makers) | one call per report for the prose of every section, given the compact results, the critique and the caveats; the numbers come from the results | `report`, the documents, the workbook, the notebook, the bundle |
+| Author | template prose (`team._template_answer` and the sentence makers); the key numbers harvested from every payload (both fits at every return period, every drought timescale with its class, the transferred signatures' bands, the reliability by year) | one call per report for the prose of every section, given the compact results, the critique and the caveats; the numbers come from the results | `report` (with `written_by`), the documents, the workbook, the notebook, the bundle |
 | Coordinator | the state machine, checkpoints, follow-ups | the same; a follow-up is classified by the Consultant as a question (answered from the workspace) or a change (steps appended, run, re-authored) | `status`, `follow_ups` |
 
 Reading between the roles: compact JSON of exactly what the role needs
@@ -133,6 +133,34 @@ declined; `text`; `payload`) and leaves the workspace consistent, so a face
 can stop at any point and resume. The keyless path is the default: a model is
 used only when one is asked for.
 
+Bring your own model, the same crew: whatever model a face runs itself hands
+its output to the crew, which treats it exactly like its own model's.
+
+```python
+ctx = s.consultant_context(text)          # the Consultant's prompt (under "system") and compact context
+r = s.say(text, proposed={"brief": {...}, "source": "device"})
+                                          # merged with the model-reply coercion (coerce_intake, unknown fields
+                                          # dropped, brief.source set); the keyless questions cover the gaps
+ctx = s.methodologist_context()           # the plan's context (methodologist_context(request) the change's)
+r = s.approve(plan={...Methodologist reply shape..., "source": "device"})
+                                          # validate_plan with repair, a wrong method dropped, the invalid steps
+                                          # pruned, the tree when nothing valid remains; study.plan["author"] is
+                                          # the source; payload plan_errors (list), plan_used ("proposed" | "tree")
+ctx = s.author_context(issues=None)       # the report's context (with issues, the fix round's)
+r = s.narrate({"summary": "...", "results-s3": "...", "answer": "..."}, source="device")
+                                          # after "done": each sentence through verify against the Critic's pool,
+                                          # dropped when its numbers are in no result; ws.report["written_by"]
+                                          # and the footer say who wrote which section; deliverables rebuilt;
+                                          # payload {"dropped": n, "written_by": {...}}
+```
+
+The prompts and the reply schemas ship as `explorer/prompts.json`
+(`aquascope.studio.prompts.as_json()`, `python -m aquascope.studio.prompts`,
+a test keeps the file in step); MCP mirrors the entry points with
+`studio_say(workspace, text, proposed=None)`, `studio_approve(workspace,
+edits=None, plan=None)`, `studio_narrate(workspace, sections, source)` and
+`studio_context(workspace, role, text=None)`.
+
 ## The deliverables (`aquascope/studio/deliverables/`)
 
 Pure Python so they run in the Pyodide worker; the plotting and document
@@ -157,7 +185,7 @@ this study does not establish, Recommendations, References, Appendix
 ## The faces
 
 - **CLI**: `aquascope studio "PROBLEM" --lat --lon [--data FILE ...] [--provider ...] [--out DIR] [--yes] [--resume workspace.json]`.
-- **MCP**: `studio_start`, `studio_say`, `studio_approve`, `studio_follow_up`, `studio_export`, the workspace dict in and out.
+- **MCP**: `studio_start`, `studio_say`, `studio_approve`, `studio_follow_up`, `studio_narrate`, `studio_context`, `studio_export`, the workspace dict in and out.
 - **Explorer**: Study mode in the drawer (`explorer/src/studio.js`), a thin face over one worker message, `studio`, with `op` start, say, approve, follow_up, file, export (and table, an XLSX to CSV). `start` builds the Studio at the page's site with the attached tables and the page's catchment row (`describe_catchment` from it) and calls `say`; the others rebuild it with `Studio.from_dict` and call the method. Every reply is `{reply, workspace, status}` with the workspace WITHOUT artifact bytes; the worker keeps its own copy WITH them by workspace id, so `file` returns one artifact by id as base64 and `export` the bundle zip. `studio_progress` posts every event as it happens; `studio_artifact` posts every artifact, PNG figures with their bytes, SVG and CSV without. matplotlib is loaded with `loadPackage` before the first run, openpyxl and python-docx with micropip before the first bundle, never on a visit that runs no study.
 
 ## The honesty rules, kept

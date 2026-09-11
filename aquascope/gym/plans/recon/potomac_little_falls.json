@@ -1,0 +1,594 @@
+{
+ "site": {
+  "lat": 38.949777777777776,
+  "lon": -77.12763888888888,
+  "source": "usgs",
+  "station_id": "USGS-01646500",
+  "name": "POTOMAC RIVER NEAR WASH, DC LITTLE FALLS PUMP STA",
+  "country": "USA",
+  "variables": [
+   "discharge",
+   "water_quality"
+  ],
+  "period_start": "1930-03-01",
+  "period_end": "2026-08-30",
+  "years": 96.5
+ },
+ "captured": "2026-09-07",
+ "command": "aquascope.explore.assess_site(38.949777777777776, -77.12763888888888)",
+ "recon": {
+  "point": {
+   "lat": 38.94978,
+   "lon": -77.12764
+  },
+  "stations": [
+   {
+    "source": "usgs",
+    "station_id": "USGS-01646500",
+    "name": "POTOMAC RIVER NEAR WASH, DC LITTLE FALLS PUMP STA",
+    "distance_km": 0.0,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "1930-03-01",
+    "period_end": "2026-08-30",
+    "years": 96.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01646500/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01646502",
+    "name": "POTOMAC RIVER, ADJUSTED, NEAR WASH, DC",
+    "distance_km": 0.0,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1930-03-01",
+    "period_end": "2025-10-31",
+    "years": 95.7,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01646502/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01646550",
+    "name": "LITTLE FALLS BRANCH NEAR BETHESDA, MD",
+    "distance_km": 1.9,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1944-06-01",
+    "period_end": "1979-01-17",
+    "years": 34.6,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01646550/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01646305",
+    "name": "DEAD RUN AT WHANN AVENUE NEAR MCLEAN, VA",
+    "distance_km": 4.3,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "2007-11-30",
+    "period_end": "2026-08-29",
+    "years": 18.7,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01646305/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01648010",
+    "name": "Rock Creek at Joyce Rd Washington, DC",
+    "distance_km": 7.5,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "2012-06-08",
+    "period_end": "2026-08-29",
+    "years": 14.2,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01648010/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01648011",
+    "name": "Luzon Branch above Rock Creek at Washington DC",
+    "distance_km": 7.6,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "2022-07-20",
+    "period_end": "2025-11-16",
+    "years": 3.3,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01648011/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01652090",
+    "name": "FOUR MILE RUN AT HWY 29 AT FALLS CHURCH, VA",
+    "distance_km": 7.7,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "2023-03-15",
+    "period_end": "2026-08-29",
+    "years": 3.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01652090/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01649000",
+    "name": "ROCK CREEK AT Q STREET, WASHINGTON  DC",
+    "distance_km": 7.9,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1892-08-18",
+    "period_end": "1933-09-29",
+    "years": 41.1,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01649000/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01648000",
+    "name": "ROCK CREEK AT SHERRILL DRIVE WASHINGTON, DC",
+    "distance_km": 8.0,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1929-10-01",
+    "period_end": "2026-03-18",
+    "years": 96.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01648000/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01652620",
+    "name": "TRIPPS RUN AT FALLS CHURCH, VA",
+    "distance_km": 9.0,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "2023-03-15",
+    "period_end": "2026-08-30",
+    "years": 3.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01652620/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01646000",
+    "name": "DIFFICULT RUN NEAR GREAT FALLS, VA",
+    "distance_km": 10.6,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "1935-04-01",
+    "period_end": "2026-08-30",
+    "years": 91.4,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01646000/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01650800",
+    "name": "SLIGO CREEK NEAR TAKOMA PARK, MD",
+    "distance_km": 11.4,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "2008-10-01",
+    "period_end": "2026-08-29",
+    "years": 17.9,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01650800/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01652500",
+    "name": "FOURMILE RUN AT ALEXANDRIA, VA",
+    "distance_km": 12.4,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1951-05-04",
+    "period_end": "2026-08-29",
+    "years": 75.3,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01652500/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01651827",
+    "name": null,
+    "distance_km": 13.8,
+    "variables": [
+     "water_quality"
+    ],
+    "period_start": "2019-03-12",
+    "period_end": "2026-08-29",
+    "years": 7.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01651827/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01647850",
+    "name": "TURKEY BRANCH NEAR ROCKVILLE, MD",
+    "distance_km": 13.8,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "2006-11-18",
+    "period_end": "2026-08-29",
+    "years": 19.8,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01647850/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01651000",
+    "name": "NORTHWEST BR ANACOSTIA RIVER NR HYATTSVILLE, MD",
+    "distance_km": 14.1,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "1938-07-01",
+    "period_end": "2023-11-13",
+    "years": 85.4,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01651000/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01651770",
+    "name": "HICKEY RUN AT NATIONAL ARBORETUM AT WASHINGTON, DC",
+    "distance_km": 14.2,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "2012-10-01",
+    "period_end": "2026-08-29",
+    "years": 13.9,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01651770/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01651003",
+    "name": "NORTHWEST BRANCH ANACOSTIA RIVER AT BRENTWOOD, MD",
+    "distance_km": 14.8,
+    "variables": [
+     "discharge",
+     "water_quality"
+    ],
+    "period_start": "2023-05-26",
+    "period_end": "2026-08-30",
+    "years": 3.3,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01651003/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01650500",
+    "name": "Northwest Branch Anacostia River nr Colesville, MD",
+    "distance_km": 15.4,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1923-10-01",
+    "period_end": "2026-08-30",
+    "years": 102.9,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01650500/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01645200",
+    "name": "WATTS BRANCH AT ROCKVILLE, MD",
+    "distance_km": 15.5,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1957-10-01",
+    "period_end": "1987-09-29",
+    "years": 30.0,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01645200/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01651760",
+    "name": null,
+    "distance_km": 15.6,
+    "variables": [
+     "water_quality"
+    ],
+    "period_start": "2024-07-04",
+    "period_end": "2026-08-29",
+    "years": 2.2,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01651760/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01651812",
+    "name": null,
+    "distance_km": 15.6,
+    "variables": [
+     "water_quality"
+    ],
+    "period_start": "2023-04-12",
+    "period_end": "2023-10-04",
+    "years": 0.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01651812/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-385504076563801",
+    "name": null,
+    "distance_km": 16.3,
+    "variables": [
+     "water_quality"
+    ],
+    "period_start": "2004-10-01",
+    "period_end": "2008-03-30",
+    "years": 3.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/385504076563801/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-385504076563802",
+    "name": null,
+    "distance_km": 16.3,
+    "variables": [
+     "water_quality"
+    ],
+    "period_start": "2004-09-30",
+    "period_end": "2008-03-30",
+    "years": 3.5,
+    "url": "https://waterdata.usgs.gov/monitoring-location/385504076563802/"
+   },
+   {
+    "source": "usgs",
+    "station_id": "USGS-01653000",
+    "name": "CAMERON RUN AT ALEXANDRIA, VA",
+    "distance_km": 16.3,
+    "variables": [
+     "discharge"
+    ],
+    "period_start": "1955-06-01",
+    "period_end": "2026-08-29",
+    "years": 71.2,
+    "url": "https://waterdata.usgs.gov/monitoring-location/01653000/"
+   }
+  ],
+  "catchment": {
+   "hybas_id": 7120567540,
+   "area_km2": 30090.3,
+   "upstream_area_km2": 30090.7,
+   "n_sub_basins": 229,
+   "elevation_m": 390.0,
+   "precipitation_mm_yr": 1004.0,
+   "aridity": 0.92,
+   "dams": 2.6,
+   "source": "BasinATLAS (HydroATLAS v1.0)"
+  },
+  "context": {
+   "years_by_variable": {
+    "discharge": 96.5,
+    "water_quality": 96.5
+   },
+   "resolution_by_variable": {
+    "discharge": "daily",
+    "water_quality": "daily"
+   },
+   "area_km2": 30090.7,
+   "return_period": null,
+   "donors": 10,
+   "available": [
+    "forcing",
+    "glofas",
+    "temperature"
+   ],
+   "ungauged": false
+  },
+  "sufficiency": [
+   {
+    "method": "at_site_flood_frequency",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "At-site flood frequency (GEV, LP3 / Bulletin 17C)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "baseflow_separation",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Baseflow separation and baseflow index",
+    "tool": "baseflow",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "crop_water_requirement",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Crop water requirement (single or dual Kc)",
+    "tool": "crop_water_demand",
+    "station": null
+   },
+   {
+    "method": "fao56_et0",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "FAO-56 Penman-Monteith reference evapotranspiration",
+    "tool": "reference_et",
+    "station": null
+   },
+   {
+    "method": "flow_duration",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow duration curve and Q95",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "glofas_cross_check",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "GloFAS modelled discharge as an independent check",
+    "tool": "anywhere",
+    "station": null
+   },
+   {
+    "method": "iwqi",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Irrigation water quality (SAR, sodium percentage, RSC, FAO 29 restriction)",
+    "tool": "iwqi",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "low_flow_frequency",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Low-flow frequency (annual minima)",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "regionalize_signatures",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Flow signatures transferred from donors",
+    "tool": "regionalize_signatures",
+    "station": null
+   },
+   {
+    "method": "spei_reanalysis",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "SPI and SPEI from ERA5 reanalysis for the cell (no rain gauge)",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "supply_reliability",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Run-of-river supply reliability against a demand (flow-duration screening)",
+    "tool": "supply_reliability",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "trend_mann_kendall",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Mann-Kendall trend with Sen's slope",
+    "tool": "analyze_station",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "water_quality_index",
+    "status": "defensible",
+    "reason": "the record supports it",
+    "label": "Water quality index against guideline values (CCME WQI 1.0, NSF WQI)",
+    "tool": "wqi",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "similar_basins",
+    "status": "marginal",
+    "reason": "meant for an ungauged point; a gauge is available here",
+    "label": "Donor gauges by catchment similarity",
+    "tool": "similar_basins",
+    "station": null
+   },
+   {
+    "method": "climate_projection",
+    "status": "not_defensible",
+    "reason": "needs gcms of at least 3, not available here",
+    "label": "CMIP6 ensemble change factors on the baseline statistic",
+    "tool": "climate",
+    "station": null
+   },
+   {
+    "method": "gr4j_calibration",
+    "status": "not_defensible",
+    "reason": "catchment of 30,091 km² is above the 10,000 km² ceiling for a lumped model",
+    "label": "GR4J rainfall-runoff calibration",
+    "tool": "gr4j",
+    "station": {
+     "source": "usgs",
+     "station_id": "USGS-01646500"
+    }
+   },
+   {
+    "method": "groundwater_trend",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Groundwater-level trend (m/yr) with confidence interval",
+    "tool": "analyze_station",
+    "station": null
+   },
+   {
+    "method": "recharge_wtf",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Recharge by water-table fluctuation",
+    "tool": "recharge",
+    "station": null
+   },
+   {
+    "method": "sgi",
+    "status": "not_defensible",
+    "reason": "no groundwater level record at this site",
+    "label": "Standardized Groundwater Index",
+    "tool": "sgi_drought",
+    "station": null
+   },
+   {
+    "method": "spei",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation-Evapotranspiration Index",
+    "tool": "drought_indices",
+    "station": null
+   },
+   {
+    "method": "spi",
+    "status": "not_defensible",
+    "reason": "no precipitation record at this site",
+    "label": "Standardized Precipitation Index",
+    "tool": "drought_indices",
+    "station": null
+   }
+  ],
+  "notes": [
+   "Record resolution is not in the catalog; daily is assumed for every variable.",
+   "10 donor gauges from a pool of 37,053 gauged catchments.",
+   "ERA5 temperature and forcing and GloFAS discharge are assumed reachable for any point on land (Open-Meteo); not checked here.",
+   "CMIP6 change factors need model output you supply (aquascope.climate works on downloaded data); not counted."
+  ]
+ }
+}
