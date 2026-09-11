@@ -53,7 +53,8 @@ from aquascope.api import baseflow_analysis, compute_all_signatures, flood_analy
 from aquascope.hydrology.flow_duration import flow_duration_curve
 from aquascope.reporting.builder import ReportBuilder
 from benchmarks import _paths
-from benchmarks.results_models import RETURN_PERIODS, SCHEMA_VERSION, Results as ResultsModel
+from benchmarks.results_models import RETURN_PERIODS, SCHEMA_VERSION
+from benchmarks.results_models import Results as ResultsModel
 
 BASE = pathlib.Path(__file__).resolve().parent
 BENCHMARK_DIR = _paths.BENCHMARK_DIR

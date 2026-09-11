@@ -20,7 +20,11 @@ and the published CAMELS attributes, and emits `results.json`. No network access
 Everything local lives in `data/camels_benchmark/`: `daily_catchments.json` (the ten
 published attributes), the synthetic daily catchment series (`daily/*_daily.csv`),
 the flood-frequency peaks (`peaks/*.csv`) and the reference quantiles
-(`ffa_reference.json`).
+(`ffa_reference.json`). The ten synthetic CSVs (~0.8 MB) are committed
+deliberately even though `generate_synthetic.py` reproduces them byte-for-byte
+from `default_rng(42)`: it buys a network-free CI, a fixed artifact to diff a
+regression against, and a reader who can see what the harness ran on without
+executing anything.
 
 ## How to run the benchmark locally
 
