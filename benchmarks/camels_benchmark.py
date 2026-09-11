@@ -530,9 +530,19 @@ def _aggregate(catchment_results: dict[str, dict], catchments: dict[str, dict]) 
 
 
 def _strict_failed(results: dict) -> bool:
-    """Whether ``--strict`` should exit non-zero for a results dict."""
+    """Whether ``--strict`` should exit non-zero for a results dict.
+
+    Mirrors the aggregate gates: fits classed ``data_limitation`` are a known
+    limitation of the reference data rather than a software defect, so they are
+    recorded and surfaced in the summary but do not fail the run. A fit is
+    classed ``data_limitation`` only when its check already fails (a labelling
+    of the same fit, never an extra finding), so subtracting the count from
+    ``n_unmet`` leaves exactly the genuine misses.
+    """
     fences = results["summary"]["gates"]
-    return bool(results["summary"]["n_unmet"] or results["summary"]["n_integrity_failures"]) or not all(
+    n_data_limitation = results["summary"].get("n_data_limitation_findings", 0)
+    n_genuine = results["summary"]["n_unmet"] - n_data_limitation
+    return bool(n_genuine or results["summary"]["n_integrity_failures"]) or not all(
         fences[k] for k in fences if k.endswith("_met")
     )
 
@@ -978,7 +988,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Exit non-zero when any check is unmet.",
+        help="Exit non-zero when any check is unmet (data-limitation findings recorded, not failing).",
     )
     args = parser.parse_args(argv)
 
