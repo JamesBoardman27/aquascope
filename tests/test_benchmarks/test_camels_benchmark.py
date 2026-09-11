@@ -355,9 +355,29 @@ def test_cli_from_json_rejects_no_reports(tmp_path) -> None:
         cb.main(["--from-json", str(run_dir / "results.json"), "--no-reports"])
 
 
+def test_cli_from_json_rejects_strict(tmp_path) -> None:
+    """--from-json re-renders a recorded run; --strict asserts only on a fresh run."""
+    run_dir = tmp_path / "run"
+    cb.main(["--output-dir", str(run_dir), "--gauge-id", "01013500"])
+    with pytest.raises(ValueError):
+        cb.main(["--from-json", str(run_dir / "results.json"), "--strict"])
+
+
 def test_cli_strict_exits_nonzero_when_unmet(tmp_path) -> None:
     """--strict fails the run on genuine misses (data-limitation is recorded, not failing)."""
     rc = cb.main(["--output-dir", str(tmp_path), "--strict"])
+    assert rc == 1
+
+
+def test_cli_strict_passes_on_data_limitation_only(tmp_path) -> None:
+    """--strict exits 0 when a gauge's only misses are data-limitation findings."""
+    rc = cb.main(["--output-dir", str(tmp_path), "--gauge-id", UNSTABLE_GAUGE, "--strict"])
+    assert rc == 0
+
+
+def test_cli_strict_fails_on_genuine_miss(tmp_path) -> None:
+    """--strict exits 1 when a genuine miss accompanies data-limitation findings."""
+    rc = cb.main(["--output-dir", str(tmp_path), "--gauge-id", "06803500", "--strict"])
     assert rc == 1
 
 

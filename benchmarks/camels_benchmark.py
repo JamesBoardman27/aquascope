@@ -532,16 +532,19 @@ def _aggregate(catchment_results: dict[str, dict], catchments: dict[str, dict]) 
 def _strict_failed(results: dict) -> bool:
     """Whether ``--strict`` should exit non-zero for a results dict.
 
-    Mirrors the aggregate gates: fits classed ``data_limitation`` are a known
-    limitation of the reference data rather than a software defect, so they are
-    recorded and surfaced in the summary but do not fail the run. A fit is
-    classed ``data_limitation`` only when its check already fails (a labelling
-    of the same fit, never an extra finding), so subtracting the count from
-    ``n_unmet`` leaves exactly the genuine misses.
+    Strict is the per-check contract on top of the aggregate gates: it fails on
+    any genuine per-check miss, any signature-integrity failure, or any unmet
+    aggregate gate (q_mean NRMSE / BFI PBIAS / FFA). Fits classed
+    ``data_limitation`` -- a ``gev`` comparison against an unstable reference
+    MLE, labelled only when the fit already fails -- are a known limitation of
+    the reference data, never a software defect: they are recorded and surfaced
+    in the summary but do not fail the run. Subtracting them from ``n_unmet``
+    leaves exactly the genuine misses, which also makes ``--strict`` stricter
+    than the gates alone (the FFA gate drops the whole ``gev`` method from its
+    mean).
     """
     fences = results["summary"]["gates"]
-    n_data_limitation = results["summary"].get("n_data_limitation_findings", 0)
-    n_genuine = results["summary"]["n_unmet"] - n_data_limitation
+    n_genuine = results["summary"]["n_unmet"] - results["summary"]["n_data_limitation_findings"]
     return bool(n_genuine or results["summary"]["n_integrity_failures"]) or not all(
         fences[k] for k in fences if k.endswith("_met")
     )
@@ -999,6 +1002,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.from_json:
         if args.no_reports:
             raise ValueError("--from-json renders reports; it cannot be combined with --no-reports.")
+        if args.strict:
+            raise ValueError("--from-json re-renders a recorded run; it cannot be combined with --strict.")
         with open(args.from_json) as f:
             results = json.load(f)
         try:
