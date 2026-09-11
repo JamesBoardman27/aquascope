@@ -646,10 +646,10 @@ class TestNewFao56Crops:
         assert get_kcb(crop, "mid") <= get_kc(crop, "mid")
 
     def test_fao56_mid_season_values(self):
-        """Kc mid-season values match FAO-56 Table 12."""
+        """Kc mid-season values match FAO-56 Rev.1 (2025)."""
         assert get_kc("sorghum", "mid") == 1.05
-        assert get_kc("groundnut", "mid") == 1.15
-        assert get_kc("sugar_beet", "mid") == 1.20
+        assert get_kc("groundnut", "mid") == 1.05
+        assert get_kc("sugar_beet", "mid") == 1.10
 
 
 class TestMilletCassavaChickpea:
@@ -690,7 +690,35 @@ class TestMilletCassavaChickpea:
         assert (df["etc"] > 0).all()
 
     def test_fao56_mid_season_values(self):
-        """Kc mid-season values match FAO-56 Table 12."""
-        assert get_kc("millet", "mid") == 1.00
-        assert get_kc("cassava", "mid") == 0.80
-        assert get_kc("chickpea", "mid") == 1.00
+        """Kc mid-season values match FAO-56 Rev.1 (2025)."""
+        assert get_kc("millet", "mid") == 1.10
+        assert get_kc("cassava", "mid") == 1.00
+        assert get_kc("chickpea", "mid") == 1.05
+
+
+class TestFao56Revised2025Citations:
+    """Verify FAO-56 revised 2025 edition citations and table integrity."""
+
+    def test_crop_water_docstring_cites_2025_edition(self):
+        from aquascope.agri import crop_water
+
+        doc = crop_water.__doc__ or ""
+        assert "Pereira, L. S." in doc
+        assert "10.4060/cd6621en" in doc
+        assert "Second edition, revised 2025" in doc
+
+    def test_methods_preconditions_cite_2025_edition(self):
+        from aquascope.methods import METHODS
+
+        cwr_method = METHODS["crop_water_requirement"]
+        assert "10.4060/cd6621en" in cwr_method.citation
+        assert "FAO (2025) revised edition" in cwr_method.citation
+        assert "1998/2025" in (cwr_method.note or "")
+
+    def test_all_kc_crops_have_kcb_and_stage_lengths(self):
+        for crop in KC_TABLE:
+            assert crop in KCB_TABLE, f"Missing KCB entry for crop '{crop}'"
+            assert crop in DEFAULT_STAGE_LENGTHS, f"Missing DEFAULT_STAGE_LENGTHS for crop '{crop}'"
+            for stage in ("initial", "mid", "late"):
+                assert stage in KC_TABLE[crop], f"Missing Kc stage '{stage}' for '{crop}'"
+                assert stage in KCB_TABLE[crop], f"Missing Kcb stage '{stage}' for '{crop}'"

@@ -1,6 +1,6 @@
 # Data Sources
 
-AquaScope ships **30 collectors** that normalise water data into typed Pydantic records. One API call per source, one schema across the toolkit.
+AquaScope ships **35 collectors** that normalise water data into typed Pydantic records. One API call per source, one schema across the toolkit.
 
 Most sources emit point observations and share the unified `water_data` schema (`WaterQualitySample`, `WaterLevelReading`, `ReservoirStatus`). Three aggregate/gridded sources use purpose-built record types that match their data shape: **FAO AQUASTAT** returns country-level `AquastatRecord`, **UN SDG 6** returns `SDG6Indicator`, and **FAO WaPOR** returns gridded `WaPORObservation`.
 
@@ -10,38 +10,43 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 
 ## Sources
 
-| Source | Region | Data Types | API | Status |
-| :--- | :--- | :--- | :--- | :---: |
-| [Taiwan CWA CODIS](https://codis.cwa.gov.tw) | Taiwan | Daily climate: rainfall, temperature, humidity, radiation, wind | REST | ✅ |
-| [Taiwan MOENV](https://data.moenv.gov.tw) | Taiwan | River / tap water quality, RPI | REST | ✅ |
-| [Taiwan WRA](https://opendata.wra.gov.tw) | Taiwan | Water levels, reservoir status | REST | ✅ |
-| [Taiwan Civil IoT](https://sta.ci.taiwan.gov.tw) | Taiwan | Real-time sensors (level, flow, rain) | SensorThings | ✅ |
-| [Taiwan WRA FHY](https://fhy.wra.gov.tw) | Taiwan | Real-time water level, rainfall, discharge | REST | ✅ |
-| [Taiwan WRA IoT](https://iot.wra.gov.tw) | Taiwan | Groundwater level, rainfall accumulation | REST | ✅ |
-| [Taiwan data.gov.tw](https://data.gov.tw) | Taiwan | Real-time river + groundwater level | REST | ✅ |
-| [Taiwan WRA Groundwater](https://opendata.wra.gov.tw) | Taiwan | Annual groundwater levels + well metadata (992 wells, 1992–) | REST | ✅ |
-| [USGS](https://api.waterdata.usgs.gov) | USA | Streamflow, water quality, gage height | OGC | ✅ |
-| [NOAA NWPS](https://api.water.noaa.gov/nwps/v1/) | USA | Streamflow observations, location metadata | REST | ✅ |
-| [Water Quality Portal](https://waterqualitydata.us) | USA | Integrated WQ from 400+ agencies | REST / CSV | ✅ |
-| [GEMStat](https://gemstat.org) | Global | Freshwater quality (170+ countries) | Zenodo | ✅ |
-| [UN SDG 6](https://sdg6data.org) | Global | SDG 6 indicators (6.1.1 – 6.6.1) | REST | ✅ |
-| [OpenMeteo](https://open-meteo.com) | Global | Weather (temp, precip, wind, solar) | REST | ✅ |
-| [Copernicus](https://cds.climate.copernicus.eu) | Global | ERA5 reanalysis, climate projections | CDS API | ✅ |
-| [FAO AQUASTAT](https://www.fao.org/aquastat) | Global | Country-level water withdrawal, irrigation | FAOSTAT API | ✅ |
-| [FAO WaPOR](https://www.fao.org/in-action/remote-sensing-for-water-productivity) | Global | Satellite ET, biomass, water productivity | REST | ✅ |
-| [EU WFD](https://www.eea.europa.eu) | Europe | Water Framework Directive status | REST | ✅ |
-| [Hub'Eau](https://hubeau.eaufrance.fr/api/v2/hydrometrie) | France | River water level, discharge | REST | ✅ |
-| [PEGELONLINE](https://www.pegelonline.wsv.de/webservice/dokuRestapi) | Germany | River water level, discharge | REST | ✅ |
-| [Japan MLIT](https://www.mlit.go.jp) | Japan | Hydrometeorology, river observations | REST | ✅ |
-| [Korea WAMIS](https://www.wamis.go.kr) | Korea | Hydrology, dam operations | REST | ✅ |
-| [India WRIS](https://indiawris.gov.in) | India | River water level | REST | ✅ |
-| [GRDC](https://zenodo.org/records/19126732) | Global | River discharge (in-situ gauges + RSEG satellite) | Zenodo / Dataverse | ✅ |
-| [CAMELS-CL](https://www.cr2.cl/camels-cl/) | Chile | Daily observed streamflow, catchment attributes | ZIP / CSV | ✅ |
-| [CAMELS-BR](https://doi.org/10.5281/zenodo.3709337) | Brazil | Daily observed streamflow, catchment attributes | ZIP / CSV | ✅ |
-| [Ireland OPW](https://waterlevel.ie) | Ireland | River / lake water level (15-min resolution) | GeoJSON / CSV | ✅ |
-| [Environment Agency (England)](https://environment.data.gov.uk) | England (UK) | River and groundwater levels, river flow, rainfall data | REST | ✅ |
-| [BOM Water Data Online](http://www.bom.gov.au/waterdata/) | Australia | Streamflow, water level, storage, groundwater level | KISTERS WISKI (KiWIS) | ✅ |
-| [Colorado DWR/CDSS](https://dwr.state.co.us/Rest/GET/Help) | Colorado, USA | State telemetry streamflow observations | REST | ✅ |
+| Source | `--source` | Region | Data Types | API | Status |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| [Taiwan CWA CODIS](https://codis.cwa.gov.tw) | `taiwan_cwa` | Taiwan | Daily climate: rainfall, temperature, humidity, radiation, wind | REST | ✅ |
+| [Taiwan MOENV](https://data.moenv.gov.tw) | `taiwan_moenv` | Taiwan | River / tap water quality, RPI | REST | ✅ |
+| [Taiwan WRA water level](https://opendata.wra.gov.tw) | `taiwan_wra_level` | Taiwan | River and canal water level | REST | ✅ |
+| [Taiwan WRA reservoirs](https://opendata.wra.gov.tw) | `taiwan_wra_reservoir` | Taiwan | Reservoir storage, inflow, release | REST | ✅ |
+| [Taiwan Civil IoT](https://sta.ci.taiwan.gov.tw) | `taiwan_civil_iot` | Taiwan | Real-time sensors (level, flow, rain) | SensorThings | ✅ |
+| [Taiwan WRA FHY](https://fhy.wra.gov.tw) | `taiwan_wra_fhy` | Taiwan | Real-time water level, rainfall, discharge | REST | ✅ |
+| [Taiwan WRA IoT](https://iot.wra.gov.tw) | `taiwan_wra_iot` | Taiwan | Groundwater level, rainfall accumulation | REST | ✅ |
+| [Taiwan data.gov.tw](https://data.gov.tw) | `taiwan_datagov` | Taiwan | Real-time river + groundwater level | REST | ✅ |
+| [Taiwan WRA groundwater (annual)](https://opendata.wra.gov.tw) | `taiwan_wra_groundwater` | Taiwan | Annual groundwater levels + well metadata (992 wells, 1992–) | REST | ✅ |
+| [Taiwan WRA groundwater (daily)](https://gweb.wra.gov.tw) | `taiwan_wra_groundwater_daily` | Taiwan | Daily groundwater levels from the gweb HydroInfo portal | REST | ✅ |
+| [USGS](https://api.waterdata.usgs.gov) | `usgs` | USA | Streamflow, water quality, gage height | OGC | ✅ |
+| [NOAA NWPS](https://api.water.noaa.gov/nwps/v1/) | `noaa_nwps` | USA | Streamflow observations, location metadata | REST | ✅ |
+| [Water Quality Portal](https://waterqualitydata.us) | `wqp` | USA | Integrated WQ from 400+ agencies | REST / CSV | ✅ |
+| [GEMStat](https://gemstat.org) | `gemstat` | Global | Freshwater quality (170+ countries) | Zenodo | ✅ |
+| [UN SDG 6](https://sdg6data.org) | `sdg6` | Global | SDG 6 indicators (6.1.1 – 6.6.1) | REST | ✅ |
+| [OpenMeteo](https://open-meteo.com) | `openmeteo` | Global | Weather (temp, precip, wind, solar) | REST | ✅ |
+| [Copernicus](https://cds.climate.copernicus.eu) | `copernicus` | Global | ERA5 reanalysis, climate projections | CDS API | ✅ |
+| [FAO AQUASTAT](https://www.fao.org/aquastat) | `aquastat` | Global | Country-level water withdrawal, irrigation | FAOSTAT API | ✅ |
+| [FAO WaPOR](https://www.fao.org/in-action/remote-sensing-for-water-productivity) | `wapor` | Global | Satellite ET, biomass, water productivity | REST | ✅ |
+| [EU WFD](https://www.eea.europa.eu) | `eu_wfd` | Europe | Water Framework Directive status | REST | ✅ |
+| [Hub'Eau](https://hubeau.eaufrance.fr/api/v2/hydrometrie) | `hubeau_hydrometrie` | France | River water level, discharge | REST | ✅ |
+| [PEGELONLINE](https://www.pegelonline.wsv.de/webservice/dokuRestapi) | `pegelonline` | Germany | River water level, discharge | REST | ✅ |
+| [OpenHi.net](https://openhi.net) | `greece_openhi` | Greece | Live 15-min discharge, stage, rainfall, climate, water quality | Enhydris 3 REST | ✅ |
+| [Greece Hydroscope](https://hydroscope.gr) | `greece_hydroscope` | Greece | Daily river stage, monthly discharge, rainfall (1904-2019) | Enhydris REST | ✅ |
+| [Japan MLIT](https://www.mlit.go.jp) | `japan_mlit` | Japan | Hydrometeorology, river observations | REST | ✅ |
+| [Korea WAMIS](https://www.wamis.go.kr) | `korea_wamis` | Korea | Hydrology, dam operations | REST | ✅ |
+| [India WRIS](https://indiawris.gov.in) | `india_wris` | India | River water level | REST | ✅ |
+| [GRDC](https://zenodo.org/records/19126732) | `grdc` | Global | River discharge (in-situ gauges + RSEG satellite) | Zenodo / Dataverse | ✅ |
+| [CAMELS-CL](https://www.cr2.cl/camels-cl/) | `camels_cl` | Chile | Daily observed streamflow, catchment attributes | ZIP / CSV | ✅ |
+| [CAMELS-BR](https://doi.org/10.5281/zenodo.3709337) | `camels_br` | Brazil | Daily observed streamflow, catchment attributes | ZIP / CSV | ✅ |
+| [ANA Hidroweb](https://www.snirh.gov.br/hidroweb/) | `brazil_ana` | Brazil | Telemetric streamflow, stage, rainfall | REST | ✅ |
+| [Ireland OPW](https://waterlevel.ie) | `ireland_opw` | Ireland | River / lake water level (15-min resolution) | GeoJSON / CSV | ✅ |
+| [Environment Agency (England)](https://environment.data.gov.uk) | `uk_ea` | England (UK) | River and groundwater levels, river flow, rainfall data | REST | ✅ |
+| [BOM Water Data Online](http://www.bom.gov.au/waterdata/) | `bom` | Australia | Streamflow, water level, storage, groundwater level | KISTERS WISKI (KiWIS) | ✅ |
+| [Colorado DWR/CDSS](https://dwr.state.co.us/Rest/GET/Help) | `colorado_cdss` | Colorado, USA | State telemetry streamflow observations | REST | ✅ |
 
 ---
 
@@ -66,6 +71,8 @@ To request a new source, open an [issue](https://github.com/Rekin226/aquascope/i
 | CAMELS-CL | No | Open access |
 | CAMELS-BR | No | Open access via Zenodo |
 | Ireland OPW | No | Open access via waterlevel.ie |
+| Greece Hydroscope | No | Open access via hydroscope.gr |
+| Greece OpenHi.net | No | Open access via system.openhi.net (CC BY-SA 4.0) |
 | Environment Agency (England) | No | Open access |
 | BOM Water Data Online | No | Open access |
 | Colorado DWR/CDSS | No | Open access |
@@ -237,3 +244,29 @@ From the CLI:
 ```bash
 aquascope collect --source camels_br --station-ids 10500000
 ```
+
+## ANA Hidroweb (Brazil)
+
+- **Source type:** `brazil_ana`
+- **Coverage:** Brazil — telemetric streamflow (discharge), stage (water level) and rainfall from ANA's national hydrometeorological network
+- **Collector:** `aquascope.collectors.brazil_ana.BrazilANACollector`
+- **Auth:** Free ANA account (CPF/CNPJ + password). ANA's own docs list two request addresses for two different services — hidro@ana.gov.br for the modern HidroWebService API used here, telemetria@ana.gov.br for the legacy SOAP service's CotaOnline options — so try hidro@ana.gov.br first and confirm against https://www.ana.gov.br/hidrowebservice/swagger-ui.html. Resolved from `ANA_HIDROWEB_IDENTIFICADOR` / `ANA_HIDROWEB_SENHA` environment variables, or passed to the constructor. The station catalog (`.stations()`) works without credentials — only time-series requests need them.
+
+**Usage:**
+```python
+from aquascope.collectors import BrazilANACollector
+
+collector = BrazilANACollector(identificador="00000000000", senha="...")
+
+# Public station catalog (no credentials needed)
+stations = collector.stations()
+
+# Telemetric time series (credentials required)
+readings = collector.collect(station_ids=["15400000"], days=30)
+```
+
+From the CLI:
+```bash
+aquascope collect --source brazil_ana --station-ids 15400000
+```
+
