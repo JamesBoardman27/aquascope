@@ -8,7 +8,7 @@
 [![Tests](https://img.shields.io/badge/tests-2500%2B%20passing-brightgreen.svg)](https://github.com/Rekin226/aquascope/actions)
 [![GitHub stars](https://img.shields.io/github/stars/Rekin226/aquascope?style=social)](https://github.com/Rekin226/aquascope/stargazers)
 
-AquaScope unifies **34 global water-data sources** behind one Python schema. On top of that it layers a full scientific computing stack, from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements**, wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 2,500+ tests.
+AquaScope unifies **36 global water-data sources** behind one Python schema. On top of that it layers a full scientific computing stack, from **Bulletin 17C flood frequency** to **FAO-56 crop water requirements**, wrapped in an AI engine that scores **26 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Validated against the CAMELS benchmark with 2,500+ tests.
 
 ---
 
@@ -25,7 +25,7 @@ pip install "aquascope[all]"       # everything: ML, viz, spatial, dashboard
 
 ## What you can do
 
-- 🌊 **Pull water data** from USGS, NOAA NWPS, Colorado DWR/CDSS, the US Water Quality Portal, England's Environment Agency, France Hub'Eau, Germany PEGELONLINE, Ireland OPW, Greece Hydroscope, EU WFD, Taiwan MOENV / WRA / CWA, Japan MLIT, Korea WAMIS, India WRIS, Australia BOM, Brazil ANA Hidroweb, CAMELS-CL and CAMELS-BR, GRDC, GEMStat, Copernicus ERA5, OpenMeteo, FAO AQUASTAT, FAO WaPOR and UN SDG 6, with one unified Python API.
+- 🌊 **Pull water data** from USGS, NOAA NWPS, Colorado DWR/CDSS, the US Water Quality Portal, England's Environment Agency, France Hub'Eau, Germany PEGELONLINE, Ireland OPW, Greece Hydroscope, EU WFD, Taiwan MOENV / WRA / CWA, Japan MLIT, Korea WAMIS, India WRIS, South Africa DWS, Australia BOM, Brazil ANA Hidroweb, CAMELS-CL and CAMELS-BR, GRDC, GEMStat, Copernicus ERA5, OpenMeteo, FAO AQUASTAT, FAO WaPOR and UN SDG 6, with one unified Python API.
 - 📈 **Run hydrological analyses**: Bulletin 17C flood frequency (GEV / LP3 / Gumbel / non-stationary GEV / EMA), baseflow separation, rating curves, and 22 hydrological signatures.
 - 🌾 **Plan agricultural water**: FAO-56 Penman–Monteith ET₀, crop water requirements for 26 crops, irrigation scheduling, and soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine**: describe your goal in plain English, get a recommended methodology scored against your dataset, and auto-execute it.
@@ -44,7 +44,7 @@ pip install "aquascope[all]"       # everything: ML, viz, spatial, dashboard
 | Non-stationary GEV                           |    ✅     |   no    | partial  |          no           |
 | Baseflow separation (Lyne-Hollick, Eckhardt) |    ✅     |   no    |    no    |          no           |
 | FAO-56 Penman–Monteith ET₀ + crop water      |    ✅     |   no    |    no    |          no           |
-| 34 unified data collectors                   |    ✅     |   no    |    no    |       per-source       |
+| 36 unified data collectors                   |    ✅     |   no    |    no    |       per-source       |
 | AI methodology recommender                   |    ✅     |   no    |    no    |          no           |
 | Interactive Streamlit dashboard              |    ✅     |   no    |    no    |          no           |
 | Free, MIT, Python-native                     |    ✅     | partial |    ✅    |        varies         |
@@ -92,7 +92,7 @@ pip install "aquascope[all]"       # everything: ML, viz, spatial, dashboard
   author  = {AquaScope Contributors},
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
-  version = {0.15.1},
+  version = {0.16.0},
   doi     = {10.5281/zenodo.21903143},
   license = {MIT}
 }
