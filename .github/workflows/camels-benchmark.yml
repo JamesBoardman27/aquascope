@@ -39,5 +39,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: camels-benchmark-report
+          name: camels-benchmark-report-${{ github.run_id }}
           path: benchmark-output/

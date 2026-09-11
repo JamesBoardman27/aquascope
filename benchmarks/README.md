@@ -73,11 +73,15 @@ Flags:
 
 - `--gauge-id 01013500 01664000` — restrict the run to these gauges.
 - `--no-reports` — write only `results.json`.
-- `--strict` — exit non-zero when any recorded check is unmet.
+- `--strict` — exit non-zero on genuine misses (any unmet per-catchment
+  tolerance, signature-integrity failure, or aggregate gate). Fits classed
+  `data_limitation` (a `gev` comparison against an unstable reference MLE) are
+  recorded and surfaced but never fail the run.
 - `--from-json PATH` — skip the run entirely and re-render an existing
   `results.json` into the output directory (`results.json` copy + `results.md`
   + `results.html`). Useful after a report layout change: the JSON stays the
-  single source of truth.
+  single source of truth. It cannot be combined with `--gauge-id`, `--no-reports` or `--strict`
+  since these flags affect the run, not the rendering of a report.
 - `--output-dir` (default `benchmark-output`) — where the three results files go.
 
 ### Where outputs live

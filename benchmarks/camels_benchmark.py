@@ -1004,6 +1004,11 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--from-json renders reports; it cannot be combined with --no-reports.")
         if args.strict:
             raise ValueError("--from-json re-renders a recorded run; it cannot be combined with --strict.")
+        if args.gauge_id is not None:
+            raise ValueError(
+                "--from-json renders the gauges that are already in the JSON; "
+                "it cannot be combined with --gauge-id."
+            )
         with open(args.from_json) as f:
             results = json.load(f)
         try:
@@ -1051,6 +1056,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Runtime: {results['summary']['timings']['total_seconds']:.1f} s (harness total {runtime:.1f} s)")
 
     if args.strict and _strict_failed(results):
+        summary = results["summary"]
+        n_genuine = summary["n_unmet"] - summary["n_data_limitation_findings"]
+        unmet_gates = [k for k, met in summary["gates"].items() if k.endswith("_met") and not met]
+        print(
+            f"  --strict failed: {n_genuine} genuine miss(es), "
+            f"{summary['n_integrity_failures']} integrity failure(s)"
+            + (f", gate(s) unmet: {', '.join(sorted(unmet_gates))}" if unmet_gates else "")
+        )
         return 1
     return 0
 

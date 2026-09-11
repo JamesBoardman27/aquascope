@@ -363,6 +363,23 @@ def test_cli_from_json_rejects_strict(tmp_path) -> None:
         cb.main(["--from-json", str(run_dir / "results.json"), "--strict"])
 
 
+def test_cli_from_json_rejects_gauge_id(tmp_path) -> None:
+    """--from-json renders the gauges already in the JSON"""
+    run_dir = tmp_path / "run"
+    cb.main(["--output-dir", str(run_dir), "--gauge-id", "01013500"])
+    with pytest.raises(ValueError):
+        cb.main(["--from-json", str(run_dir / "results.json"), "--gauge-id", "01664000"])
+
+
+def test_cli_fresh_run_flags_combine(tmp_path) -> None:
+    """--gauge-id --no-reports --strict are compatible on a fresh run."""
+    rc = cb.main(["--output-dir", str(tmp_path), "--gauge-id", "03451500", "--no-reports", "--strict"])
+    assert rc == 0
+    assert (tmp_path / "results.json").exists()
+    assert not (tmp_path / "results.md").exists()
+    assert not (tmp_path / "results.html").exists()
+
+
 def test_cli_strict_exits_nonzero_when_unmet(tmp_path) -> None:
     """--strict fails the run on genuine misses (data-limitation is recorded, not failing)."""
     rc = cb.main(["--output-dir", str(tmp_path), "--strict"])
@@ -375,10 +392,11 @@ def test_cli_strict_passes_on_data_limitation_only(tmp_path) -> None:
     assert rc == 0
 
 
-def test_cli_strict_fails_on_genuine_miss(tmp_path) -> None:
+def test_cli_strict_fails_on_genuine_miss(tmp_path, capsys) -> None:
     """--strict exits 1 when a genuine miss accompanies data-limitation findings."""
     rc = cb.main(["--output-dir", str(tmp_path), "--gauge-id", "06803500", "--strict"])
     assert rc == 1
+    assert "1 genuine miss(es), 0 integrity failure(s)" in capsys.readouterr().out
 
 
 def test_cli_rejects_unknown_gauge(tmp_path) -> None:
@@ -398,7 +416,7 @@ def test_strict_flags_integrity_failures() -> None:
 
 
 def test_strict_ignores_data_limitation_findings() -> None:
-    """--strict mirrors the gates: a run whose only misses are data-limitation passes."""
+    """--strict does not fail a run whose only misses are data-limitation findings."""
     results = cb.build_results(gauge_ids=[UNSTABLE_GAUGE])
     assert results["summary"]["n_unmet"] > 0
     assert results["summary"]["n_unmet"] == results["summary"]["n_data_limitation_findings"]
