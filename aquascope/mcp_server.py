@@ -278,7 +278,11 @@ def _flood_result(res: dict[str, Any]) -> dict[str, Any]:
     keep = {k: res.get(k) for k in ("source", "station_id", "agency", "license", "attribution", "unit",
                                     "start", "end", "years", "n", "stats", "ffa", "notes", "methods",
                                     "fetch_note", "requested", "variable", "data_snapshot", "archive_revision",
-                                    "software_revision", "eligibility")}
+                                    "software_revision", "eligibility", "annual_max")}
+    # The annual maxima are the fitted sample (complete years only): the frequency curve plots them at their
+    # plotting positions, without which the fit cannot be checked by eye.
+    if keep.get("annual_max") is None:
+        keep.pop("annual_max", None)
     if not keep.get("ffa"):
         keep["error"] = "flood frequency not available (see notes)"
     return keep
