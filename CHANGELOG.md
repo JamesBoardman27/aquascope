@@ -7,6 +7,8 @@ All notable changes to AquaScope are documented here.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-08
+
 ### Added
 - **The Study Desk**, where a finished study is revised, checked and signed (`aquascope.studio.desk`, `aquascope desk`, and a panel beside the report in the Explorer).
   - The levers are the design return period, the record window, the years whose flood is left out of the fit, and the distribution the answer quotes.
