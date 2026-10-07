@@ -16,7 +16,7 @@ No installation; core Explorer workflows need no API key.
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21903143.svg)](https://doi.org/10.5281/zenodo.21903143)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![Tests](https://img.shields.io/badge/tests-3100%2B%20passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-3200%2B%20passing-brightgreen.svg)](#)
 [![Live Explorer Demo – Runs in Your Browser](https://img.shields.io/badge/%F0%9F%8C%8A%20Live%20Demo-AquaScope%20Explorer-blue)](https://rekin226-aquascope-explorer.static.hf.space/)
 
 [![GitHub stars](https://img.shields.io/github/stars/Rekin226/aquascope?style=social)](https://github.com/Rekin226/aquascope/stargazers)
@@ -39,7 +39,7 @@ No installation; core Explorer workflows need no API key.
 
 ---
 
-AquaScope unifies **37 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **flood-frequency methods** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **27 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Regression checks include the CAMELS benchmark with 3,100+ tests across the project.
+AquaScope unifies **37 global water-data sources** behind one Python schema, then layers a full scientific computing stack on top — from **flood-frequency methods** to **FAO-56 crop water requirements** — wrapped in an AI engine that scores **27 research methodologies** against your dataset and auto-executes **26 analysis pipelines**. Regression checks include the CAMELS benchmark with 3,200+ tests across the project.
 The daily benchmark inputs are synthetic; flood benchmarks also use observed USGS annual peaks.
 See [validation scope](docs/validation_scope.md) for comparators and limitations.
 
@@ -55,12 +55,16 @@ Start with one task:
 - **Analyse my table:** use a sample CSV, check the inferred columns, then replace it with your own data.
 
 Catalog coverage varies by agency and variable. A station on the map is not a guarantee
-of accessible observations or a sufficiently long record. Explorer shows the period it
-actually analyzes; modelled discharge is distinguished from gauge observations.
+of accessible observations or a sufficiently long record. Explorer fetches the full record
+by default (or the last 40 or 20 years, your choice) and shows the period it actually
+analyzes; modelled discharge is distinguished from gauge observations.
 
 **Study** guides you from a question through a plan you approve to a report and export
 bundle: Word, Excel, figures, notebook, findings and study YAML. Core studies run without
-an API key. Optional model setup is available when you choose to use it.
+an API key. Optional model setup is available when you choose to use it. Beyond the design
+flow, a study can test whether the flood is changing, calibrate GR4J at the gauge and run
+"what if" rainfall and warming scenarios, or carry seven CMIP6 models through it to 2050
+([advanced studies](docs/advanced_studies.md)).
 
 The [open archive](https://huggingface.co/datasets/Rekin226/aquascope-gauges) supplies
 station catalogs and mirrored observations; inspect observation refresh status separately
@@ -80,15 +84,22 @@ aquascope studio
 ```
 
 That is all. The Studio asks where (a gauge name like `Fish River Fort Kent`, a station id like `USGS-01013500`,
-or `lat, lon`) and what you want to know ("Is flooding here getting worse?"), asks what the question leaves open,
-shows the plan, and runs only when you approve it (`e` edits a step, e.g. `s3.return_period=200`). The bundle lands in
-`./studio-<id>/`: `report.docx`, `workbook.xlsx`, `study.ipynb`, `figures/`, `findings.json` and `study.yaml`,
-which re-runs the whole study with `aquascope run study.yaml`. After the report, ask a follow-up (another gauge, a
+or `lat, lon`) and what you want to know ("Is flooding here getting worse?"). Then it asks only what the study still
+needs, one pick-list question at a time with the reason (a trend question: which period; a design question: which
+return period), shows the plan, and runs only when you approve it (`e` edits a step, e.g. `s3.return_period=200`). The bundle lands in
+`./studio-<id>/`: a technical report and a short memo (`report.docx`, `memo.docx`, and `report.html`, which prints
+to PDF), `workbook.xlsx`, `study.ipynb`, `figures/` (300 dpi PNG and SVG), `findings.json` and `study.yaml`, which
+re-runs the whole study with `aquascope run study.yaml`. `--style style.yaml` puts your organisation, project and
+names on the cover. Then `aquascope studio ./studio-<id>/` opens it on the Study Desk to revise it: leave out a suspect flood, change the return
+period or the distribution, see how far the answer moves, add review comments and sign it off, with every change
+recorded as a revision. After the report, ask a follow-up (another gauge, a
 trend, the flow duration curve) and the bundle is updated.
 
-It needs no key: the playbooks plan and the templates write. With a key in your environment
-(`ANTHROPIC_API_KEY`, or `GROQ_API_KEY` on Groq's free tier) the Studio offers to put the model behind the brief,
-the plan and the prose, with a $1 spend ceiling. The numbers are the same either way: they come from the tools, and a
+It needs no key: the playbooks plan and the templates write. If you have one, the Studio asks: paste it
+(hidden), it is checked with one short request, and the model writes the brief, the plan and the prose, with a $1
+spend ceiling. No key yet? Groq's free tier works, and the Studio links you to it. It can remember the key for next
+time (`~/.config/aquascope/keys.json`, readable only by you), and a key already in your environment
+(`ANTHROPIC_API_KEY`, `GROQ_API_KEY`, ...) is offered instead. The numbers are the same either way: they come from the tools, and a
 sentence whose number is in no result is dropped. One line, no questions:
 
 ```bash
@@ -104,7 +115,7 @@ virtual environment first: `python3 -m venv .venv && source .venv/bin/activate`.
 - 📈 **Run hydrological analyses** — flood frequency (GEV / LP3 / Gumbel / non-stationary GEV, with separate EMA routines), baseflow separation, rating curves, 22 hydrological signatures.
 - 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 26 crops (olive, grape, citrus and winter wheat resolved by variety and canopy), irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
-- 🧑‍🔬 **Hand a study to the crew** — `aquascope studio "PROBLEM" --lat --lon`: a Consultant, a Scout, a Methodologist, Analysts, an Interpreter, a Critic and an Author over one workspace, the plan shown before it runs, every step gated (a failed gate fails its step, not the study), every answer graded (established, indicative, screening, not established) with findings that point at the result they rest on, a request for the data that would unlock a question instead of a decline, and the bundle (Word, Excel, figures, notebook, findings.json, study.yaml) at the end. Also in the Explorer and over MCP.
+- 🧑‍🔬 **Hand a study to the crew** — `aquascope studio "PROBLEM" --lat --lon`: a Consultant, a Scout, a Methodologist, Analysts, an Interpreter, a Critic and an Author over one workspace, the plan shown before it runs, every step gated (a failed gate fails its step, not the study), every answer graded (established, indicative, screening, not established) with findings that point at the result they rest on, a request for the data that would unlock a question instead of a decline, and the bundle at the end: a technical report and a memo (Word and print-ready HTML) that lead with the answer and its grade, the Excel workbook, publication figures, the notebook, findings.json and study.yaml. Also in the Explorer and over MCP. The [advanced studies](docs/advanced_studies.md) go past the design flow: change points and a nonstationary flood fit, GR4J with a snow store validated on years it never saw, "what if" scenarios, and CMIP6 change factors through the calibrated model.
 - 📊 **Visualise + report** — 17 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
 - 🗺️ **Spatial hydrology** — DEM processing, D8 flow direction, watershed delineation, Strahler ordering.
 
@@ -116,6 +127,7 @@ For the full capability list see [docs/features.md](docs/features.md).
 | :--- | :---: | :---: | :---: | :---: |
 | LP3 / EMA routines (workflow validation required) | ✅ | ✅ | partial | — |
 | Non-stationary GEV | ✅ | — | partial | — |
+| CMIP6 change factors through a calibrated GR4J, in one study | ✅ | — | — | — |
 | Baseflow separation (Lyne-Hollick, Eckhardt) | ✅ | — | — | — |
 | FAO-56 Penman-Monteith ET₀ + crop water | ✅ | — | — | — |
 | 37 unified data collectors | ✅ | — | — | per-source |
@@ -130,7 +142,12 @@ For the full capability list see [docs/features.md](docs/features.md).
 ```bash
 pip install aquascope              # core — collectors + hydrology
 pip install "aquascope[all]"       # everything — ML, viz, spatial, dashboard
+uv tool install "aquascope[all]"   # or as a command-line tool in its own environment
 ```
+
+To upgrade later, `aquascope update` finds the newest release and upgrades it the way it
+was installed (uv, pipx, or the environment's pip); `aquascope update --check` only looks,
+and `aquascope --version` says what you have.
 
 Feature-group extras:
 
@@ -310,7 +327,7 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 30-command CLI (`agri`, `basins`, `caravan`, `gym` and `playbooks` carry subcommands) for the most common workflows:
+AquaScope ships a 33-command CLI (`agri`, `basins`, `caravan`, `eval`, `gym` and `playbooks` carry subcommands) for the most common workflows:
 
 ```bash
 # Find stations, then collect data
@@ -340,6 +357,9 @@ aquascope recommend --parameters DO,BOD5,COD --goal "pollution trend detection" 
 aquascope solve "Design flow for a road crossing, 100-year return period" --lat 51.415 --lon -0.308
 aquascope studio                                     # the crew: asks where and what, then brief, plan, run, bundle
 aquascope studio "Design flow for a road crossing, 100-year, and how sure can we be" --at "Thames Kingston" --out kingston/
+aquascope studio kingston/ --exclude-years 2014 --sign checked="A. Name"  # the Study Desk: revise, review, sign
+aquascope eval score kingston/                       # how the crew did: gates, Critic, report quality, time, cost
+aquascope eval stats studies/ --by model             # many studies at once: grades, gate failures, cost per study
 aquascope area-study --bbox=-0.9,51.2,0.3,51.8       # a flood study over every gauge in a box: Q100, flood trends, a regional curve
 
 # Interactive Streamlit dashboard — multipage workspace with 37 live sources,
@@ -370,7 +390,7 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 
 ## 🧪 Scientifically validated
 
-- **3,100+ tests** covering every collector, hydrology method, and pipeline (spatial and ARIMA tests require the optional `[all]` / `[ml]` extras)
+- **3,200+ tests** covering every collector, hydrology method, and pipeline (spatial and ARIMA tests require the optional `[all]` / `[ml]` extras)
 - **CAMELS benchmark** — a 10-catchment validation subset of the [CAMELS dataset](https://ral.ucar.edu/solutions/products/camels) ships with the repo at `data/camels_benchmark/` and runs as part of CI
 - **Every method cited** — equations, decision trees, and DOI references for all 27 methodologies live in the [theory guide](docs/theory.md)
 - **JOSS paper in preparation** — see [`paper.md`](paper.md) and [`paper.bib`](paper.bib)
@@ -388,7 +408,9 @@ Full details, endpoints, and API-key requirements: [docs/data_sources.md](docs/d
 | [Architecture](docs/guides/architecture.md) | How AquaScope is structured internally |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
 | [Use cases](docs/use_cases.md) | Real-world applications and case studies |
+| [Advanced studies](docs/advanced_studies.md) | Is the flood changing, climate change to 2050, "what if" the rain drops: what runs and what the numbers cannot say |
 | [HydroGym](docs/gym.md) | A gym-style calibration environment over real basins, with baselines and a leaderboard |
+| [Evaluating studies](docs/evaluation.md) | `aquascope eval`: a study's scorecard and trace, and stats across many runs, read from the bundles |
 | [HydroGym benchmark](docs/hydrogym.md) | Hydrology agents scored on real sites: task outcomes, plan quality against expert plans, and the report the user receives |
 | [Integration guides](docs/integration_guides/) | xarray, QGIS, R interoperability |
 | [Contributing](CONTRIBUTING.md) | How to add a data source, methodology, or test |
@@ -503,8 +525,8 @@ If you use AquaScope in your research, please cite:
   author  = {Ouédraogo, Abdoul Rachid},
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
-  version = {0.20.0},
-  doi     = {10.5281/zenodo.23009178},
+  version = {0.25.0},
+  doi     = {10.5281/zenodo.23219118},
   license = {MIT}
 }
 ```
@@ -512,7 +534,7 @@ If you use AquaScope in your research, please cite:
 Machine-readable metadata lives in [CITATION.cff](CITATION.cff); GitHub's "Cite this
 repository" button renders it in APA and BibTeX. Every tagged release is archived on
 Zenodo; `10.5281/zenodo.21903143` is the concept DOI that always resolves to the latest
-version (v0.20.0 is [10.5281/zenodo.23009178](https://doi.org/10.5281/zenodo.23009178)).
+version (v0.25.0 is [10.5281/zenodo.23219118](https://doi.org/10.5281/zenodo.23219118)).
 
 ## 📄 License
 

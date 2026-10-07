@@ -204,6 +204,39 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     "recharge": {"yields": ["recharge"], "methods": ["recharge_wtf"], "tables": ["recharge_events"],
                  "figures": ["recharge"]},
     "aquifer_drawdown": {"kind": "none", "yields": ["drawdown"], "tables": ["drawdown"]},
+    # the advanced study steps (aquascope.advanced)
+    "change_points": {
+        "kind": "station", "yields": ["change_points", "trend"], "methods": ["change_point_test"],
+        "tables": ["change_tests"], "figures": ["change_points"],
+        "gates": [{"check": "min_years", "path": "n"}, {"check": "stationary", "path": "stationary"}],
+    },
+    "nonstationary_flood": {
+        "kind": "station", "yields": ["ffa", "nonstationary", "annual_maxima"], "methods": ["nonstationary_gev"],
+        "tables": ["nonstationary_table", "annual_maxima"], "figures": ["nonstationary_levels"],
+        "gates": [{"check": "min_years", "path": "n_years"},
+                  {"check": "ci_finite", "path": "nonstationary.ci_last_year.ci"}],
+    },
+    "pot_flood": {
+        "kind": "station", "yields": ["ffa", "peaks"], "methods": ["pot_gpd"],
+        "tables": ["pot_table"], "figures": ["pot_frequency"],
+        "gates": [{"check": "min_years", "path": "n_years"}, {"check": "min_samples", "path": "n_peaks"}],
+    },
+    "catchment_model": {
+        "kind": "station", "yields": ["model", "skill", "scenarios", "params"], "methods": ["gr4j_calibration"],
+        "tables": ["model_skill", "scenarios"], "figures": ["model_fit", "scenario_bars"],
+        "gates": [{"check": "kge_min", "path": "validation.kge"}, {"check": "max_area_km2", "path": "area_km2"}],
+    },
+    "climate_projection": {
+        "kind": "site", "yields": ["projection", "ensemble"], "methods": ["climate_projection"],
+        "tables": ["projection_ensemble", "projection_models"], "figures": ["projection_spread"],
+        "gates": [{"check": "min_models", "path": "n_models"}],
+    },
+    "regional_flood": {
+        "kind": "site", "yields": ["regional", "stations"], "methods": ["regional_index_flood"],
+        "tables": ["regional_sites"], "figures": ["regional_growth"],
+        "gates": [{"check": "min_sites", "path": "n_pooled"}],
+    },
+    "compare_gauges": {"kind": "site", "yields": ["compare"], "methods": ["gauge_comparison"], "tables": ["compare"]},
     LOAD_TABLE: {
         "kind": "table", "yields": ["series", "samples"], "tables": ["series"], "figures": ["series"],
         "gates": [{"check": "not_empty", "path": "n"}],

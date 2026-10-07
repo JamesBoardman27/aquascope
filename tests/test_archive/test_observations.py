@@ -224,6 +224,21 @@ def test_a_full_record_harvest_keeps_closed_stations_and_a_capped_one_skips_them
     assert [r["station_id"] for r in picked] == ["NEW"]
 
 
+def test_the_files_the_40_year_cap_truncated_are_refreshed_first():
+    """#270: a mirror file that starts decades after the catalog's first date goes to the front of the stale queue,
+    so the full-record fetch merges the missing years in within the fewest runs."""
+    old = "2020-01-01T00:00:00+00:00"
+    rows = [{"source": "usgs", "station_id": sid, "variables": ["discharge"], "period_start": start}
+            for sid, start in (("WHOLE", "1986-01-01"), ("CUT", "1898-03-01"), ("BIT", "1970-01-01"))]
+    stations = {"WHOLE": {"first": "1986-01-02", "harvested_at": old, "last_attempt_status": "ok"},
+                "CUT": {"first": "1986-08-23", "harvested_at": old, "last_attempt_status": "ok"},
+                "BIT": {"first": "1986-08-23", "harvested_at": old, "last_attempt_status": "ok"}}
+    manifest = {"sources": {obs.entry_key("usgs", "discharge"): {"stations": stations}}}
+    picked = obs._pick_stations(rows, manifest, "usgs", "discharge", 10, 7, None)
+    assert [r["station_id"] for r in picked] == ["CUT", "BIT", "WHOLE"]
+    assert obs._missing_years(rows[0], stations["WHOLE"]) == 0.0
+
+
 def test_sub_daily_rainfall_folds_to_daily_totals_and_flow_to_means():
     """OpenHi telemetry is 15-minute: a day of rainfall is its sum, a day of flow its mean (#408)."""
     idx = pd.date_range("2024-01-01", periods=96 * 2, freq="15min")

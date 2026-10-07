@@ -2,12 +2,119 @@
 
 All notable changes to AquaScope are documented here.
 
+<!-- Each entry describes its release as it shipped. Counts in past entries are not updated
+     afterwards, and tests/test_docs_counts.py does not check this file. See #453. -->
+
 ## [Unreleased]
 
 ### Changed
 - **Source terms are verified before a collector is written** (#474). `docs/guides/adding_data_source.md` gains a Step 0 checklist: the first-party terms covering the dataset or API being called, the terms of any third-party platform that hosts, proxies or wraps it, the licence name or identifier exactly as the publisher writes it, the required attribution, whether the terms permit automated collection, browser requests, caching, derived outputs, downloads and redistribution, and the terms URL and date checked recorded in a new issue or pull request. Attribution has three outcomes: copy the publisher's wording verbatim when an exact statement is given, write a short accurate statement when attribution is required without exact wording, or write "none stated" when it is not required. The findings then land in the registry's `license`, `attribution` and `redistributable` fields; a source whose redistribution permission is unclear is documented as restricted and left `redistributable=False`, so it still works everywhere but never reaches the Archive. `.github/ISSUE_TEMPLATE/new_data_source.md` asks requesters for the terms URL, licence, attribution statement and date checked, and `CONTRIBUTING.md` makes the check a pre-step, advising that unclear terms be clarified before implementation.
 
 ### Fixed
+- Record the verified v0.25.0 Zenodo DOI (`10.5281/zenodo.23219118`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
+
+## [0.25.0] - 2026-10-08
+
+### Added
+- **The Study Desk**, where a finished study is revised, checked and signed (`aquascope.studio.desk`, `aquascope desk`, and a panel beside the report in the Explorer).
+  - The levers are the design return period, the record window, the years whose flood is left out of the fit, and the distribution the answer quotes.
+  - A change reruns only the flood steps it touches, with their checks, rewrites the documents, and is recorded as a lettered revision with the answer before and after.
+  - A sensitivity table shows the design value under the reasonable alternatives (other fits, the largest flood left out, the last 50 or 30 years, excluded years put back). It is computed from the stored annual maxima without a fetch.
+  - Review comments are kept with their responses.
+  - Signing as prepared, checked or approved fills the document control and moves the status from DRAFT to CHECKED to ISSUED.
+  - The report gains a revision history, a sensitivity section and a review log.
+- `analyze_station` and `flood_frequency` take `exclude_years`: those years' annual maxima leave the fit, its trend and step-change tests and its bootstrap. They are returned as `annual_max_excluded` and shown as crosses on the frequency curve. Steering offers it as a control.
+
+### Changed
+- **One command for the Studio.** `aquascope studio` given a finished study's bundle folder (or its `workspace.json`) opens the Study Desk, and the Desk's options (`--exclude-years`, `--estimator`, `--years`, `--set`, `--sign`, `--comment`, `--resolve`, `--by`, `--note`) work on it directly. `aquascope desk` stays as the shorter name for the same thing. `--return-period` also sets the design return period of a new study.
+
+### Fixed
+- Record the verified v0.24.0 Zenodo DOI (`10.5281/zenodo.23214018`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
+- A Study Desk revision refits the record the study already holds, from its record table, instead of fetching it again. Before, a rerun could arrive with a different record from the first run (in the browser the first run can fall back to the archive's 40-year copy), so a revision mixed a change of assumption with a change of data.
+- The `NumExpr defaulting to N threads` line no longer opens every command.
+- The Author's software citation no longer depends on the deliverables package being importable.
+
+## [0.24.0] - 2026-10-07
+
+### Added
+- **The Studio writes documents a hydrologist would sign.** A new `aquascope.studio.document` composes each study into a technical report and a short technical memorandum, rendered to Word, print-ready HTML (A4, which prints to PDF) and Markdown from the same structure.
+  - The report opens with a cover and a document-control table: prepared, checked and approved lines that stay blank until a person fills them, with a DRAFT stamp.
+  - The summary leads with the answer in a box: the design value, the interval that belongs to it, the grade and the reason for the grade.
+  - The results are organised by question (design flood, stationarity, transfer from similar catchments, climate context), not by plan step.
+  - Figures and tables are numbered and cross-referenced. At most six figures go in the body and the rest in an appendix.
+  - Each check is a sentence with its verdict, followed by limitations, recommendations and references, with the reproducibility details in an appendix.
+  - Numbers are given to three significant figures, and units are written as a reader writes them (m³/s, km², °C).
+  - An agency's details (organisation, project, client, people, logo, accent colour) come from `aquascope studio --style style.yaml` and travel with the workspace.
+  - A study that established nothing becomes a one-page study note saying what failed in plain words and what to do next, never a report.
+  - A flood question at an ungauged site is answered as screening. Transferred depths are converted to m³/s with the upstream area, GloFAS is set beside them, and the report names the gauge whose record would answer it.
+- **Publication figures** (`aquascope.viz.publication`).
+  - One serif face (Times New Roman, else the bundled STIX, so the browser matches the desktop), a full frame with inward ticks and the Okabe-Ito colours.
+  - Figures are sized to the page, with no title inside the frame, legends placed in the emptiest corner, and Unicode units. They are written as PNG at 300 dpi and as SVG.
+  - The flood frequency curve is drawn on Gumbel probability paper, with the observed annual maxima at their plotting positions and an annual-exceedance-probability axis. Line series break at gaps instead of joining across them.
+  - The flow-duration curve uses a normal-probability axis, and the transferred signatures are a dot-and-band plot with their leave-one-out skill.
+  - Every Studio figure maker uses the style.
+- **The Explorer's finished study opens the report and the memo in a reader**, with Print or save as PDF and the Word files beside them.
+- **A shorter terminal log for `aquascope studio`.** There is one line per stage and one per analysis, with its checks folded in (`aquascope.studio.progress.Narrator`), and the run ends with the answer box and the files to open. `--verbose` keeps the full event stream.
+
+- **`fetch_series` reads BOM and ANA records**, so the Studio's Scout and the Explorer can use an Australian or Brazilian gauge instead of falling back to regionalisation. `bom` reads BOM Water Data Online's quality-checked daily mean for the requested window, discharge first and water level when the gauge has none (A4261794 carries level only). `brazil_ana` reads ANA's conventional network (`HidroSerieHistorica`), which needs no credentials: daily discharge then stage, reviewed months preferred over provisional ones. Each note says the series lags real time: weeks for BOM, months for ANA. A station on ANA's telemetric or water-quality networks only still has no record. `DIRECT_FETCH_SOURCES` lists the sources `fetch_series` reaches directly. BOM refuses cross-origin requests, so it is marked browser-unreachable and the Explorer says so. Nothing from either source is mirrored.
+
+### Changed
+- The site reconnaissance can fetch the record of a nearby gauge whose span the catalog does not know (`assess_site(..., probe_km=...)`; the Studio's Scout looks within 10 km), instead of dropping a gauge that may sit at the site. A source AquaScope cannot fetch yet is named as such, with the suggestion to attach the agency's record.
+- `flood_frequency` keeps the annual maxima it was fitted to, so the frequency curve can show them.
+- The snow sensitivity in the site check is worded for each method. For flood frequency it reads "the annual maxima can mix snowmelt and rainfall floods", not the rainfall-runoff model's "a method without a snow store".
+- `aquascope.viz` imports its plotting functions lazily, so importing the package no longer imports matplotlib.
+
+### Fixed
+- Record the verified v0.23.0 Zenodo DOI (`10.5281/zenodo.23200452`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
+
+## [0.23.0] - 2026-10-07
+
+### Added
+- **`aquascope update` upgrades aquascope the way it was installed**, and `aquascope --version` says which version you have. It reads the newest release from PyPI, works out from the running interpreter whether this copy is a uv tool, a pipx app, a conda or virtual environment or a development checkout, and runs the matching upgrade after asking (`--yes` skips the question, `--check` only reports). A uv tool installed with an exact pin, which `uv tool upgrade` never moves, is reinstalled without the pin with the same extras and Python; a development checkout is told to `git pull`. The logic is in `aquascope.updates`.
+- **`aquascope eval` scores, traces and compares finished studies** from their bundles, with no model and no network. `eval score` gives one study's scorecard: outcome and grade, steps and gates passed, failed and skipped, the Critic's checks, report quality on the six HydroGym axes (against its reference when the package has one), plan accuracy against a reference case with `--case`, and time, tokens and cost by role. `eval trace` lays out the run: each phase and step with its duration, the gates that did not pass and why, and the model calls per role. `eval stats` groups many studies by playbook, model, date or grade, names the gate checks that fail or skip most often, and writes CSV. The functions are in `aquascope.evaluation`.
+- **The Explorer's station panel lets you choose the period** (#270): the full record (the default), the last 40 years or the last 20, next to the record card. The choice travels in the link as `&yr=40`, `&yr=20` or `&yr=all`, and the loading line says which one is on its way, since a full USGS record can be a century of daily values.
+
+### Fixed
+- **Preserve USGS quality qualifiers on the keyless path** (#481). Keyless NWIS observations now retain their qualifiers, so approved, provisional and estimated readings are mapped to the correct quality status instead of being reported as unknown. Added regression coverage for the keyless fetch_raw → normalise path.
+- The README and the Explorer guide say the record is fetched in full by default and can be cut to 40 or 20 years (#270), and the Analyst guide's reconnaissance example no longer says a fetch serves the last 40 years or that CMIP6 needs model output you supply.
+- Record the verified v0.22.0 Zenodo DOI (`10.5281/zenodo.23132668`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
+
+## [0.22.0] - 2026-10-04
+
+### Changed
+- **The design-flow study checks the annual maxima for a step change too** (#376). The flood fit that `analyze_station` and `flood_frequency` run now carries Pettitt's test on the same maxima (`ffa.amax_change`), next to the Mann-Kendall trend it already had. A significant shift keeps the estimate and grades it indicative, with the year named and a pointer to the flood change study. There is no new plan step, so every recorded study and HydroGym score stays as it was.
+
+### Fixed
+- Stale counts outside the count guard (#453). `docs/api.md` and `docs/faq.md` state the registry's source count and are now guarded; the banner, the architecture guide and the troubleshooting page no longer carry decorative counts; the dashboard's AI page reads the methodology count from the knowledge base; and `.github/copilot-instructions.md` describes the current repo. Counts in `paper.md`, `ROADMAP.md` and past CHANGELOG entries are snapshots and stay as written, with a comment saying so.
+- Record the verified v0.21.0 Zenodo DOI (`10.5281/zenodo.23048856`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
+- The showcase workflow opens a pull request for each new recording again; it had mistaken the long-merged #263 for an open one, so recordings since then sat on `showcase/recordings` unseen. It also stops seeding from that branch once its pull request has closed, which had rolled the recorded studies back to their 2026-09-14 copies.
+
+## [0.21.0] - 2026-09-30
+
+### Added
+- **Studies go past the stationary design flow.** Seven new study steps in `aquascope.advanced`, each a plain JSON tool that the Explorer, `aquascope studio`, the Analyst and `aquascope mcp` all run:
+  - `change_points`: Pettitt, PELT and Mann-Kendall with Sen's slope on the annual maxima or means. It says whether the record is one sample.
+  - `nonstationary_flood`: a GEV whose location moves with time, set beside the stationary GEV, with the likelihood-ratio test, AIC and a bootstrap interval.
+  - `pot_flood`: declustered peaks over a threshold fitted to a Generalised Pareto.
+  - `catchment_model`: GR4J on the gauge and ERA5, with a degree-day snow store where it snows. It is validated on years it never saw, reports a 90 % band scored by its coverage, and runs "what if" scenarios.
+  - `climate_projection`: change factors from seven CMIP6 HighResMIP models through the Open-Meteo Climate API, run through the calibrated GR4J for the change in mean flow, low flow and the flood. The spread across models is reported, not only the median.
+  - `regional_flood` and `compare_gauges`: the gauges around a site pooled (Hosking and Wallis) or set side by side.
+- **Three new playbooks for the questions that come after the design flow.** `flood_change` asks whether the flood is getting worse. `climate_change` asks how the river changes by 2050. `catchment_response` asks what happens if the rain drops or it warms. Each has its own checklist question, declines and caveats. Plain words route to them, and "rainfall drops 10% and 2 degrees warmer" is read from the question.
+- **The Explorer's Study intake offers these as "Try a study" questions.** A gauge gets the design flow, the change, climate and what-if studies; a bare point gets the ones that need no record at the spot. Every new step has plain titles, steering controls, figures, tables and key numbers traced to their payload paths.
+- **The method registry says what each method assumes** (#376). `assumes` and `sensitive_to` sit on every method. Change points in the record, a regulated catchment (degree of regulation at or above 10 %, an aquascope threshold) or a snowy one demote the methods that depend on them to marginal, with the reason. They are never blocked.
+- New gate checks `stationary`, `min_models` and `min_sites`. A step skipped because its input failed now still runs its own fallback when that fallback needs nothing that failed: the climate study falls back to climate-only factors when the catchment model does not validate.
+- **The Studio asks what the study needs, one question at a time, as a pick list.** A playbook can now carry a `checklist`: the things the study must know before it plans, each with the question, one line on what the answer changes, the options and the words in a question that already answer it (`aquascope.playbooks.ChecklistItem`, `checklist_open`). The Consultant reads the question first, asks only what is still open, one at a time with its reason, and a reply that names no option is asked again; the model's own extra questions are dropped for a checklist playbook, and a model reads its answers into the same values. The flood playbook is the first: "Is flooding here getting worse?" is read as a trend question and asks only which period, while "design flow for a crossing, 100-year" asks nothing. In the terminal the options are an arrow-key list with an "Other" row (`questionary`, added to the `studio` extra; numbers without it); in the Explorer they are the chips, with the reason under the question.
+- **`aquascope studio` asks whether you have a model key, and takes it there.** "No, run keyless", "Yes, paste a key" or "Get a free key first (Groq)": the key is pasted hidden, its provider read off the prefix (`sk-ant-`, `gsk_`, `hf_`, `sk-`, ...) or picked from a list, and checked with one five-token request before the study starts, so a mistyped key is said at once ("the key was refused (401)") instead of the crew turning keyless in silence. Remembering it is opt-in (`~/.config/aquascope/keys.json`, mode 600), and a remembered or exported key is offered on the next run. The logic is `aquascope.ai_engine.keys` (`guess_provider`, `check_key`, `save_key`, `load_saved_keys`).
+- **A goal the chosen gauge cannot answer is said, with the gauges nearby that can.** When the goal's branch needs a record the gauge at the site does not have (a trend needs 20 years up to recent ones; a gauge that stopped in 1915 has none), the Studio stops after scouting and offers the discharge gauges within reach that do, with their record length and distance, or keeping the gauge with the method it allows; the plan is not quietly swapped for a different study (`aquascope.studio.coordinator.gauge_offer`). A reply that cannot be used is asked again with the reason ("10 is too few: a trend needs at least 20"). In the terminal, "Run this plan?" is a pick list too (run it, change a step, not now), a reply in your own words changes the brief and plans again, and "not now" saves the study and prints the command to resume it instead of "Declined at review".
+- **A flood trend question gets a trend study and a trend answer.** A new `trend` branch of the flood playbook (for the "flood trend" goal) runs Mann-Kendall with Sen's slope on the annual flood peaks over the chosen window, with a frequency fit for scale, and without the GloFAS return-level cross-check or the gate that treats a significant trend as a warning. The answer leads with the slope and whether it is significant ("Sen's slope 0.24 m3/s per year, Mann-Kendall p = 0.32: no significant trend at 5 %"), not with a 100-year flow.
+
+### Changed
+- **The weekly harvest refreshes the mirror files the old 40-year cap truncated first** (#270). A file that starts years after the station's catalog start goes to the front of the refresh queue, most truncated first, and the full-record fetch merges the missing years in. Studies that read the Archive (the regional pool, the Explorer's first read) get the whole record back within the fewest runs.
+- HydroGym generates its tasks from its seven benchmark playbooks by default (`BENCHMARK_PLAYBOOKS`), so new playbooks do not change the task set or the leaderboard until they have expert plans.
+- **Infer `site_id` for co-located stations at harvest time** (#455). Group stations sharing a source, folded name, and coordinates rounded to 3 decimal places (~100 m) under a synthetic `site_id` (`syn:<source>:<hash>`). Collapses duplicate co-located records in sources without agency site identifiers (such as Taiwan CWA's replaced Taipei gauge pairs and USGS nested well sensors) while preserving any collector-supplied agency identifiers.
+
+### Fixed
+- `fit_nonstationary_gev` optimised the shape in the Coles convention but started from scipy's and reported it as scipy's. Return levels for any non-Gumbel shape came out with the wrong tail, and the likelihood-ratio statistic could come out as zero. Both fits now start from the stationary maximum-likelihood estimate, the shape is bounded to |xi| <= 0.5, and the result carries the test's p-value and the stationary fit.
 - Record the verified v0.20.0 Zenodo DOI (`10.5281/zenodo.23009178`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
 
 ## [0.20.0] - 2026-09-28
@@ -44,6 +151,7 @@ All notable changes to AquaScope are documented here.
 - **`aquascope studio` on its own starts a study.** In a terminal with no place or question, the Studio asks where (a gauge name or river words searched in the station catalog, a station id such as `USGS-01013500`, or `lat, lon`) and what you want to know, then carries on as before: questions, plan, approval, bundle. When a model key is set in the environment it offers to use it, with a $1 spend ceiling, instead of staying silently keyless; the Studio still never uses a key it was not told to. A new `--at PLACE` does the same lookup without questions. When the `studio` extra is missing, the CLI now says the bundle holds only the Markdown and HTML report and the tables, and names `pip install "aquascope[studio]"`. The README gains a "Run a study on your machine" section and lists the `studio` and `basins` extras.
 
 ### Fixed
+- **A "last N years" window longer than the archive copy now comes from the agency.** The archive mirror holds 40 years for many gauges; asking for the last 50 served those 40 and said so. The agency is now asked for the window when it reaches more than a year before the archive copy, as the full record already was.
 - **The cross-check gate no longer says "within" when it failed.** A failing `cross_check_ratio` read "ratio 1.82 (within a factor 1.50 allowed): the cross-check disagrees"; it now reads "ratio 1.82, outside the allowed factor of 1.50: the cross-check disagrees", and a passing one "within the allowed factor". The recorded Kingston study carries the new wording.
 - **UK EA collector: distinguish 'no data' from 'endpoint failed'** (#463). `_fetch_paginated_items` now propagates failed requests as `CollectorError` with causal HTTP status resolution, rather than returning `None` and masking failed requests as empty stations. Genuinely empty reading pages continue to return empty lists. Station metadata lookup catches only `(RuntimeError, ValueError)` and returns `None` with an explanatory note since metadata enrichment is optional for reading queries.
 

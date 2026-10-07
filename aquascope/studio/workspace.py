@@ -50,6 +50,10 @@ class Question:
     options: list[str] | None = None
     default: Any = None
     answer: Any = None
+    #: One line on what the answer changes in the study (a checklist question's ``why``).
+    why: str | None = None
+    #: Why the last reply could not be used, said when the question is asked again.
+    retry: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -58,7 +62,8 @@ class Question:
     def from_dict(cls, d: dict[str, Any]) -> Question:
         return cls(id=str(d.get("id") or ""), text=str(d.get("text") or ""),
                    options=list(d["options"]) if d.get("options") else None,
-                   default=d.get("default"), answer=d.get("answer"))
+                   default=d.get("default"), answer=d.get("answer"), why=d.get("why") or None,
+                   retry=d.get("retry") or None)
 
 
 @dataclass
@@ -88,6 +93,9 @@ class Brief:
     ready: bool = False
     #: Who wrote it: "rules" (keyword rules and intake hints), "device" (an on-device model), "model".
     source: str = "rules"
+    #: The intake fields the client stated (in the text, in an answer, or as a model read them): the checklist
+    #: counts these as known, never a field that only holds its default.
+    stated: list[str] = field(default_factory=list)
 
     @property
     def open_questions(self) -> list[Question]:
@@ -301,6 +309,12 @@ class Workspace:
     #: Follow-ups after the report: ``{"text", "at", "kind": "question" | "change", "steps": [...]}``.
     follow_ups: list[dict[str, Any]] = field(default_factory=list)
     declined_reason: str | None = None
+    #: The house style the documents are dressed in (:class:`aquascope.studio.document.HouseStyle` as a dict:
+    #: organisation, project, the people who prepared and checked it, the logo as ``logo_b64``).
+    house_style: dict[str, Any] | None = None
+    #: The Study Desk's state (:mod:`aquascope.studio.desk`): ``{"revisions": [...], "comments": [...],
+    #: "estimator": "gev_lmoments" | "lp3" | "gev_bootstrap"}``.
+    desk: dict[str, Any] | None = None
     version: int = WORKSPACE_VERSION
     #: A face's callback for every event as it happens (the Coordinator sets it); not serialised.
     listener: Any = field(default=None, repr=False, compare=False)
@@ -431,6 +445,8 @@ class Workspace:
             "tables": dict(self.tables),
             "follow_ups": list(self.follow_ups),
             "declined_reason": self.declined_reason,
+            "house_style": dict(self.house_style) if self.house_style else None,
+            "desk": dict(self.desk) if self.desk else None,
         }
 
     @classmethod
@@ -458,6 +474,8 @@ class Workspace:
             tables={str(k): str(v) for k, v in (d.get("tables") or {}).items()},
             follow_ups=[dict(f) for f in (d.get("follow_ups") or []) if isinstance(f, dict)],
             declined_reason=d.get("declined_reason"),
+            house_style=dict(d["house_style"]) if isinstance(d.get("house_style"), dict) else None,
+            desk=dict(d["desk"]) if isinstance(d.get("desk"), dict) else None,
             version=int(d.get("version") or WORKSPACE_VERSION),
         )
         return ws

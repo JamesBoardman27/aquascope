@@ -120,6 +120,114 @@ def _drought_class(value: Any) -> str | None:
     return "extremely dry"
 
 
+#: The advanced study steps (aquascope.advanced): their key numbers come from :func:`_advanced_numbers`.
+_ADVANCED_TOOLS = frozenset({"change_points", "nonstationary_flood", "pot_flood", "catchment_model",
+                             "climate_projection", "regional_flood", "compare_gauges"})
+
+
+def _advanced_numbers(sid: str, tool: str, p: dict[str, Any], rp: Any) -> list[dict[str, Any]]:  # noqa: C901
+    """Key numbers of the advanced steps, each with the path it sits at (``evidence.basis``)."""
+    out: list[dict[str, Any]] = []
+    unit = p.get("unit") or ""
+
+    def add(label: str, value: Any, unit_: str | None, basis: str, band: list[Any] | None = None) -> None:
+        if value is None or (isinstance(value, float) and value != value) or isinstance(value, bool):
+            return
+        evidence: dict[str, Any] = {"basis": basis}
+        if band and len(band) == 2 and all(isinstance(x, (int, float)) for x in band):
+            # the uncertainty that belongs to this number: a bootstrap interval, or the spread across models
+            evidence.update({"result_id": f"{sid}.{basis}",
+                             "interval": {"result_id": f"{sid}.{basis}", "bounds": [float(band[0]), float(band[1])]}})
+        out.append({"label": label, "value": _sig(value) if isinstance(value, (int, float)) else value,
+                    "unit": unit_ if unit_ is not None else unit, "step": sid, "evidence": evidence})
+
+    t = _t(rp)
+    if tool == "change_points":
+        pet, mk = p.get("pettitt") or {}, p.get("mann_kendall") or {}
+        add("Years of annual values tested", p.get("n"), "years", "n")
+        if pet.get("significant"):
+            add("Step change year (Pettitt)", pet.get("change_year"), "", "pettitt.change_year")
+            add("Change in the mean after the step", pet.get("change_pct"), "%", "pettitt.change_pct")
+        add("Pettitt p-value", p_text(pet.get("p_value")), "", "pettitt.p_value")
+        add("Mann-Kendall p-value (annual maxima)" if p.get("tested") == "annual_max" else
+            "Mann-Kendall p-value (annual means)", p_text(mk.get("p_value")), "", "mann_kendall.p_value")
+        add("Sen's slope", mk.get("sen_slope_pct_per_decade"), "% per decade", "mann_kendall.sen_slope_pct_per_decade")
+    elif tool == "nonstationary_flood":
+        key = t if str(t) in ((p.get("stationary") or {}).get("q_by_T") or {}) else None
+        key = str(key) if key is not None else next(iter(reversed(list(((p.get("stationary") or {}).get("q_by_T")
+                                                                          or {}).keys()))), None)
+        if key is None:
+            return out
+        st = (p.get("stationary") or {}).get("q_by_T") or {}
+        ns = p.get("nonstationary") or {}
+        ci = ns.get("ci_last_year") or {}
+        band = ci.get("ci") if str(_t(ci.get("T"))) == key else None
+        # the answer: the level of the model the likelihood-ratio test and AIC prefer, today
+        if p.get("preferred") == "nonstationary":
+            add(f"{key}-year level today, preferred model (nonstationary GEV)",
+                (ns.get("q_by_T_last_year") or {}).get(key), None, f"nonstationary.q_by_T_last_year.{key}", band)
+        else:
+            add(f"{key}-year level today, preferred model (stationary GEV)", st.get(key), None,
+                f"stationary.q_by_T.{key}")
+        add(f"{key}-year level, stationary GEV", st.get(key), None, f"stationary.q_by_T.{key}")
+        add(f"{key}-year level in {p.get('last_year')}, nonstationary GEV", (ns.get("q_by_T_last_year") or {}).get(key),
+            None, f"nonstationary.q_by_T_last_year.{key}")
+        add(f"{key}-year level in {p.get('horizon_year')}, nonstationary GEV (trend extended)",
+            (ns.get("q_by_T_horizon") or {}).get(key), None, f"nonstationary.q_by_T_horizon.{key}")
+        row = next((r for r in p.get("table") or [] if str(_t(r.get("T"))) == key), None)
+        if row:
+            idx = (p.get("table") or []).index(row)
+            add(f"Change in the {key}-year level, {p.get('first_year')} to {p.get('last_year')}",
+                row.get("change_first_to_last_pct"), "%", f"table.{idx}.change_first_to_last_pct")
+        add("Trend term likelihood-ratio p-value", p_text((p.get("likelihood_ratio") or {}).get("p_value")), "",
+            "likelihood_ratio.p_value")
+    elif tool == "pot_flood":
+        q = (p.get("gpd") or {}).get("q_by_T") or {}
+        key = str(t) if str(t) in q else (list(q)[-1] if q else None)
+        if key is not None:
+            add(f"{key}-year return level, peaks over threshold (GPD)", q.get(key), None, f"gpd.q_by_T.{key}")
+        add("Independent peaks per year", p.get("peaks_per_year"), "", "peaks_per_year")
+    elif tool == "catchment_model":
+        val = p.get("validation") or {}
+        add("Validation KGE", val.get("kge"), "", "validation.kge")
+        add("Validation NSE", val.get("nse"), "", "validation.nse")
+        add("90 % band coverage on the validation years", (p.get("band") or {}).get("coverage"), "", "band.coverage")
+        runs = list(enumerate(p.get("scenarios") or []))
+        # the combined scenario (a rainfall change and a warming together) is the one the question describes
+        runs.sort(key=lambda ir: 0 if (ir[1].get("dp_pct") and ir[1].get("dt_c")) else 1)
+        for i, r in runs:
+            label = r.get("label") or f"scenario {i + 1}"
+            add(f"Change in mean flow, {label}", r.get("mean_flow_change_pct"), "%",
+                f"scenarios.{i}.mean_flow_change_pct")
+            add(f"Change in low flow (Q95), {label}", r.get("q95_change_pct"), "%", f"scenarios.{i}.q95_change_pct")
+            add(f"Change in the median annual maximum, {label}", r.get("amax_median_change_pct"), "%",
+                f"scenarios.{i}.amax_median_change_pct")
+    elif tool == "climate_projection":
+        ens = p.get("ensemble") or {}
+        rp_c = _t(p.get("return_period") or 20)
+        names = {"mean_flow_change_pct": "Change in mean flow", "flood_change_pct": f"Change in the {rp_c}-year flood",
+                 "q95_change_pct": "Change in low flow (Q95)", "precip_change_pct": "Change in annual rainfall",
+                 "pet_change_pct": "Change in evaporation", "temp_change_c": "Change in mean temperature",
+                 "wettest_day_change_pct": f"Change in the {rp_c}-year wettest day"}
+        for key, name in names.items():
+            e = ens.get(key) or {}
+            if not e.get("n"):
+                continue
+            u = "°C" if key == "temp_change_c" else "%"
+            add(f"{name}, CMIP6 median", e.get("median"), u, f"ensemble.{key}.median", [e.get("min"), e.get("max")])
+            add(f"{name}, CMIP6 lowest model", e.get("min"), u, f"ensemble.{key}.min")
+            add(f"{name}, CMIP6 highest model", e.get("max"), u, f"ensemble.{key}.max")
+        add("Climate models", p.get("n_models"), "", "n_models")
+    elif tool == "regional_flood":
+        add("Gauges pooled", p.get("n_pooled"), "", "n_pooled")
+        add("Heterogeneity H", p.get("heterogeneity_H"), "", "heterogeneity_H")
+        tg = p.get("target") or {}
+        add("100-year flow at the gauge, pooled (regional)", tg.get("pooled_q100"), "m3/s", "target.pooled_q100")
+        add("100-year flow at the gauge, at-site (Archive record)", tg.get("at_site_q100"), "m3/s",
+            "target.at_site_q100")
+    return out
+
+
 def _numbers_for(sid: str, tool: str, p: dict[str, Any], rp: Any) -> list[dict[str, Any]]:  # noqa: C901
     out: list[dict[str, Any]] = []
     unit = p.get("unit") or ""
@@ -183,6 +291,10 @@ def _numbers_for(sid: str, tool: str, p: dict[str, Any], rp: Any) -> list[dict[s
         if isinstance(trend, dict) and trend.get("p_value") is not None:
             add(f"Mann-Kendall p-value ({trend.get('on') or 'annual mean'})", p_text(trend["p_value"]), "")
             add("Sen's slope", trend.get("sens_slope_per_year"), f"{unit} per year" if unit else "per year")
+        shift = (p.get("ffa") or {}).get("amax_change") or {}
+        if shift.get("significant"):  # a stationary fit across a regime shift (#376)
+            add("Step change in the annual maxima (Pettitt), year", shift.get("change_year"), "",
+                evidence={"basis": "ffa.amax_change.change_year"})
         out += others
     elif tool == "describe_catchment":
         attrs = p.get("attributes") or {}
@@ -200,6 +312,8 @@ def _numbers_for(sid: str, tool: str, p: dict[str, Any], rp: Any) -> list[dict[s
                 if e.get("low") is not None and e.get("high") is not None:
                     add(f"{label} band, low", e["low"], u)
                     add(f"{label} band, high", e["high"], u)
+    elif tool in _ADVANCED_TOOLS:
+        out += _advanced_numbers(sid, tool, p, rp)
     elif tool == "anywhere":
         cl = p.get("climate") or {}
         add("ERA5 precipitation", cl.get("precipitation_mm_per_year"), "mm per year")
@@ -338,8 +452,13 @@ def key_numbers(study: Study, results: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def software_citation() -> str:
-    from aquascope.studio.deliverables._common import citation
-
+    """The software's own reference. The Author must not depend on the deliverables package (a core install, or
+    a face that blocks it), so without it the citation names the concept DOI alone."""
+    try:
+        from aquascope.studio.deliverables._common import citation
+    except ImportError:
+        return (f"Rekin226 and contributors. AquaScope Hydrology {__version__} [Software]. All versions: "
+                f"https://doi.org/{SOFTWARE_DOI}.")
     return citation()
 
 

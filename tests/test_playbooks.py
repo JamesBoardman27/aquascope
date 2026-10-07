@@ -20,8 +20,8 @@ RAIN = {"source": "uk_ea", "station_id": "R1", "name": "Teddington rain", "dista
         "variables": ["precipitation"], "years": 36.0}
 BORE = {"source": "uk_ea", "station_id": "W1", "name": "Bore", "distance_km": 5.0,
         "variables": ["groundwater_level"], "years": 15}
-ALL_IDS = ["drought_status", "flood_risk", "groundwater_decline", "irrigation_feasibility", "supply_reliability",
-           "ungauged_flow", "water_quality"]
+ALL_IDS = ["catchment_response", "climate_change", "drought_status", "flood_change", "flood_risk",
+           "groundwater_decline", "irrigation_feasibility", "supply_reliability", "ungauged_flow", "water_quality"]
 #: What assess_site reports as reachable for any point on land.
 POINT_PRODUCTS = ("glofas", "temperature", "forcing")
 
@@ -130,7 +130,7 @@ def test_placeholders_resolve_to_typed_values_and_prose():
     rp = [g for g in fetch.expects if g["check"] == "max_return_period_factor"][0]
     assert rp["return_period"] == 200 and isinstance(rp["return_period"], int)
     assert "T = 200 year" in fetch.rationale and "39.5 years" in study.plan["rationale"]
-    assert study.problem["params"] == {"return_period": 200, "decision": "design flow"}
+    assert study.problem["params"] == {"return_period": 200, "decision": "design flow", "years": None}
     assert study.plan["station"]["station_id"] == "3400TH"
 
 
@@ -269,7 +269,7 @@ def test_the_explorer_playbook_list_is_the_package_s_own():
     data = json.loads(as_json())
     ids = [p["id"] for p in data["playbooks"]]
     assert ids == ALL_IDS
-    flood = data["playbooks"][1]
+    flood = next(p for p in data["playbooks"] if p["id"] == "flood_risk")
     assert flood["title"] and flood["problem"] == "flood_risk"
     fields = {f["name"]: f for f in flood["intake"]}
     assert fields["return_period"]["type"] == "int" and fields["return_period"]["default"] == 100
@@ -537,7 +537,7 @@ def test_the_scout_asks_the_registry_by_the_playbooks_problem_not_its_id():
     """drought_status is the playbook, drought the problem the sufficiency table knows; the live run had crashed."""
     seen = {}
 
-    def fake_assess(lat, lon, *, problem=None, return_period=None):
+    def fake_assess(lat, lon, *, problem=None, return_period=None, probe_km=0.0):
         seen["problem"] = problem
         return RICH
 
@@ -551,9 +551,11 @@ def test_the_scout_asks_the_registry_by_the_playbooks_problem_not_its_id():
 def test_coerce_intake_makes_a_model_s_reply_safe():
     """The lenient twin of fill_intake: a small model's mistake costs a default, never the plan."""
     good = pbk.coerce_intake("flood_risk", {"return_period": "50", "decision": "Design Flow", "foo": 1})
-    assert good == {"return_period": 50, "decision": "design flow"}      # coerced, options case-folded, foo dropped
+    # coerced, options case-folded, foo dropped
+    assert good == {"return_period": 50, "decision": "design flow", "years": None}
     bad = pbk.coerce_intake("flood_risk", {"return_period": -3, "decision": "mapping"})
-    assert bad == {"return_period": 100, "decision": "design flow"}      # below min 2 and outside the options
+    # below min 2 and outside the options
+    assert bad == {"return_period": 100, "decision": "design flow", "years": None}
     assert pbk.coerce_intake("flood_risk", {"return_period": float("nan")})["return_period"] == 100
     assert pbk.coerce_intake("flood_risk", {"return_period": [50]})["return_period"] == 100
     assert pbk.coerce_intake("flood_risk", {"return_period": True})["return_period"] == 100

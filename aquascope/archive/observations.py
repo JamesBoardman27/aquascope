@@ -219,7 +219,22 @@ def _pick_stations(
                 when = datetime(1970, 1, 1, tzinfo=timezone.utc)
             if when < cutoff:
                 stale.append(row)
+    # A file that starts years after the catalog says the station does was harvested under the old 40-year cap
+    # (#270); a full-record fetch now merges the earlier years in, so those go first, the most truncated first.
+    stale.sort(key=lambda r: -_missing_years(r, done.get(r["station_id"]) or {}))
     return (fresh + stale)[:max_stations]
+
+
+def _missing_years(row: dict[str, Any], entry: dict[str, Any]) -> float:
+    """Years between the catalog's first date for a station and the first day its mirror file holds (0 when the
+    file reaches back to the catalog's start, or either date is unknown)."""
+    try:
+        listed = datetime.fromisoformat(str(row.get("period_start") or "")[:10])
+        held = datetime.fromisoformat(str(entry.get("first") or "")[:10])
+    except ValueError:
+        return 0.0
+    gap = (held - listed).days / 365.25
+    return gap if gap > 1.0 else 0.0
 
 
 def _rate_limited(exc: BaseException) -> bool:
