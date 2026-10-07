@@ -106,7 +106,13 @@ With a model, the model reads your replies into the same values; it cannot skip 
    listed, never hidden.
 8. **Bundle.** Markdown, `study.yaml`, `report.json`, `findings.json`, `workspace.json` and,
    when the deliverables package is installed, the figures, the Excel
-   workbook, the Word report, the notebook and one zip. The raw record and
+   workbook, the Word report and memo, the notebook and one zip. The report
+   and the memo (`aquascope.studio.document`) lead with the answer and its
+   grade, organise the results by question, number every figure and table,
+   and leave the checked-by and approved-by lines blank for a person; a
+   study that established nothing becomes a one-page study note instead.
+   `report.html` and `memo.html` print to A4 (the PDF path), and
+   `--style style.yaml` sets the organisation, project, names and logo. The raw record and
    the raw samples live in the workbook and the notebook; the documents say
    which sheet, and print the evidence tables only.
 9. **Follow-up.** A question is answered from the workspace; a change (another
@@ -287,8 +293,9 @@ board above the input shows one thing at a time:
    that copy. The table open in My data is handed to the new worker again.
 4. **Done**: the answer, the key numbers, the figures, what the study does
    not establish when the Critic listed anything, **Download bundle** (the
-   zip) and links for the Word, Excel, Markdown, notebook and `study.yaml`
-   files. The input stays open: a question is answered from the workspace, a
+   zip), **Read the report** and **Read the memo** (the documents in a
+   reader with Print or save as PDF), and links for the Word, Excel,
+   Markdown, notebook and `study.yaml` files. The input stays open: a question is answered from the workspace, a
    change ("redo it with a 200-year return period") is planned, run and
    re-authored, and the board refreshes. **New study** clears the board for
    another study at the same place.

@@ -87,8 +87,10 @@ That is all. The Studio asks where (a gauge name like `Fish River Fort Kent`, a 
 or `lat, lon`) and what you want to know ("Is flooding here getting worse?"). Then it asks only what the study still
 needs, one pick-list question at a time with the reason (a trend question: which period; a design question: which
 return period), shows the plan, and runs only when you approve it (`e` edits a step, e.g. `s3.return_period=200`). The bundle lands in
-`./studio-<id>/`: `report.docx`, `workbook.xlsx`, `study.ipynb`, `figures/`, `findings.json` and `study.yaml`,
-which re-runs the whole study with `aquascope run study.yaml`. After the report, ask a follow-up (another gauge, a
+`./studio-<id>/`: a technical report and a short memo (`report.docx`, `memo.docx`, and `report.html`, which prints
+to PDF), `workbook.xlsx`, `study.ipynb`, `figures/` (300 dpi PNG and SVG), `findings.json` and `study.yaml`, which
+re-runs the whole study with `aquascope run study.yaml`. `--style style.yaml` puts your organisation, project and
+names on the cover. After the report, ask a follow-up (another gauge, a
 trend, the flow duration curve) and the bundle is updated.
 
 It needs no key: the playbooks plan and the templates write. If you have one, the Studio asks: paste it
@@ -111,7 +113,7 @@ virtual environment first: `python3 -m venv .venv && source .venv/bin/activate`.
 - 📈 **Run hydrological analyses** — flood frequency (GEV / LP3 / Gumbel / non-stationary GEV, with separate EMA routines), baseflow separation, rating curves, 22 hydrological signatures.
 - 🌾 **Plan agricultural water** — FAO-56 Penman-Monteith ET₀, crop water requirements for 26 crops (olive, grape, citrus and winter wheat resolved by variety and canopy), irrigation scheduling, soil water balance with auto-irrigation.
 - 🤖 **Ask the AI engine** — describe your goal in plain English and get a recommended methodology, scored against your dataset profile and auto-executed. LLM enhancement via OpenAI, Groq (free), HuggingFace (free), or local Ollama.
-- 🧑‍🔬 **Hand a study to the crew** — `aquascope studio "PROBLEM" --lat --lon`: a Consultant, a Scout, a Methodologist, Analysts, an Interpreter, a Critic and an Author over one workspace, the plan shown before it runs, every step gated (a failed gate fails its step, not the study), every answer graded (established, indicative, screening, not established) with findings that point at the result they rest on, a request for the data that would unlock a question instead of a decline, and the bundle (Word, Excel, figures, notebook, findings.json, study.yaml) at the end. Also in the Explorer and over MCP. The [advanced studies](docs/advanced_studies.md) go past the design flow: change points and a nonstationary flood fit, GR4J with a snow store validated on years it never saw, "what if" scenarios, and CMIP6 change factors through the calibrated model.
+- 🧑‍🔬 **Hand a study to the crew** — `aquascope studio "PROBLEM" --lat --lon`: a Consultant, a Scout, a Methodologist, Analysts, an Interpreter, a Critic and an Author over one workspace, the plan shown before it runs, every step gated (a failed gate fails its step, not the study), every answer graded (established, indicative, screening, not established) with findings that point at the result they rest on, a request for the data that would unlock a question instead of a decline, and the bundle at the end: a technical report and a memo (Word and print-ready HTML) that lead with the answer and its grade, the Excel workbook, publication figures, the notebook, findings.json and study.yaml. Also in the Explorer and over MCP. The [advanced studies](docs/advanced_studies.md) go past the design flow: change points and a nonstationary flood fit, GR4J with a snow store validated on years it never saw, "what if" scenarios, and CMIP6 change factors through the calibrated model.
 - 📊 **Visualise + report** — 17 plot types, Q-Q / P-P diagnostics, Markdown / HTML reports with embedded figures, threshold alerts (WHO / EPA / EU WFD).
 - 🗺️ **Spatial hydrology** — DEM processing, D8 flow direction, watershed delineation, Strahler ordering.
 
@@ -520,8 +522,8 @@ If you use AquaScope in your research, please cite:
   author  = {Ouédraogo, Abdoul Rachid},
   year    = {2026},
   url     = {https://github.com/Rekin226/aquascope},
-  version = {0.23.0},
-  doi     = {10.5281/zenodo.23200452},
+  version = {0.24.0},
+  doi     = {10.5281/zenodo.21903143},
   license = {MIT}
 }
 ```
