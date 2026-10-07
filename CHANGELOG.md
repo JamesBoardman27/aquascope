@@ -7,8 +7,7 @@ All notable changes to AquaScope are documented here.
 
 ## [Unreleased]
 
-### Fixed
-- **Preserve USGS quality qualifiers on the keyless path** (#481). Keyless NWIS observations now retain their qualifiers, so approved, provisional and estimated readings are mapped to the correct quality status instead of being reported as unknown. Added regression coverage for the keyless fetch_raw → normalise path.
+## [0.23.0] - 2026-10-07
 
 ### Added
 - **`aquascope update` upgrades aquascope the way it was installed**, and `aquascope --version` says which version you have. It reads the newest release from PyPI, works out from the running interpreter whether this copy is a uv tool, a pipx app, a conda or virtual environment or a development checkout, and runs the matching upgrade after asking (`--yes` skips the question, `--check` only reports). A uv tool installed with an exact pin, which `uv tool upgrade` never moves, is reinstalled without the pin with the same extras and Python; a development checkout is told to `git pull`. The logic is in `aquascope.updates`.
@@ -16,6 +15,7 @@ All notable changes to AquaScope are documented here.
 - **The Explorer's station panel lets you choose the period** (#270): the full record (the default), the last 40 years or the last 20, next to the record card. The choice travels in the link as `&yr=40`, `&yr=20` or `&yr=all`, and the loading line says which one is on its way, since a full USGS record can be a century of daily values.
 
 ### Fixed
+- **Preserve USGS quality qualifiers on the keyless path** (#481). Keyless NWIS observations now retain their qualifiers, so approved, provisional and estimated readings are mapped to the correct quality status instead of being reported as unknown. Added regression coverage for the keyless fetch_raw → normalise path.
 - The README and the Explorer guide say the record is fetched in full by default and can be cut to 40 or 20 years (#270), and the Analyst guide's reconnaissance example no longer says a fetch serves the last 40 years or that CMIP6 needs model output you supply.
 - Record the verified v0.22.0 Zenodo DOI (`10.5281/zenodo.23132668`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
 
