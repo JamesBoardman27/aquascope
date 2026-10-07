@@ -7,6 +7,9 @@ All notable changes to AquaScope are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **Preserve USGS quality qualifiers on the keyless path** (#481). Keyless NWIS observations now retain their qualifiers, so approved, provisional and estimated readings are mapped to the correct quality status instead of being reported as unknown. Added regression coverage for the keyless fetch_raw → normalise path.
+
 ### Added
 - **`aquascope update` upgrades aquascope the way it was installed**, and `aquascope --version` says which version you have. It reads the newest release from PyPI, works out from the running interpreter whether this copy is a uv tool, a pipx app, a conda or virtual environment or a development checkout, and runs the matching upgrade after asking (`--yes` skips the question, `--check` only reports). A uv tool installed with an exact pin, which `uv tool upgrade` never moves, is reinstalled without the pin with the same extras and Python; a development checkout is told to `git pull`. The logic is in `aquascope.updates`.
 - **`aquascope eval` scores, traces and compares finished studies** from their bundles, with no model and no network. `eval score` gives one study's scorecard: outcome and grade, steps and gates passed, failed and skipped, the Critic's checks, report quality on the six HydroGym axes (against its reference when the package has one), plan accuracy against a reference case with `--case`, and time, tokens and cost by role. `eval trace` lays out the run: each phase and step with its duration, the gates that did not pass and why, and the model calls per role. `eval stats` groups many studies by playbook, model, date or grade, names the gate checks that fail or skip most often, and writes CSV. The functions are in `aquascope.evaluation`.
