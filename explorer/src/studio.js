@@ -109,8 +109,11 @@ const ROLE_NAME = {
   coordinator: "coordinator", scout: "scout", analyst: "analysts", critic: "critic",
 };
 
-const DOCS = [["report-docx", "Word"], ["workbook", "Excel"], ["report-md", "Markdown"], ["notebook", "notebook"],
-  ["study", "study.yaml"]];
+const DOCS = [["report-docx", "Report (Word)"], ["memo-docx", "Memo (Word)"], ["workbook", "Excel"],
+  ["report-md", "Markdown"], ["notebook", "notebook"], ["study", "study.yaml"]];
+
+// The documents the board can open in its reader: the composed report and memo, as the worker built them.
+const READABLE = [["report-html", "Read the report"], ["memo-html", "Read the memo"]];
 
 const S = {
   ws: null,             // the workspace dict, without the artifact bytes
@@ -491,7 +494,14 @@ function doneHtml() {
   if (S.recorded) return recordedDoneHtml(report, numbers, not);
   const figs = artifacts.filter((a) => a.kind === "figure" && a.media_type === "image/png");
   const docs = DOCS.filter(([id]) => artifacts.some((a) => a.id === id));
+  const readable = READABLE.filter(([id]) => artifacts.some((a) => a.id === id));
   return gradeBadgeHtml(report.grade) +
+    (readable.length
+      ? `<div class="study-docs-card"><strong>The documents are ready.</strong> A technical report and a short ` +
+        `memorandum, written from the results, with numbered figures and tables.<div class="row-actions">` +
+        readable.map(([id, label], i) => `<button type="button" class="btn${i ? "" : " primary"}" data-read="${id}">${label}</button>`).join("") +
+        `</div></div>`
+      : "") +
     decisionHtml(report) +
     findingsHtml(report) +
     `<article class="study-answer ask-result" tabindex="-1" aria-label="The answer">${mdToHtml(report.answer || "No answer was produced.")}</article>` +
@@ -1335,6 +1345,63 @@ async function downloadArtifact(id) {
   }
 }
 
+// ── the reader ──────────────────────────────────────────────────────────────
+// The composed report (or memo) in a full-height panel: the worker's HTML in a sandboxed frame (it carries no
+// script), with Print / Save as PDF and the Word file beside it. The document is the product; the board above
+// is its summary.
+
+async function openReader(id) {
+  if (!S.ws) return;
+  note("Opening the document…");
+  try {
+    const res = await call("studio", { op: "file", workspace: S.ws, artifact_id: id });
+    if (!res || res.error) throw new Error((res && res.error) || "no document");
+    const bin = atob(res.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    showReader(new TextDecoder("utf-8").decode(bytes), id);
+    note("");
+  } catch (err) {
+    note(`Could not open the document: ${err.message}`, "error");
+  }
+}
+
+function showReader(html, id) {
+  let box = document.querySelector(".study-reader");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "study-reader";
+    box.className = "modal study-reader";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-label", "Study document");
+    document.body.appendChild(box);
+    box.addEventListener("click", (e) => {
+      const act = e.target.closest("[data-reader]");
+      if (e.target === box || (act && act.dataset.reader === "close")) { box.hidden = true; return; }
+      if (!act) return;
+      if (act.dataset.reader === "print") {
+        const frame = box.querySelector("iframe");
+        if (frame && frame.contentWindow) frame.contentWindow.print();
+      } else if (act.dataset.reader === "word") {
+        downloadArtifact(act.dataset.word);
+      }
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !box.hidden) box.hidden = true; });
+  }
+  const word = id === "memo-html" ? "memo-docx" : "report-docx";
+  const hasWord = (S.ws.artifacts || []).some((a) => a.id === word);
+  box.innerHTML =
+    `<div class="modal-box study-reader-box"><div class="modal-head"><h2>${id === "memo-html" ? "Technical memorandum" : "Technical report"}</h2>` +
+    `<div class="row-actions"><button type="button" class="btn" data-reader="print">Print or save as PDF</button>` +
+    (hasWord ? `<button type="button" class="btn" data-reader="word" data-word="${word}">Word</button>` : "") +
+    `<button type="button" class="btn" data-reader="close" aria-label="Close">Close</button></div></div>` +
+    `<iframe title="Study document" sandbox="allow-same-origin allow-modals"></iframe></div>`;
+  box.querySelector("iframe").srcdoc = html;
+  box.hidden = false;
+  box.querySelector('[data-reader="close"]').focus();
+}
+
 // ── the live run ────────────────────────────────────────────────────────────
 
 function appendEvent(e) {
@@ -1478,6 +1545,8 @@ function onBoardClick(e) {
   if (tryChip) { $("study-text").value = tryChip.dataset.try; send(tryChip.dataset.try); return; }
   const file = e.target.closest("[data-file]");
   if (file) { e.preventDefault(); downloadArtifact(file.dataset.file); return; }
+  const read = e.target.closest("[data-read]");
+  if (read) { openReader(read.dataset.read); return; }
   const remove = e.target.closest("[data-remove]");
   if (remove) { S.files.splice(Number(remove.dataset.remove), 1); renderBoard(); }
 }

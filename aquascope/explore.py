@@ -182,7 +182,8 @@ METHODS: dict[str, dict[str, str]] = {
         "name": "Mann-Kendall trend on annual means",
         "text": "Non-parametric Mann-Kendall test with Sen's slope on the annual mean series.",
         "citation": "Mann, H. B. (1945). Nonparametric tests against trend. Econometrica, 13, 245-259; "
-        "Sen, P. K. (1968). J. Am. Stat. Assoc., 63, 1379-1389.",
+        "Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall's tau. "
+        "J. Am. Stat. Assoc., 63(324), 1379-1389.",
     },
     "who_screen": {
         "name": "WHO drinking-water guideline screen",
@@ -440,6 +441,18 @@ def _agency_record_if_longer(
 DIRECT_FETCH_SOURCES = frozenset({"usgs", "uk_ea", "hubeau_hydrometrie", "pegelonline", "ireland_opw",
                                   "greece_hydroscope", "greece_openhi", "poland_imgw", "taiwan_cwa",
                                   "bom", "brazil_ana"})
+
+
+def can_fetch(source: str) -> bool:
+    """Whether AquaScope can fetch a station record from ``source`` (directly, or from the Archive's mirror)."""
+    if source in DIRECT_FETCH_SOURCES:
+        return True
+    try:
+        from aquascope.archive.observations import harvestable_variables
+
+        return bool(harvestable_variables(source))
+    except Exception:  # noqa: BLE001 - no archive module, no mirror
+        return False
 
 
 def fetch_series(
@@ -1475,6 +1488,29 @@ def _station_entry(row: dict[str, Any], lat: float, lon: float, today: date) -> 
     }
 
 
+def _probe_span(st: dict[str, Any], variable: str) -> dict[str, Any] | None:
+    """The record span of a catalog station found by fetching its record: ``{"period_start", "period_end",
+    "years", "span_source": "probed"}``, or None when nothing (or less than a year) came back."""
+    if not can_fetch(str(st["source"])):
+        return {"unfetchable": True}
+    try:
+        got = fetch_series(str(st["source"]), str(st["station_id"]), variable=variable)
+    except Exception:  # noqa: BLE001 - a probe that fails leaves the station unspanned
+        return None
+    s = got.get("series") if isinstance(got, dict) else None
+    if s is None or not len(s):
+        return None
+    s = s.dropna()
+    if not len(s):
+        return None
+    start, end = s.index.min(), s.index.max()
+    years = round((end - start).days / 365.25, 1)
+    if years < 1:
+        return None
+    return {"period_start": start.strftime("%Y-%m-%d"), "period_end": end.strftime("%Y-%m-%d"), "years": years,
+            "span_source": "probed"}
+
+
 def _label(st: dict[str, Any]) -> str:
     name = st.get("name") or st.get("station_id")
     return f"{name} ({st['source']}/{st['station_id']})"
@@ -1523,6 +1559,7 @@ def assess_site(
     area_km2: float | None = None,
     donors: int | None = None,
     change_points: list[int] | None = None,
+    probe_km: float = 0.0,
 ) -> dict[str, Any]:
     """What can be answered at a place: the gauges in reach, the catchment, and what the record supports.
 
@@ -1537,6 +1574,11 @@ def assess_site(
     assume stationarity to marginal (#376); a regulated or snowy catchment
     (BasinATLAS) does the same for the methods sensitive to it. Everything
     returned is plain JSON.
+
+    ``probe_km`` (off by default) lets the reconnaissance fetch the record of a station within that distance
+    whose span the catalog does not know (the two nearest at most), instead of dropping a gauge that may sit at
+    the site: the Studio's Scout sets it, because a BOM or ANA gauge at 0 km with a long record is common and
+    was being ignored.
 
     Returns ``{"point", "stations", "catchment", "context", "sufficiency", "notes"}``.
     """
@@ -1577,11 +1619,40 @@ def assess_site(
             station_by[var] = st
     # Only the variables a method in the table consumes deserve a "nearest gauge is too far" note.
     wanted = {m.variable for m in METHODS.values() if m.variable and (problem is None or problem in m.problems)}
+    if probe_km > 0:
+        probed = 0
+        for var in [v for v in RECORD_VARIABLES if v in unspanned and v in wanted]:
+            st = unspanned[var]
+            if st["distance_km"] > probe_km or probed >= 2:
+                continue
+            probed += 1
+            span = _probe_span(st, var)
+            st["probed"] = True
+            if span is not None and span.get("unfetchable"):
+                st["fetchable"] = False
+                notes.append(f"{_label(st)} measures {var.replace('_', ' ')} {st['distance_km']:g} km from the site, "
+                             f"but AquaScope cannot fetch {st['source']} records yet and the catalog has no record "
+                             f"span; the agency may hold a usable record, which can be attached as a table.")
+                continue
+            if span is None:
+                notes.append(f"{_label(st)} measures {var.replace('_', ' ')}; the catalog has no record span and "
+                             "fetching its record returned nothing usable.")
+                continue
+            st.update(span)
+            del unspanned[var]
+            years_by[var] = st["years"]
+            resolution_by[var] = "daily"
+            station_by[var] = st
+            notes.append(f"{_label(st)}: the catalog has no record span for it, so its record was fetched: "
+                         f"{st['years']:g} years of {var.replace('_', ' ')}, {st['period_start']} to "
+                         f"{st['period_end']}.")
     for var in RECORD_VARIABLES:
         if var in station_by or var not in wanted:
             continue
         if var in unspanned:
             st = unspanned[var]
+            if st.get("probed"):
+                continue          # the probe already said what it found
             notes.append(f"{_label(st)} measures {var.replace('_', ' ')} but the catalog has no record span for it; "
                          "not counted.")
             continue

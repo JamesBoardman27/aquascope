@@ -23,7 +23,10 @@ def test_yes_runs_to_the_bundle(monkeypatch, capsys, tmp_path, no_deliverables):
         cli.main()
     printed = capsys.readouterr().out
     assert "Plan (playbook, playbook flood_risk, branch at_site, 4 step(s))" in printed
-    assert "The record at Kingston" in printed and "Bundle written to" in printed
+    # the end of a run is the answer box and the files to open, not the event stream
+    # the end of a run is the answer box and the files to open, not the event stream
+    assert "Kingston (UK EA 3400TH)" in printed and "50-year flood: 480 m³/s" in printed
+    assert "Grade:" in printed and "Documents in" in printed
     names = {p.name for p in out.iterdir()}
     assert {"report.md", "study.yaml", "report.json", "workspace.json"} <= names
     assert "T = 50 years" in (out / "report.md").read_text(encoding="utf-8")
@@ -51,7 +54,7 @@ def test_without_a_terminal_the_plan_waits_and_the_workspace_resumes(monkeypatch
         cli.main()
     printed = capsys.readouterr().out
     workspace = json.loads((out / "workspace.json").read_text(encoding="utf-8"))
-    assert "Bundle written to" in printed and workspace["status"] == "done"
+    assert "Documents in" in printed and workspace["status"] == "done"
 
 
 def test_interactive_answers_edits_and_follows_up(monkeypatch, capsys, tmp_path, no_deliverables):
@@ -65,7 +68,7 @@ def test_interactive_answers_edits_and_follows_up(monkeypatch, capsys, tmp_path,
         cli.main()
     printed = capsys.readouterr().out
     assert "1. Demand" in printed and "Plan (playbook, playbook supply_reliability" in printed
-    assert "Bundle written to" in printed
+    assert "Documents in" in printed
     ws = json.loads((out / "workspace.json").read_text(encoding="utf-8"))
     assert ws["status"] == "done" and ws["brief"]["intake"]["demand_m3s"] == 2.0
     assert next(s for s in ws["study"]["steps"] if s["id"] == "s2")["arguments"]["years"] == 20

@@ -1997,9 +1997,25 @@ def cmd_studio(args: argparse.Namespace) -> None:
 
         load_saved_keys()      # a key the person asked the Studio to remember; the shell's own wins
 
+    from aquascope.studio.progress import Narrator
+
+    narrator = Narrator()
+    verbose = bool(getattr(args, "verbose", False))
+    if not verbose:
+        # The short log speaks for the crew: library notes (fit parameters, a missing optional API key) stay out
+        # of it unless something is wrong.
+        logging.getLogger("aquascope").setLevel(logging.WARNING)
+        for name in ("aquascope.collectors", "aquascope.archive", "numexpr"):
+            logging.getLogger(name).setLevel(logging.ERROR)
+
     def on_event(event: dict) -> None:
-        if not args.quiet:
+        if args.quiet:
+            return
+        if verbose:
             print(f"  · {_format_event(event)}", file=sys.stderr)
+            return
+        for line in narrator.feed(event):
+            print(f"  {line}", file=sys.stderr)
 
     try:
         studio = Studio(
@@ -2019,6 +2035,14 @@ def cmd_studio(args: argparse.Namespace) -> None:
         logger.error("%s", exc)
         sys.exit(1)
     ws = studio.workspace
+    if getattr(args, "style", None):
+        from aquascope.studio.document import load_style
+
+        try:
+            ws.house_style = load_style(args.style).to_dict()
+        except (OSError, ValueError) as exc:
+            logger.error("cannot read the house style %s: %s", args.style, exc)
+            sys.exit(1)
     out_dir = Path(args.out or f"./studio-{ws.id}")
     interactive = sys.stdin.isatty() and not args.yes
 
@@ -2089,7 +2113,9 @@ def cmd_studio(args: argparse.Namespace) -> None:
         checkpoint()
         sys.exit(1 if reply is not None else 0)
     if reply.kind == "plan":
-        print(reply.text)
+        # Asked to approve, the whole plan is shown; run with --yes, its first line says what will run (the
+        # progress log shows each analysis as it happens) unless --verbose asks for everything.
+        print(reply.text if interactive or getattr(args, "verbose", False) else reply.text.splitlines()[0])
         edits = None
         if interactive:
             run, change, later = "Run it", "Change a step first", "Not now (save it for later)"
@@ -2131,32 +2157,36 @@ def cmd_studio(args: argparse.Namespace) -> None:
             except ValueError as exc:
                 print(f"  {exc}", file=sys.stderr)
     if reply.kind == "report":
-        print()
-        print(reply.text)
-        decision = reply.payload.get("decision") or {}
-        findings = reply.payload.get("findings") or []
-        if (decision or findings) and not args.quiet:
+        for line in narrator.flush():
+            if not args.quiet and not verbose:
+                print(f"  {line}", file=sys.stderr)
+        paths = studio.export(out_dir)
+        if verbose:
+            print()
+            print(reply.text)
+            decision = reply.payload.get("decision") or {}
             if decision.get("grade"):
                 print(f"\n  Grade: {str(decision['grade']).replace('_', ' ')}", file=sys.stderr)
             for line in decision.get("conditions") or []:
                 print(f"   · holds if: {line}", file=sys.stderr)
             for line in decision.get("what_would_change_it") or []:
                 print(f"   · would change it: {line}", file=sys.stderr)
-            if findings:
-                print("\n  Findings:", file=sys.stderr)
-                for f in findings[:12]:
-                    print(f"   · [{str(f.get('grade') or '').replace('_', ' ')}] {f.get('claim')}", file=sys.stderr)
-            for r in reply.payload.get("data_requests") or []:
-                print(
-                    f"   · data the crew would ask for: {r.get('what')} ({r.get('effect_on_grade')})", file=sys.stderr
-                )
-        missing = reply.payload.get("not_established") or []
-        if missing and not args.quiet:
-            print("\n  What this study does not establish:", file=sys.stderr)
-            for line in missing:
-                print(f"   · {line}", file=sys.stderr)
-        paths = studio.export(out_dir)
-        print(f"\n  Bundle written to {out_dir}: {', '.join(sorted(paths))}")
+            for f in (reply.payload.get("findings") or [])[:12]:
+                print(f"   · [{str(f.get('grade') or '').replace('_', ' ')}] {f.get('claim')}", file=sys.stderr)
+            for line in reply.payload.get("not_established") or []:
+                print(f"   · not established: {line}", file=sys.stderr)
+            print(f"\n  Bundle written to {out_dir}: {', '.join(sorted(paths))}")
+        else:
+            print()
+            try:
+                from aquascope.studio.document import terminal_summary
+
+                lines = terminal_summary(ws, str(out_dir))
+            except Exception as exc:  # noqa: BLE001 - the summary is a nicety; the answer must still print
+                logger.debug("terminal summary unavailable: %s", exc)
+                lines = [reply.text, "", f"Bundle written to {out_dir}"]
+            for line in lines:
+                print(line)
         if _studio_missing_extras():
             print(
                 "  This install writes the Markdown and HTML report and the tables only. For the Word report, "
@@ -3550,6 +3580,11 @@ def main() -> None:
     )
     p_studio.add_argument("--resume", default=None, metavar="WORKSPACE.JSON", help="Resume a saved workspace")
     p_studio.add_argument("--quiet", "-q", action="store_true", help="Do not print the timeline as it happens")
+    p_studio.add_argument("--verbose", "-v", action="store_true",
+                          help="Print every event the crew emits (every gate, figure and file), not the short log")
+    p_studio.add_argument("--style", default=None, metavar="STYLE.yaml",
+                          help="A house style for the documents: organisation, project, client, prepared_by, "
+                               "checked_by, logo, accent (YAML or JSON)")
 
     # ── studio-showcase ───────────────────────────────────────────────
     p_show = sub.add_parser(
