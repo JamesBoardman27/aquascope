@@ -7,6 +7,8 @@ All notable changes to AquaScope are documented here.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-07
+
 ### Added
 - **The Studio writes documents a hydrologist would sign.** A new `aquascope.studio.document` composes each study into a technical report and a short technical memorandum, rendered to Word, print-ready HTML (A4, which prints to PDF) and Markdown from the same structure.
   - The report opens with a cover and a document-control table: prepared, checked and approved lines that stay blank until a person fills them, with a DRAFT stamp.
