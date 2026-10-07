@@ -8,7 +8,7 @@ All notable changes to AquaScope are documented here.
 ## [Unreleased]
 
 ### Added
-- **The Studio writes documents a hydrologist would sign.** A new `aquascope.studio.document` composes each study into a technical report and a two-page technical memorandum, rendered to Word, print-ready HTML (A4, which prints to PDF) and Markdown from the same structure.
+- **The Studio writes documents a hydrologist would sign.** A new `aquascope.studio.document` composes each study into a technical report and a short technical memorandum, rendered to Word, print-ready HTML (A4, which prints to PDF) and Markdown from the same structure.
   - The report opens with a cover and a document-control table: prepared, checked and approved lines that stay blank until a person fills them, with a DRAFT stamp.
   - The summary leads with the answer in a box: the design value, the interval that belongs to it, the grade and the reason for the grade.
   - The results are organised by question (design flood, stationarity, transfer from similar catchments, climate context), not by plan step.

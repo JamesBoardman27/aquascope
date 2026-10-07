@@ -1425,7 +1425,7 @@ def _next_steps(f: Facts) -> list[str]:
 #: The files a person opens, in the order a summary lists them, with what each is for.
 KEY_FILES = (
     ("report.docx", "technical report (Word): data, method, checks, references"),
-    ("memo.docx", "two-page technical memorandum (Word)"),
+    ("memo.docx", "short technical memorandum (Word)"),
     ("report.html", "the report as one page; print it for a PDF"),
     ("workbook.xlsx", "every table, for a checker"),
     ("study.yaml", "replays the study: aquascope run study.yaml"),

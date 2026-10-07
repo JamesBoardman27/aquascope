@@ -47,7 +47,7 @@ _CAPTIONS = {
     "html": "The technical report as one self-contained HTML page that prints to A4 (print it for a PDF).",
     "docx": "The technical report as a Word document: cover and document control, summary, data, method, "
             "results, checks, limitations, recommendations, references.",
-    "memo": "The technical memorandum as a Word document: the answer, its basis and conditions on two pages.",
+    "memo": "The technical memorandum as a Word document: the answer, its basis and its conditions, in a few pages.",
     "memo-html": "The technical memorandum as one self-contained HTML page (print it for a PDF).",
     "xlsx": "The workbook: README, inventory, plan, gates, every table, the figure index, the ledger.",
     "ipynb": "The notebook that re-runs the study and redraws the figures.",

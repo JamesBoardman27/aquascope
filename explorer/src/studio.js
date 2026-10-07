@@ -497,7 +497,7 @@ function doneHtml() {
   const readable = READABLE.filter(([id]) => artifacts.some((a) => a.id === id));
   return gradeBadgeHtml(report.grade) +
     (readable.length
-      ? `<div class="study-docs-card"><strong>The documents are ready.</strong> A technical report and a two-page ` +
+      ? `<div class="study-docs-card"><strong>The documents are ready.</strong> A technical report and a short ` +
         `memorandum, written from the results, with numbered figures and tables.<div class="row-actions">` +
         readable.map(([id, label], i) => `<button type="button" class="btn${i ? "" : " primary"}" data-read="${id}">${label}</button>`).join("") +
         `</div></div>`
