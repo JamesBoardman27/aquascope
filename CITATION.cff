@@ -35,6 +35,9 @@ identifiers:
     value: 10.5281/zenodo.21903143
     description: Concept DOI, resolves to the latest archived version
   - type: doi
+    value: 10.5281/zenodo.23214018
+    description: Version DOI for v0.24.0
+  - type: doi
     value: 10.5281/zenodo.23200452
     description: Version DOI for v0.23.0
   - type: doi
@@ -98,7 +101,7 @@ preferred-citation:
       orcid: "https://orcid.org/0000-0002-4616-4153"
   version: 0.24.0
   date-released: "2026-10-07"
-  doi: 10.5281/zenodo.21903143
+  doi: 10.5281/zenodo.23214018
   license: MIT
   repository-code: https://github.com/Rekin226/aquascope
   url: https://rekin226.github.io/aquascope

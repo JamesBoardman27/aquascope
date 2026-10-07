@@ -21,6 +21,7 @@ RELEASE_DOIS = {
     "0.21.0": "10.5281/zenodo.23048856",
     "0.22.0": "10.5281/zenodo.23132668",
     "0.23.0": "10.5281/zenodo.23200452",
+    "0.24.0": "10.5281/zenodo.23214018",
 }
 
 #: The report's sections in the order the Author writes them; anything else the Author adds goes after ``results``.
