@@ -2001,6 +2001,12 @@ def cmd_studio(args: argparse.Namespace) -> None:
 
     narrator = Narrator()
     verbose = bool(getattr(args, "verbose", False))
+    if not verbose:
+        # The short log speaks for the crew: library notes (fit parameters, a missing optional API key) stay out
+        # of it unless something is wrong.
+        logging.getLogger("aquascope").setLevel(logging.WARNING)
+        for name in ("aquascope.collectors", "aquascope.archive", "numexpr"):
+            logging.getLogger(name).setLevel(logging.ERROR)
 
     def on_event(event: dict) -> None:
         if args.quiet:
@@ -2107,7 +2113,9 @@ def cmd_studio(args: argparse.Namespace) -> None:
         checkpoint()
         sys.exit(1 if reply is not None else 0)
     if reply.kind == "plan":
-        print(reply.text)
+        # Asked to approve, the whole plan is shown; run with --yes, its first line says what will run (the
+        # progress log shows each analysis as it happens) unless --verbose asks for everything.
+        print(reply.text if interactive or getattr(args, "verbose", False) else reply.text.splitlines()[0])
         edits = None
         if interactive:
             run, change, later = "Run it", "Change a step first", "Not now (save it for later)"
