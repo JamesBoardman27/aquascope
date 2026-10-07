@@ -90,7 +90,9 @@ return period), shows the plan, and runs only when you approve it (`e` edits a s
 `./studio-<id>/`: a technical report and a short memo (`report.docx`, `memo.docx`, and `report.html`, which prints
 to PDF), `workbook.xlsx`, `study.ipynb`, `figures/` (300 dpi PNG and SVG), `findings.json` and `study.yaml`, which
 re-runs the whole study with `aquascope run study.yaml`. `--style style.yaml` puts your organisation, project and
-names on the cover. After the report, ask a follow-up (another gauge, a
+names on the cover. Then `aquascope desk ./studio-<id>/` revises it: leave out a suspect flood, change the return
+period or the distribution, see how far the answer moves, add review comments and sign it off, with every change
+recorded as a revision. After the report, ask a follow-up (another gauge, a
 trend, the flow duration curve) and the bundle is updated.
 
 It needs no key: the playbooks plan and the templates write. If you have one, the Studio asks: paste it
@@ -325,7 +327,7 @@ Switch to MCMC with `degree>1` for polynomial models, or pass `prior_precision` 
 
 ## 💻 CLI
 
-AquaScope ships a 32-command CLI (`agri`, `basins`, `caravan`, `eval`, `gym` and `playbooks` carry subcommands) for the most common workflows:
+AquaScope ships a 33-command CLI (`agri`, `basins`, `caravan`, `eval`, `gym` and `playbooks` carry subcommands) for the most common workflows:
 
 ```bash
 # Find stations, then collect data
@@ -355,6 +357,7 @@ aquascope recommend --parameters DO,BOD5,COD --goal "pollution trend detection" 
 aquascope solve "Design flow for a road crossing, 100-year return period" --lat 51.415 --lon -0.308
 aquascope studio                                     # the crew: asks where and what, then brief, plan, run, bundle
 aquascope studio "Design flow for a road crossing, 100-year, and how sure can we be" --at "Thames Kingston" --out kingston/
+aquascope desk kingston/ --exclude-years 2014 --sign checked="A. Name"   # revise, review, sign; see the sensitivity
 aquascope eval score kingston/                       # how the crew did: gates, Critic, report quality, time, cost
 aquascope eval stats studies/ --by model             # many studies at once: grades, gate failures, cost per study
 aquascope area-study --bbox=-0.9,51.2,0.3,51.8       # a flood study over every gauge in a box: Q100, flood trends, a regional curve

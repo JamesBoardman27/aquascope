@@ -38,7 +38,7 @@ def render_markdown(doc: Document) -> str:
             path = b.path or f"figures/{b.id}.png"
             out += [f"![Figure {b.number}]({path})", "", f"*Figure {b.number}. {b.caption}*", ""]
         elif isinstance(b, Table):
-            out += [f"*Table {b.number}. {b.caption}*", ""]
+            out += [f"*Table {b.number}. {b.caption}*" if b.numbered and b.number else f"*{b.caption}*", ""]
             out.append("| " + " | ".join(_esc(c) for c in b.columns) + " |")
             out.append("| " + " | ".join("---:" if (b.align[i:i + 1] or ["l"])[0] == "r" else "---"
                                          for i in range(len(b.columns))) + " |")

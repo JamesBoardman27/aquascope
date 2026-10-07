@@ -39,6 +39,10 @@ class HouseStyle:
     prepared_by: str = ""
     checked_by: str = ""
     approved_by: str = ""
+    #: The dates the Desk's sign-off wrote (ISO), shown on the sign-off lines.
+    prepared_on: str = ""
+    checked_on: str = ""
+    approved_on: str = ""
     reference: str = ""
     version: str = "1.0"
     #: "DRAFT" until a person has checked the study; "" removes the stamp, "FINAL" after approval.

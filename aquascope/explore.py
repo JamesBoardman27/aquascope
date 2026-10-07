@@ -763,11 +763,15 @@ def _annual_max(s: pd.Series) -> pd.Series:
 
 
 def analyze_series(s: pd.Series, variable: str, unit: str, *,
-                   return_periods: list[float] | None = None) -> dict[str, Any]:
+                   return_periods: list[float] | None = None,
+                   exclude_years: list[int] | None = None) -> dict[str, Any]:
     """Compute Phase-0 analytics for a series. Pure function, JSON-safe output.
 
     ``return_periods`` picks the T the fits report (default 2, 5, 10, 25, 50 and 100 years); a study that
-    asks for a 200-year flow passes the list with 200 in it.
+    asks for a 200-year flow passes the list with 200 in it. ``exclude_years`` drops those years' annual maxima
+    from the flood fit, its trend and step-change tests (a year a hydrologist judges unreliable: a dam break, a
+    rating that was later revised); the dropped maxima are kept under ``annual_max_excluded`` so a figure can
+    show them.
     """
     rps = _return_periods(return_periods)
     from aquascope.hydrology.flood_frequency import fit_gev_lmoments, fit_lp3
@@ -809,6 +813,14 @@ def analyze_series(s: pd.Series, variable: str, unit: str, *,
     out["series"] = {"t": [d.strftime("%Y-%m-%d") for d in daily.index], "v": [_clean(float(v)) for v in daily.values]}
 
     am = _annual_max(s)
+    drop = sorted({int(y) for y in exclude_years or [] if str(y).strip().lstrip("-").isdigit()})
+    if drop:
+        dropped = am[am.index.year.isin(drop)]
+        am = am[~am.index.year.isin(drop)]
+        out["annual_max_excluded"] = {"year": [int(y) for y in dropped.index.year],
+                                      "v": [_clean(float(v)) for v in dropped.values]}
+        out["notes"].append(f"Excluded from the flood fit at the analyst's request: "
+                            f"{', '.join(str(y) for y in drop)}.")
     out["annual_max"] = {"year": [int(y) for y in am.index.year], "v": [_clean(float(v)) for v in am.values]}
     out["eligibility"] = {
         "flood_frequency": variable == "discharge" and len(am) >= MIN_YEARS_FOR_FFA,
@@ -972,12 +984,15 @@ def _return_periods(return_periods: Any) -> list[Any]:
     return [int(v) if float(v).is_integer() else v for v in out]
 
 
-def flood_ci(s: pd.Series, *, return_periods: list[float] | None = None) -> dict[str, Any]:
-    """The slow part: bootstrap GEV confidence bands (called on demand)."""
+def flood_ci(s: pd.Series, *, return_periods: list[float] | None = None,
+             exclude_years: list[int] | None = None) -> dict[str, Any]:
+    """The slow part: bootstrap GEV confidence bands (called on demand), on the same maxima as the fits."""
     from aquascope.hydrology.flood_frequency import fit_gev
 
     rps = _return_periods(return_periods)
     am = _annual_max(s.dropna())
+    if exclude_years:
+        am = am[~am.index.year.isin([int(y) for y in exclude_years])]
     r = fit_gev(am, return_periods=rps, ci_level=0.90)
     return {
         "estimator": "gev_mle_with_lmoments_fallback", "ci_level": 0.90,
@@ -1001,6 +1016,7 @@ def analyze_station(
     variable: str | None = None,
     period_start: Any = None,
     return_periods: list[float] | None = None,
+    exclude_years: list[int] | None = None,
 ) -> dict[str, Any]:
     """Fetch + analyse one station. The entry point the browser worker calls.
 
@@ -1041,7 +1057,8 @@ def analyze_station(
     if s is None or s.empty:
         result.update({"n": 0, "error": "The source returned no observations for this station."})
         return result
-    result.update(analyze_series(s, fetched["variable"], fetched["unit"], return_periods=return_periods))
+    result.update(analyze_series(s, fetched["variable"], fetched["unit"], return_periods=return_periods,
+                                 exclude_years=exclude_years))
     return result
 
 

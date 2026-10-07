@@ -121,6 +121,10 @@ class Narrator:
                 tm = _TOOL_IN_DETAIL.match(detail)
                 self._open[sid] = {"tool": tm.group(1) if tm else "", "gates": [], "error": "", "fallback": ""}
                 return out
+            if kind == "reused":
+                tm = _TOOL_IN_DETAIL.match(detail)
+                name = _TOOL_WORDS.get(tm.group(1), tm.group(1).replace("_", " ").capitalize()) if tm else sid
+                return [f"· {name:<{self.width}} reused from the last run"]
             st = self._open.setdefault(sid, {"tool": "", "gates": [], "error": "", "fallback": ""})
             if kind in ("error", "failed", "stop"):
                 st["error"] = detail

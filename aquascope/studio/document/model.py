@@ -69,6 +69,8 @@ class Table:
     compact: bool = False
     #: Row indexes set in bold (the design return period in a table of return levels).
     emphasis: list[int] = field(default_factory=list)
+    #: False for a control table (revision history, review log): no "Table N." label, not counted.
+    numbered: bool = True
     number: int = 0
 
 
@@ -136,7 +138,7 @@ class Document:
         for b in self.blocks:
             if isinstance(b, Figure):
                 figs[b.id] = b.number = len(figs) + 1
-            elif isinstance(b, Table):
+            elif isinstance(b, Table) and b.numbered:
                 tabs[b.id] = b.number = len(tabs) + 1
 
         def swap(m: re.Match[str]) -> str:
