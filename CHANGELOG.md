@@ -17,8 +17,14 @@ All notable changes to AquaScope are documented here.
   - The report gains a revision history, a sensitivity section and a review log.
 - `analyze_station` and `flood_frequency` take `exclude_years`: those years' annual maxima leave the fit, its trend and step-change tests and its bootstrap. They are returned as `annual_max_excluded` and shown as crosses on the frequency curve. Steering offers it as a control.
 
+### Changed
+- **One command for the Studio.** `aquascope studio` given a finished study's bundle folder (or its `workspace.json`) opens the Study Desk, and the Desk's options (`--exclude-years`, `--estimator`, `--years`, `--set`, `--sign`, `--comment`, `--resolve`, `--by`, `--note`) work on it directly. `aquascope desk` stays as the shorter name for the same thing. `--return-period` also sets the design return period of a new study.
+
 ### Fixed
 - Record the verified v0.24.0 Zenodo DOI (`10.5281/zenodo.23214018`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
+- A Study Desk revision refits the record the study already holds, from its record table, instead of fetching it again. Before, a rerun could arrive with a different record from the first run (in the browser the first run can fall back to the archive's 40-year copy), so a revision mixed a change of assumption with a change of data.
+- The `NumExpr defaulting to N threads` line no longer opens every command.
+- The Author's software citation no longer depends on the deliverables package being importable.
 
 ## [0.24.0] - 2026-10-07
 

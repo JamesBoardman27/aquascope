@@ -668,10 +668,15 @@ class Studio:
             ws.set_study(study)
             ws.event("coordinator", "revise", f"{'; '.join(words)}; rerunning {', '.join(sorted(dirty))}")
             self._defer_deliverables = True
+            saved_tools = self._tools
+            # A revision changes assumptions, not data: the flood steps refit the record the study holds.
+            # A caller's own tools (the browser's, a test's) keep precedence.
+            self._tools = {**desk.stored_record_tools(ws), **saved_tools}
             try:
                 reply = self._run_to_report(prior=prior, reuse=keep)
             finally:
                 self._defer_deliverables = False
+                self._tools = saved_tools
         if doc.get("estimator"):
             desk.desk_state(ws)["estimator"] = doc["estimator"]
             words.append(f"the answer quotes {desk.ESTIMATORS[doc['estimator']]}")
