@@ -193,7 +193,8 @@ def test_caller_hints_skip_the_archive_lookups(small_catalog, archive):
 # ── a gauge the catalog has no span for (the probe) ─────────────────────────
 
 NO_SPAN = _row("usgs", "USGS-7", "Unspanned Creek", 45.0, -100.0, ["discharge"], None)
-NO_SPAN_BOM = _row("bom", "A4261794", "Paris Creek Tributary", -35.2156, 138.8332, ["discharge"], None)
+NO_SPAN_DWS = _row("south_africa_dws", "A2H012", "Crocodile River at Kalkheuwel", -25.82, 27.92, ["discharge"],
+                   None)
 
 
 def test_without_the_probe_a_gauge_with_no_catalog_span_is_not_counted(archive):
@@ -228,13 +229,13 @@ def test_the_probe_fetches_the_record_and_counts_the_gauge(archive):
 
 
 def test_a_source_aquascope_cannot_fetch_is_said_plainly(archive):
-    catalog.set_catalog([NO_SPAN_BOM])
+    catalog.set_catalog([NO_SPAN_DWS])
     try:
         with patch.object(explore, "fetch_series") as fetch:
-            res = explore.assess_site(-35.2156, 138.8332, problem="flood_risk", probe_km=10.0)
+            res = explore.assess_site(-25.82, 27.92, problem="flood_risk", probe_km=10.0)
         fetch.assert_not_called()
     finally:
         catalog.set_catalog(None)
-    note = next(n for n in res["notes"] if "Paris Creek" in n)
-    assert "cannot fetch bom records yet" in note and "attached as a table" in note
-    assert sum("Paris Creek" in n for n in res["notes"]) == 1
+    note = next(n for n in res["notes"] if "Kalkheuwel" in n)
+    assert "cannot fetch south_africa_dws records yet" in note and "attached as a table" in note
+    assert sum("Kalkheuwel" in n for n in res["notes"]) == 1

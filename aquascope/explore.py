@@ -63,6 +63,8 @@ def _browser_unreachable_message(source: str, station_id: str) -> str:
             "The AquaScope archive has no mirrored file for this station yet; "
             "the weekly harvest fills the mirror in over time."
         )
+    elif meta.redistributable:
+        archive = f"The AquaScope archive does not mirror {meta.label} observations yet."
     else:
         archive = (
             f"Its observations are not mirrored in the AquaScope archive because {meta.label} "
@@ -286,6 +288,11 @@ def _records_to_series(records: list, prefer: str | None = None) -> tuple[pd.Ser
 
 # Which agency parameter serves which archive variable.
 _USGS_CODES = {"discharge": "00060", "water_level": "00065"}
+_BOM_PARAMETERS = {
+    "discharge": "Water Course Discharge",
+    "water_level": "Water Course Level",
+    "groundwater_level": "Ground Water Level",
+}
 
 
 def _parse_date(value: Any) -> date | None:
@@ -432,7 +439,8 @@ def _agency_record_if_longer(
 #: The sources :func:`fetch_series` can fetch a record from directly (its dispatch below); others need the
 #: Archive's mirror or a record the user attaches.
 DIRECT_FETCH_SOURCES = frozenset({"usgs", "uk_ea", "hubeau_hydrometrie", "pegelonline", "ireland_opw",
-                                  "greece_hydroscope", "greece_openhi", "poland_imgw", "taiwan_cwa"})
+                                  "greece_hydroscope", "greece_openhi", "poland_imgw", "taiwan_cwa",
+                                  "bom", "brazil_ana"})
 
 
 def can_fetch(source: str) -> bool:
@@ -610,6 +618,48 @@ def fetch_series(
         note = (
             "IMGW-PIB daily archive, hydrological-year files (November to October, published once the "
             f"year has ended, so the record stops at the last October; today's reading is in the live API); {asked}."
+        )
+    elif source == "bom":
+        # KiWIS serves the quality-checked daily mean for any window in one request; a gauge often carries
+        # level only (A4261794 has no discharge series), so level is the fallback, not an error.
+        c = build_collector("bom")
+        s, var, unit = None, "", ""
+        for want in (variable,) if variable else ("discharge", "water_level"):
+            parameter_type = _BOM_PARAMETERS.get(want or "")
+            if parameter_type is None:
+                continue
+            recs = c.collect(station_id=station_id, parameter_type=parameter_type,
+                             start_date=start.isoformat(), end_date=end.isoformat())
+            s, var, unit = _records_to_series(recs)
+            if s is not None:
+                # One value per local day, stamped 00:30 local time; index it by the day.
+                s = s.groupby(s.index.normalize()).last()
+                if want == "groundwater_level":
+                    var = "groundwater_level"  # WaterLevelReading, but the series is a bore
+                break
+        note = (
+            "BOM Water Data Online, quality-checked daily mean (DMQaQc.Merged.DailyMean.24HR; it trails real "
+            f"time by weeks while the data are checked); {asked}."
+        )
+    elif source == "brazil_ana":
+        # The conventional network (HidroSerieHistorica) is the long, no-credential daily record, and one
+        # request returns the whole window. The telemetric network needs an ANA account and serves sub-daily
+        # readings, so it is not used here. A per-row station-name lookup would page the whole SNIRH catalog.
+        c = build_collector("brazil_ana")
+        c.enrich_from_catalog = False
+        s, var, unit = None, "", ""
+        for want in (variable,) if variable else ("discharge", "water_level"):
+            if want not in ("discharge", "water_level", "precipitation"):
+                continue
+            recs = c.collect(station_ids=[station_id], mode="historical", variables=(want,),
+                             start_date=start.isoformat(), end_date=end.isoformat())
+            s, var, unit = _records_to_series(recs)
+            if s is not None:
+                break
+        note = (
+            "ANA Hidroweb conventional network (HidroSerieHistorica): daily values, reviewed (Consistido) "
+            "preferred over provisional (Bruto), published in batches months behind real time; stations on the "
+            f"telemetric or water-quality networks only have no record here; {asked}."
         )
     elif source == "taiwan_cwa":
         # CODIS answers one calendar year per request and each takes several

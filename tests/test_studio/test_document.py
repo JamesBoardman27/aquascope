@@ -94,7 +94,8 @@ def _ungauged() -> Workspace:
     ws.findings = {"decision": {"answer": "No number in the results answers the decision (screening).",
                                 "value": None, "grade": "screening", "basis": []}}
     ws.inventory = Inventory(site=dict(ws.site), datasets=[
-        Dataset(id="bom:A4261794:discharge", kind="station", variable="discharge", source="bom",
+        Dataset(id="south_africa_dws:A4261794:discharge", kind="station", variable="discharge",
+                source="south_africa_dws",
                 station_id="A4261794", name="Paris Creek Tributary upstream Paris Creek Road", distance_km=0.0)])
     ws.status = "done"
     return ws
@@ -203,7 +204,7 @@ def test_an_ungauged_flood_question_is_answered_honestly():
     assert "Paris Creek Tributary" in rows["Next step"] and "at the site" in rows["Next step"]
     md = docs.render_markdown(doc)
     assert "No number in the results" not in md
-    assert "Ask the agency for its daily record" in md       # AquaScope cannot fetch bom records yet
+    assert "Ask the agency for its daily record" in md       # AquaScope cannot fetch this source yet
     assert "Do not size a structure from the screening values" in md
 
 
