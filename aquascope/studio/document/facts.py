@@ -303,7 +303,7 @@ def _trend(payload: dict[str, Any]) -> dict[str, Any]:
 
 def facts_of(ws: Workspace) -> Facts:  # noqa: C901 - one pass over the workspace, branch per payload kind
     """Read the workspace into :class:`Facts`."""
-    from aquascope.studio.deliverables import _common as c
+    from aquascope import __version__
 
     f = Facts()
     b = ws.brief
@@ -315,7 +315,7 @@ def facts_of(ws: Workspace) -> Facts:  # noqa: C901 - one pass over the workspac
     f.asks_trend = "trend" in f.decision.lower()
     site = ws.site or (ws.inventory.site if ws.inventory else None) or {}
     f.lat, f.lon = _num(site.get("lat", site.get("latitude"))), _num(site.get("lon", site.get("longitude")))
-    f.version = c.version()
+    f.version = str(__version__)
     f.created = str(ws.created or "")[:10]
     f.workspace_id = str(ws.id or "")
     f.model, f.provider = str(ws.model or ""), str(ws.provider or "")
@@ -404,7 +404,13 @@ def facts_of(ws: Workspace) -> Facts:  # noqa: C901 - one pass over the workspac
                         "offset_km": _num(cell.get("offset_km")), "ratio": _num(cell.get("ratio")),
                         "mean": _num(cell.get("mean_flow")) or _num((g.get("stats") or {}).get("mean")
                                                                    if isinstance(g.get("stats"), dict) else None),
-                        "step": sid}
+                        "step": sid, "ffa": _ffa(g), "start": g.get("start"), "end": g.get("end"),
+                        "years": g.get("years")}
+            am = g.get("annual_max") if isinstance(g.get("annual_max"), dict) else {}
+            vals = [_num(v) for v in am.get("v") or []]
+            vals = [v for v in vals if v is not None]
+            if vals:
+                f.glofas["amax_mean"] = sum(vals) / len(vals)
         if tool in ("similar_basins", "regionalize_signatures"):
             reg = f.regional
             if isinstance(p.get("estimates"), dict):
@@ -415,12 +421,32 @@ def facts_of(ws: Workspace) -> Facts:  # noqa: C901 - one pass over the workspac
                 else p.get("k")
             if k:
                 reg["k"] = k
-            from aquascope.studio.deliverables._payload import stations_of
+            try:
+                from aquascope.studio.deliverables._payload import stations_of
 
-            donors = stations_of(p)
+                donors = stations_of(p)
+            except ImportError:        # a core install without the deliverables
+                donors = []
             if donors and not reg.get("donors"):
                 reg["donors"] = donors
 
+    area = _num(f.catchment.get("area_km2"))
+    if area and f.regional.get("estimates"):
+        # Depths per day over the catchment as flows (Q = depth x area / 86.4 for mm/d and km2 to m3/s): the
+        # arithmetic is stated wherever the converted value is quoted.
+        conv = []
+        skill = f.regional.get("skill") or {}
+        for key, e in f.regional["estimates"].items():
+            if not isinstance(e, dict) or str(e.get("unit")) != "mm/d" or _num(e.get("value")) is None:
+                continue
+            k = area / 86.4
+            conv.append({"key": key, "label": str(e.get("label") or key), "value": _num(e["value"]) * k,
+                         "low": (_num(e.get("low")) or 0) * k if _num(e.get("low")) is not None else None,
+                         "high": _num(e.get("high")) * k if _num(e.get("high")) is not None else None,
+                         "mm": _num(e["value"]), "n_donors": e.get("n_donors"),
+                         "nse": _num((skill.get(key) or {}).get("nse")) if isinstance(skill.get(key), dict) else None})
+        f.regional["converted"] = conv
+        f.regional["area_km2"] = area
     name = f.record.get("station_name") or f.record.get("name") or ""
     f.site_name = str(name)
     f.site_id = station_label(f.record.get("source"), f.record.get("station_id"))
@@ -459,6 +485,7 @@ def facts_of(ws: Workspace) -> Facts:  # noqa: C901 - one pass over the workspac
         answer = re.sub(r"\*\*(.+?)\*\*", r"\1", str(ws.report["answer"]))
         f.headline.setdefault("value", None)
         f.headline["answer"] = re.split(r"(?<=[.!?])\s+", answer.strip())[0]
+        f.headline["source"] = "author"
         if f.grade == "not_established" and any(s.get("ok") for s in f.steps):
             try:
                 from aquascope.studio.roles.interpreter import grade_for_study

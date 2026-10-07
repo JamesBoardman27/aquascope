@@ -1546,6 +1546,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
+#: How far from the site the reconnaissance fetches the record of a gauge whose span the catalog does not know.
+PROBE_KM = 10.0
+
+
 def _scout(site: dict[str, float], kind: str | None, intake: dict[str, Any],
            say: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
     rp = intake.get("return_period")
@@ -1563,7 +1567,7 @@ def _scout(site: dict[str, float], kind: str | None, intake: dict[str, Any],
         from aquascope.explore import assess_site
 
         recon = assess_site(site["lat"], site["lon"], problem=problem,
-                            return_period=float(rp) if isinstance(rp, (int, float)) else None)
+                            return_period=float(rp) if isinstance(rp, (int, float)) else None, probe_km=PROBE_KM)
     except Exception as exc:  # noqa: BLE001 - no reconnaissance is a fact the plan has to live with
         recon = {"point": dict(site), "stations": [], "catchment": {},
                  "context": {"years_by_variable": {}, "resolution_by_variable": {}, "ungauged": True},

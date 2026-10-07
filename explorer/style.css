@@ -710,6 +710,13 @@ body.drawer-open .panel { visibility: hidden; }
 .modal-body h3 { font-size: .89rem; margin: 1rem 0 .3rem; }
 .modal-body pre { background: var(--bg-sunken); padding: .65rem .7rem; border-radius: var(--radius-xs); overflow: auto; font-size: .77rem; }
 .modal-body .cite-methods { padding-left: 1.1rem; font-size: .79rem; color: var(--muted); }
+/* the study reader: the composed report at full height, the frame carries its own page styles */
+.study-reader { place-items: stretch center; }
+.study-reader-box { max-width: 980px; max-height: none; height: calc(100vh - 2rem); display: flex; flex-direction: column; overflow: hidden; }
+.study-reader-box .row-actions { margin: 0; }
+.study-reader-box iframe { flex: 1; width: 100%; border: 0; background: #e9ecef; }
+.study-docs-card { border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: var(--radius-xs); padding: .7rem .8rem; margin: .6rem 0 .8rem; font-size: .85rem; line-height: 1.5; }
+.study-docs-card .row-actions { margin-top: .5rem; }
 
 /* ── the workbench (your own data) ───────────────────────────────────────── */
 

@@ -207,13 +207,15 @@ def _series(payload: dict[str, Any], unit: str | None, site: dict[str, Any] | No
     xs: list[Any] = []
     ys: list[float] = []
     if am:
+        # The marker sits at the date of the year's highest plotted day but at the true annual maximum: the
+        # plotted series may be thinned for size, and a thinned peak would sit below the value the fit used.
         years = np.array([year_of(d) or 0 for d in dates])
-        for y in am[0]:
+        for y, peak in zip(am[0], am[1]):
             idx = np.where(years == y)[0]
             if len(idx) and np.isfinite(v[idx]).any():
                 j = idx[np.nanargmax(v[idx])]
                 xs.append(t[j])
-                ys.append(float(v[j]))
+                ys.append(float(peak) if peak is not None else float(v[j]))
         if xs:
             ax.plot(xs, ys, linestyle="none", marker="o", markersize=3.2, markerfacecolor="white",
                     markeredgecolor=DARK, markeredgewidth=0.7, label="Annual maximum", zorder=3)

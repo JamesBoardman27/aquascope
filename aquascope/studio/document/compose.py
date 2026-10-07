@@ -50,7 +50,7 @@ from aquascope.studio.document.model import (
 from aquascope.studio.document.style import HouseStyle
 from aquascope.studio.workspace import Workspace
 
-__all__ = ["build_memo", "build_report", "is_failed_study"]
+__all__ = ["build_memo", "build_report", "is_failed_study", "terminal_summary"]
 
 #: At most this many figures in the body of a report; the rest go to the appendix.
 MAX_BODY_FIGURES = 6
@@ -231,6 +231,71 @@ def _t(t: float | None) -> str:
     return f"{int(t)}" if t is not None and float(t).is_integer() else tx.num(t)
 
 
+def _is_flood(f: Facts) -> bool:
+    return f.playbook in ("flood_risk", "flood_change") or "flood" in f.question.lower()
+
+
+def _no_design(f: Facts) -> bool:
+    """A flood question the study could not answer with a frequency fit at the site (and no other answer: an
+    Author's answer from a workspace without structured findings is quoted as it is)."""
+    return (_is_flood(f) and not f.ffa and not (f.asks_trend and f.trend)
+            and f.headline.get("source") != "author")
+
+
+def _amax_transfer(f: Facts) -> dict[str, Any] | None:
+    return next((c for c in f.regional.get("converted") or [] if c["key"] in ("q_annual_max_mm",)), None)
+
+
+def _gauge_to_get(f: Facts, max_km: float = 10.0) -> dict[str, Any] | None:
+    """The nearest station that measures discharge (or level) within ``max_km`` whose record the catalogue does
+    not know: the one record worth asking for."""
+    for n in sorted(f.nearby, key=lambda x: x.get("km") if x.get("km") is not None else 1e9):
+        if n.get("years") or n.get("km") is None or n["km"] > max_km:
+            continue
+        if str(n.get("variable")) in ("discharge", "water_level"):
+            return n
+    return None
+
+
+def _fetchable(n: dict[str, Any]) -> bool:
+    try:
+        from aquascope.explore import can_fetch
+
+        return can_fetch(str(n.get("source") or ""))
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _screening_sentences(f: Facts) -> list[str]:
+    out: list[str] = []
+    am = _amax_transfer(f)
+    if am:
+        out.append(f"Transferred from {f.regional.get('k') or am.get('n_donors') or 'the'} similar catchments, the "
+                   f"mean annual maximum daily flow at the site is about {tx.value(am['value'], 'm3/s')}"
+                   + (f" (band {tx.band(am['low'], am['high'], 'm3/s')})" if am.get("high") else "")
+                   + "; this is the average yearly flood, not a return-period flood.")
+    gf = (f.glofas.get("ffa") or {}) if f.glofas else {}
+    if gf.get("fits"):
+        t = f.return_period or 100.0
+        try:
+            i = [float(x) for x in gf["T"]].index(float(t))
+        except (ValueError, TypeError):
+            i = None
+        fit = gf["fits"].get("gev_lmoments") or next(iter(gf["fits"].values()))
+        if i is not None and fit["q"][i] is not None:
+            s = (f"The GloFAS model gives a {_t(t)}-year daily flow of {tx.value(fit['q'][i], 'm3/s')} at its "
+                 f"nearest grid cell")
+            if am and f.glofas.get("amax_mean"):
+                ratio = am["value"] / f.glofas["amax_mean"] if f.glofas["amax_mean"] else None
+                if ratio and (ratio > 2 or ratio < 0.5):
+                    factor = f"about {tx.num(ratio, 2)} times lower" if ratio > 1 else \
+                        f"about {tx.num(1 / ratio, 2)} times higher"
+                    s += (f", but its average yearly flood ({tx.value(f.glofas['amax_mean'], 'm3/s')}) is {factor} "
+                          f"than the transferred one, so the two screening sources disagree")
+            out.append(s + ".")
+    return out
+
+
 # ── prose: the summary ──────────────────────────────────────────────────────
 
 
@@ -299,6 +364,18 @@ def summary_sentences(f: Facts) -> list[str]:
     condition."""
     out: list[str] = []
     is_flood = bool(f.ffa) and (f.playbook in ("flood_risk", "") or "flood" in f.question.lower())
+    if _no_design(f):
+        why = ("no gauged discharge record at the site was available to the study" if not f.gauged else
+               "the record at the site could not support a frequency fit")
+        out.append(f"The study could not estimate a design flood at {f.site_label}: {why}.")
+        out += _screening_sentences(f)
+        g = _gauge_to_get(f)
+        if g:
+            where = "at the site" if (g.get("km") or 0) < 0.5 else f"{tx.num(g.get('km'), 2)} km away"
+            out.append(f"{g['name']} ({g['id']}), {where}, measures {str(g['variable']).replace('_', ' ')}, but its "
+                       f"record was not available to the study; that record is the most useful next step.")
+        out.append(f"The values above are graded **{GRADE_WORDS.get(f.grade, f.grade).lower()}**. {f.grade_reason}")
+        return [tx.clean_units(x) for x in out if x]
     if is_flood and not f.asks_trend:
         out += _flood_summary(f)
     elif f.asks_trend and f.trend:
@@ -330,7 +407,7 @@ def summary_sentences(f: Facts) -> list[str]:
 def _record_words(f: Facts) -> str:
     r = f.record
     var = str(r.get("variable") or "the record").replace("_", " ")
-    agency = r.get("agency") or (str(r.get("source") or "").upper())
+    agency = r.get("agency") or ""
     period = _record_period(f)
     yrs = tx.years(r.get("years"))
     return (f"the {var} record of {f.site_label}" + (f" ({agency})" if agency and agency not in f.site_label else "")
@@ -527,6 +604,8 @@ def _title(f: Facts) -> tuple[str, str]:
     pb = f.playbook
     if f.asks_trend:
         head = "Flood trend assessment"
+    elif _no_design(f):
+        head = "Flood screening at an ungauged site" if not f.gauged else "Flood screening"
     elif pb == "flood_risk" or (f.ffa and "flood" in f.question.lower()):
         head = f"{_t(t)}-year design flood estimate" if t else "Flood frequency assessment"
     else:
@@ -607,7 +686,8 @@ def build_report(ws: Workspace, style: HouseStyle | None = None, facts: Facts | 
     assumptions = _dedupe([*(ws.brief.assumptions or []), *(((ws.study or {}).get("plan") or {}).get(
         "assumptions") or [])])
     assumptions = [a for a in assumptions if not re.search(r"\b(option|intake field|recorded as the integer|"
-                                                           r"unanswered)\b", a, re.I)]
+                                                           r"unanswered|the default|client asked|proceed)\b|\?", a,
+                                                           re.I)]
     if assumptions:
         doc.add(Heading("Assumptions", level=2))
         doc.add(Bullets(assumptions[:8], numbered=True))
@@ -633,6 +713,8 @@ def build_report(ws: Workspace, style: HouseStyle | None = None, facts: Facts | 
         _trend_section(doc, f, placer)
     if f.asks_trend and f.ffa:
         _ffa_section(doc, f, placer)
+    if _no_design(f) and (f.regional.get("converted") or f.glofas.get("ffa")):
+        _screening_section(doc, f, placer)
     if f.regional.get("estimates"):
         _regional_section(doc, f, placer)
     for step in f.steps:
@@ -644,6 +726,13 @@ def build_report(ws: Workspace, style: HouseStyle | None = None, facts: Facts | 
         _generic_section(doc, ws, f, step, placer, hero_kinds + supporting)
     if f.climate or f.glofas:
         _context_section(doc, f, placer)
+
+    # Discussion: a model's interpretation, when one wrote it (the numbers in it passed the Critic's check)
+    disc = _discussion(f)
+    if disc:
+        doc.add(Heading("Discussion"))
+        for para in disc:
+            doc.add(Para(para))
 
     # 6 Checks and grade
     doc.add(Heading("Checks and confidence"))
@@ -715,6 +804,20 @@ def _answer_callout(f: Facts) -> Callout:
     t = _design_t(f)
     at = _fits_at(f, t)
     u = (f.ffa.get("unit") if f.ffa else None) or h.get("unit")
+    if _no_design(f):
+        body = "No design flood: " + ("no gauged record at the site" if not f.gauged else "the record could not "
+                                                                                          "support a fit")
+        am = _amax_transfer(f)
+        if am:
+            rows.append(("Screening value", f"mean annual maximum daily flow {tx.value(am['value'], u or 'm3/s')}"
+                         + (f" ({tx.band(am['low'], am['high'], 'm3/s')})" if am.get("high") else "")
+                         + f", from {f.regional.get('k') or 'similar'} donor catchments"))
+        g = _gauge_to_get(f)
+        if g:
+            where = "at the site" if (g.get("km") or 0) < 0.5 else f"{tx.num(g.get('km'), 2)} km away"
+            rows.append(("Next step", f"obtain the record of {g['name']} ({g['id']}), {where}"))
+        rows.append(("Grade", GRADE_WORDS.get(f.grade, f.grade)))
+        return Callout(title="Answer", body=body, rows=[(a, tx.clean_units(b)) for a, b in rows], tone="caution")
     if f.ffa and not f.asks_trend and at:
         main = at.get("gev_lmoments") or at.get("lp3") or at.get("gev_bootstrap")
         body = f"{_t(t)}-year flood: {tx.value(main['q'], u)}"
@@ -722,9 +825,8 @@ def _answer_callout(f: Facts) -> Callout:
         for name in ("lp3", "gev_bootstrap"):
             alt = at.get(name)
             if alt and alt.get("ci") and alt["ci"][0] is not None:
-                lvl = f"{alt['level'] * 100:g} %" if alt.get("level") else ""
-                rows.append((f"{lvl} interval".strip(), f"{tx.band(alt['ci'][0], alt['ci'][1], u)} "
-                                                        f"({alt['label']})"))
+                label = f"{alt['level'] * 100:g} % interval" if alt.get("level") else "Interval"
+                rows.append((label, f"{tx.band(alt['ci'][0], alt['ci'][1], u)} ({alt['label']})"))
                 break
         others = [f"{v['label']} {tx.value(v['q'], u)}" for k, v in at.items() if v is not main and v.get("q")]
         if others:
@@ -946,6 +1048,44 @@ def _trend_section(doc: Document, f: Facts, placer: _Placer) -> None:
     doc.add(fig)
 
 
+def _screening_section(doc: Document, f: Facts, placer: _Placer) -> None:
+    doc.add(Heading("Screening flood magnitudes", level=2))
+    rows: list[list[Any]] = []
+    am = _amax_transfer(f)
+    if am:
+        rows.append(["Similar catchments", "Mean annual maximum daily flow", tx.num(am["value"]),
+                     tx.span(am["low"], am["high"]) if am.get("high") else "",
+                     f"{tx.num(am['mm'])} mm/d over {tx.num(f.regional.get('area_km2'))} km², "
+                     f"{f.regional.get('k') or am.get('n_donors') or '?'} donors"
+                     + (f", leave-one-out NSE {tx.num(am['nse'], 2)}" if am.get("nse") is not None else "")])
+    for c in f.regional.get("converted") or []:
+        if c["key"] in ("q_mean_mm", "q05_mm"):
+            rows.append(["Similar catchments", c["label"][:1].upper() + c["label"][1:], tx.num(c["value"]),
+                         tx.span(c["low"], c["high"]) if c.get("high") else "", f"{tx.num(c['mm'])} mm/d"])
+    gf = (f.glofas.get("ffa") or {}) if f.glofas else {}
+    if gf.get("fits"):
+        fit = gf["fits"].get("gev_lmoments") or next(iter(gf["fits"].values()))
+        for i, t in enumerate(gf["T"]):
+            if t in (10, 100, f.return_period):
+                rows.append(["GloFAS v4 grid cell", f"{_t(t)}-year daily flow ({fit['label']})", tx.num(fit["q"][i]),
+                             "", f"{gf.get('n_years')} modelled annual maxima"])
+        if f.glofas.get("amax_mean"):
+            rows.append(["GloFAS v4 grid cell", "Mean annual maximum daily flow", tx.num(f.glofas["amax_mean"]),
+                         "", "modelled, not a gauge reading"])
+    s = [" ".join(_screening_sentences(f)),
+         "{tab:screening} sets the screening values side by side. None of them is a design value: the transferred "
+         "values are regional averages for catchments like this one, and the modelled values come from a global "
+         "model whose grid cell is not verified to match this catchment."]
+    doc.add(Para(tx.clean_units(" ".join(x for x in s if x))))
+    doc.add(Table(id="screening", columns=["Source", "Quantity", "Value (m³/s)", "Band", "Basis"], rows=rows,
+                  caption="Screening flood magnitudes at the site; flows in m³/s, transferred depths converted "
+                          "with the BasinATLAS upstream area (Q = depth × area / 86.4).",
+                  align=["l", "l", "r", "r", "l"]))
+    fig = placer.take("glofas_series")
+    if fig is not None:
+        doc.add(Para(f"{{fig:{fig.id}}} shows the modelled annual maxima."), fig)
+
+
 def _regional_section(doc: Document, f: Facts, placer: _Placer) -> None:
     reg = f.regional
     doc.add(Heading("Transfer from similar catchments", level=2))
@@ -1023,6 +1163,22 @@ def _generic_section(doc: Document, ws: Workspace, f: Facts, step: dict[str, Any
                 doc.add(Para(f"{{fig:{fig.id}}} shows the result."), fig)
 
 
+def _discussion(f: Facts) -> list[str]:
+    """The paragraphs a language model wrote that interpret rather than restate: its decision and summary
+    sections, cleaned of step ids and unit spellings. Empty when no model wrote prose."""
+    if f.prose.get("_written_by") != "model":
+        return []
+    out = []
+    for key in ("decision", "summary"):
+        text = f.prose.get(key) or ""
+        text = _STEP_NOISE.sub("", text)
+        text = re.sub(r"\b(step|steps) s\d+(\.fallback)?\b", "the analysis", text, flags=re.I)
+        text = re.sub(r"\s+", " ", text).strip()
+        if len(text) > 60 and text not in out:
+            out.append(tx.clean_units(text))
+    return out[:2]
+
+
 def _limitations(ws: Workspace, f: Facts) -> list[str]:
     items = [tx.assumption(c) for c in f.conditions] + list(f.limitations)
     for ch in f.checks:
@@ -1030,7 +1186,12 @@ def _limitations(ws: Workspace, f: Facts) -> list[str]:
             items.append(f"A check could not be run ({ch.sentence}): {_full_detail(ch.detail)}")
         elif ch.verdict == "failed":
             items.append(f"A check failed ({ch.sentence}): {_full_detail(ch.detail)}")
-    items += f.caveats
+    caveats = list(f.caveats) + [x for x in f.limitations if x not in items]
+    if not f.ffa:
+        caveats = [c for c in caveats if not re.search(r"\b(Log-Pearson|LP3|L-moments|estimator|Rare quantiles)\b",
+                                                         c)]
+    items = [x for x in items if f.ffa or not re.search(r"\b(Log-Pearson|LP3|Rare quantiles)\b", x)]
+    items += caveats
     rep = ws.report or {}
     for x in [*((ws.critique or {}).get("not_established") or []), *(rep.get("not_established") or [])]:
         x = tx_clean(str(x))
@@ -1062,6 +1223,17 @@ def _recommendations(f: Facts) -> list[str]:
     elif h.get("value") is not None:
         recs.append(f"Use the result as a{'n' if g in ('established', 'indicative') else ''} "
                     f"{GRADE_WORDS.get(g, g).lower()} estimate.")
+    gauge = _gauge_to_get(f)
+    if gauge and (_no_design(f) or not f.gauged):
+        where = "at the site" if (gauge.get("km") or 0) < 0.5 else f"{tx.num(gauge.get('km'), 2)} km from the site"
+        how = ("Ask the agency for its daily record and attach it to the study as a table (a CSV of dates and "
+               "values); AquaScope cannot fetch records from this source yet." if not _fetchable(gauge) else
+               "Name it as the study's gauge and run the study again.")
+        recs.insert(0, f"Obtain the record of {gauge['name']} ({gauge['id']}), {where}, which measures "
+                       f"{str(gauge['variable']).replace('_', ' ')}: with a usable record the question can be answered "
+                       f"from measurements at the site and the grade can rise above screening. {how}")
+    if _no_design(f):
+        recs.append("Do not size a structure from the screening values in this report.")
     for w in f.would_change[:2]:
         m = re.match(r"^a longer record for (.+?):\s*(.+)$", w, re.I)
         if m:
@@ -1246,3 +1418,49 @@ def _next_steps(f: Facts) -> list[str]:
     out.append("Attach a record of your own (a CSV of dates and values) with --data; the crew uses it in place of "
                "a catalogue record.")
     return _dedupe(out)
+
+
+# ── the answer in a terminal ────────────────────────────────────────────────
+
+#: The files a person opens, in the order a summary lists them, with what each is for.
+KEY_FILES = (
+    ("report.docx", "technical report (Word): data, method, checks, references"),
+    ("memo.docx", "two-page technical memorandum (Word)"),
+    ("report.html", "the report as one page; print it for a PDF"),
+    ("workbook.xlsx", "every table, for a checker"),
+    ("study.yaml", "replays the study: aquascope run study.yaml"),
+)
+
+
+def terminal_summary(ws: Workspace, out_dir: str | None = None) -> list[str]:
+    """The end of a run as a person wants to read it in a terminal: what was estimated, the answer box, the
+    grade with its reason, and the files to open."""
+    f = facts_of(ws)
+    lines: list[str] = []
+    if is_failed_study(ws, f):
+        lines.append("The study could not be completed: no analysis produced a result that passed its checks.")
+        for x in f.failures[:4]:
+            lines.append(f"  · {x['what']}: {x['why']}")
+        for n in _next_steps(f)[:3]:
+            lines.append(f"  → {n}")
+    else:
+        title, sub = _title(f)
+        lines.append(f"{title}" + (f" · {f.site_label}" if f.site_label else ""))
+        box = _answer_callout(f)
+        lines.append("")
+        lines.append(f"  {box.body}")
+        for k, v in box.rows:
+            lines.append(f"  {k + ':':<16} {v}")
+        lines.append("")
+        lines.append(f"  {f.grade_reason}")
+    if out_dir:
+        lines.append("")
+        lines.append(f"Documents in {out_dir}:")
+        names = {a.name for a in ws.artifacts}
+        for name, what in KEY_FILES:
+            if name in names:
+                lines.append(f"  {name:<14} {what}")
+        n_fig = sum(1 for a in ws.artifacts if a.kind == "figure" and a.media_type == "image/png")
+        if n_fig:
+            lines.append(f"  {'figures/':<14} {n_fig} figures, PNG at 300 dpi and SVG")
+    return lines

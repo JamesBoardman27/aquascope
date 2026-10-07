@@ -7,10 +7,10 @@ the tools return; the workspace is built by hand.
 from __future__ import annotations
 
 import io
-import re
 import json
 import math
 import random
+import re
 import sys
 import zipfile
 from pathlib import Path
