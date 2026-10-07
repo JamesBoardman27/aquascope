@@ -261,6 +261,43 @@ source="device")`, `studio_context(workspace, role, text=None)` (role
 `studio_export(workspace, out_dir)`. The tools are stateless: each returns
 the reply, a summary and the workspace dict to pass to the next.
 
+## The Study Desk
+
+A report is never right the first time. The Desk is where a finished study is revised, checked and signed,
+with every change on record (`aquascope.studio.desk`).
+
+- **Levers in plain words.** The design return period, the record window (only the last N years), the years
+  whose flood is left out of the fit (a dam break, a rating revised afterwards), and the distribution the
+  answer quotes. The first three rerun the flood steps, with their checks, through the steering. Every other
+  result is reused, and `study.yaml` reproduces the revision (`exclude_years` is a real argument of the flood
+  fit). The distribution only changes which fit leads the answer; every fit stays in the tables.
+- **A revision history.** Each change is a lettered revision (A is the study as the crew delivered it), with
+  who made it and the answer before and after. The table sits under the document control in the report.
+- **Sensitivity of the answer.** The design value under the reasonable alternatives:
+  - the other fitted distributions,
+  - the largest flood left out,
+  - only the most recent 50 or 30 years,
+  - the excluded years put back.
+
+  It is computed from the stored annual maxima with the reported distribution, without a new fetch, and goes
+  in the report under the design flood.
+- **Review and sign-off.** Review comments are kept with their responses in an appendix. Signing as prepared,
+  checked or approved fills the document control and moves the status from DRAFT to CHECKED to ISSUED.
+
+From the command line:
+
+```bash
+aquascope desk studio-abc123/                      # the levers, the sensitivity, the revisions
+aquascope desk studio-abc123/ --exclude-years 2008 --by "A. Reviewer"
+aquascope desk studio-abc123/ --estimator lp3 --comment "Why GEV here?" --section "Design flood"
+aquascope desk studio-abc123/ --resolve c1="LP3 now leads, per agency practice" --sign checked="B. Checker"
+```
+
+Each call rewrites the documents and `workspace.json` in the bundle directory. In the Explorer, **Read the
+report** opens the document with the Desk beside it. A change there reruns in the browser and reloads the
+document in place. From Python, `Studio.revise({...})`, `Studio.sign(role, name)` and
+`aquascope.studio.desk.comment` / `resolve` / `sensitivity` do the same.
+
 ## In the Explorer
 
 **Study** is the second mode of the Explorer's drawer, next to Ask. Open it

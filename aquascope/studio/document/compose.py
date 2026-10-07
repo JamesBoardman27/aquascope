@@ -299,26 +299,39 @@ def _screening_sentences(f: Facts) -> list[str]:
 # ── prose: the summary ──────────────────────────────────────────────────────
 
 
+#: How a sentence names each fit.
+_FIT_PHRASE = {"gev_lmoments": "a GEV distribution fitted by L-moments",
+               "lp3": "a Log-Pearson III distribution fitted by log-space moments",
+               "gev_bootstrap": "a GEV distribution fitted by maximum likelihood"}
+
+
+def _main_key(f: Facts, at: dict[str, dict[str, Any]]) -> str | None:
+    """The fit the answer quotes: the Desk's choice when it ran, else GEV (L-moments), LP3, GEV (MLE)."""
+    for key in (f.estimator, "gev_lmoments", "lp3", "gev_bootstrap"):
+        if key in at and at[key].get("q") is not None:
+            return key
+    return None
+
+
 def _flood_summary(f: Facts) -> list[str]:
     t = _design_t(f)
     at = _fits_at(f, t)
     u = f.ffa.get("unit") or "m3/s"
     sentences: list[str] = []
-    gev, lp3, ml = at.get("gev_lmoments"), at.get("lp3"), at.get("gev_bootstrap")
-    main = gev or lp3 or ml
+    key = _main_key(f, at)
+    main = at.get(key) if key else None
     if not main or main.get("q") is None:
         return sentences
     n = f.ffa.get("n_years")
     yrs = f.ffa.get("years") or []
     span = f" ({min(yrs)} to {max(yrs)})" if yrs else ""
-    main_name = "a GEV distribution fitted by L-moments" if main is gev else \
-        ("a Log-Pearson III distribution" if main is lp3 else "a GEV distribution fitted by maximum likelihood")
+    main_name = _FIT_PHRASE.get(str(key), "the fitted distribution")
     sentences.append(f"The {_t(t)}-year flood at {f.site_label} is estimated at {tx.value(main['q'], u)}, from "
                      f"{main_name} to {tx.plural(int(n), 'complete year') if n else 'the'} of annual maximum "
                      f"daily-mean flow{span}.")
     others = []
-    for alt in (lp3, ml):
-        if alt is None or alt is main or alt.get("q") is None:
+    for alt in (at.get(k) for k in ("gev_lmoments", "lp3", "gev_bootstrap") if k != key):
+        if alt is None or alt.get("q") is None:
             continue
         diff = (alt["q"] - main["q"]) / main["q"] * 100 if main["q"] else None
         piece = f"{alt['label']} gives {tx.value(alt['q'], u)}"
@@ -629,7 +642,8 @@ def build_report(ws: Workspace, style: HouseStyle | None = None, facts: Facts | 
     doc = Document(title=title, subtitle=sub, kind="Technical report", status=style.status,
                    meta={"organisation": style.author_line, "date": f.created, "site": f.site_label,
                          "reference": style.reference, "version": style.version})
-    doc.add(KeyValue(_control_rows(f, style, "report")), Signoff(_signoff_roles(style)), PageBreak())
+    doc.add(KeyValue(_control_rows(f, style, "report")), Signoff(_signoff_roles(style)), revision_table(f),
+            PageBreak())
     prefer = {"frequency_curve": f.ffa.get("step", ""), "trend": f.trend.get("step", "")}
     placer = _Placer(_figures(ws), {k: v for k, v in prefer.items() if v})
 
@@ -709,6 +723,7 @@ def build_report(ws: Workspace, style: HouseStyle | None = None, facts: Facts | 
     if f.ffa and not f.asks_trend:
         _ffa_section(doc, f, placer)
         handled_steps.add(str(f.ffa.get("step")))
+        _sensitivity_section(doc, ws, f)
     if f.trend and (f.ffa or f.asks_trend):
         _trend_section(doc, f, placer)
     if f.asks_trend and f.ffa:
@@ -786,14 +801,89 @@ def build_report(ws: Workspace, style: HouseStyle | None = None, facts: Facts | 
         doc.add(PageBreak(), Heading("Appendix A. Supplementary figures", numbered=False))
         for fig in rest:
             doc.add(fig)
-    doc.add(Heading(("Appendix B" if rest else "Appendix A") + ". Reproducibility", numbered=False))
+    log = review_table(f)
+    letters = iter("ABCDE")
+    if rest:
+        next(letters)
+    if log is not None:
+        doc.add(Heading(f"Appendix {next(letters)}. Review comments and responses", numbered=False), log)
+    doc.add(Heading(f"Appendix {next(letters)}. Reproducibility", numbered=False))
     doc.add(Para(_repro_para(f)))
     return doc.finalize()
 
 
 def _signoff_roles(style: HouseStyle) -> list[tuple[str, str]]:
-    return [("Prepared by", style.prepared_by), ("Checked by", style.checked_by),
-            ("Approved by", style.approved_by)]
+    def line(name: str, on: str) -> str:
+        return f"{name}, {on}" if name and on else name
+    return [("Prepared by", line(style.prepared_by, style.prepared_on)),
+            ("Checked by", line(style.checked_by, style.checked_on)),
+            ("Approved by", line(style.approved_by, style.approved_on))]
+
+
+def revision_table(f: Facts) -> Table | None:
+    """The revision history the Desk recorded: what changed, by whom, and the answer before and after."""
+    if not f.revisions:
+        return None
+    rows = []
+    for r in f.revisions:
+        after = r.get("after") or {}
+        before = r.get("before") or {}
+        value = ""
+        if after.get("value") is not None:
+            value = tx.value(after["value"], after.get("unit"))
+            if before.get("value") is not None and tx.num(before["value"]) != tx.num(after["value"]):
+                value = f"{tx.num(before['value'])} → {value}"
+        rows.append([r.get("rev", ""), str(r.get("at") or "")[:10], tx.clean_units(r.get("description") or ""),
+                     r.get("by") or "", value, GRADE_WORDS.get(str(after.get("grade")), after.get("grade") or "")])
+    t = next((r.get("after", {}).get("t") for r in reversed(f.revisions) if (r.get("after") or {}).get("t")), None)
+    return Table(id="revisions", columns=["Rev", "Date", "Change", "By", f"{_t(t)}-year flood" if t else "Answer",
+                                          "Grade"], rows=rows, caption="Revision history.",
+                 align=["l", "l", "l", "l", "r", "l"], numbered=False)
+
+
+def review_table(f: Facts) -> Table | None:
+    if not f.comments:
+        return None
+    rows = [[c.get("id", ""), c.get("section") or "General", tx.clean_units(c.get("text") or ""),
+             c.get("author") or "", tx.clean_units(c.get("response") or ""),
+             "Resolved" if c.get("status") == "resolved" else "Open"] for c in f.comments]
+    return Table(id="review", columns=["No.", "Section", "Comment", "By", "Response", "Status"], rows=rows,
+                 caption="Review comments and the responses to them.", align=["l"] * 6, numbered=False)
+
+
+def _sensitivity_section(doc: Document, ws: Workspace, f: Facts) -> None:
+    """How far the design value moves under the reasonable alternatives (aquascope.studio.desk.sensitivity)."""
+    try:
+        from aquascope.studio.desk import sensitivity
+
+        rows = sensitivity(ws)
+    except Exception:  # noqa: BLE001 - the sensitivity is an aid; the report stands without it
+        rows = []
+    if len(rows) < 2:
+        return
+    t = _design_t(f)
+    u = tx.unit(f.ffa.get("unit") or "m3/s")
+    body = []
+    for r in rows:
+        ch = r.get("change_pct")
+        body.append([r["case"], tx.num(r["value"]), "" if ch is None or r is rows[0] else f"{ch:+.0f} %",
+                     str(r.get("n") or ""), r.get("basis") or ""])
+    spread = [abs(r["change_pct"]) for r in rows[1:] if r.get("change_pct") is not None]
+    doc.add(Heading("Sensitivity of the design value", level=2))
+    worst = max(rows[1:], key=lambda r: abs(r.get("change_pct") or 0))
+    doc.add(Para(tx.clean_units(
+        f"{{tab:sensitivity}} gives the {_t(t)}-year flood under the reasonable alternatives to the choices "
+        f"made in this study. The largest change is {worst['case'][:1].lower() + worst['case'][1:]}, "
+        f"{worst['change_pct']:+.0f} % ({tx.value(worst['value'], u)})."
+        + (" Every alternative stays within 10 % of the reported value." if spread and max(spread) <= 10 else "")
+        + (" The recent decades alone give a markedly different flood than the whole record. That is worth a "
+           "closer look at whether the record is one stationary sample, whatever the trend and step-change tests "
+           "found." if any(r["case"].startswith("Most recent") and abs(r.get("change_pct") or 0) > 20
+                           for r in rows) else ""))))
+    doc.add(Table(id="sensitivity", columns=["Case", f"{_t(t)}-year flood ({u})", "Change", "Years", "Basis"],
+                  rows=body, caption=f"The {_t(t)}-year daily-mean flood under alternative choices; the refits use "
+                                     f"the reported distribution on the stored annual maxima.",
+                  align=["l", "r", "r", "r", "l"], emphasis=[0]))
 
 
 def _answer_callout(f: Facts) -> Callout:
@@ -819,10 +909,11 @@ def _answer_callout(f: Facts) -> Callout:
         rows.append(("Grade", GRADE_WORDS.get(f.grade, f.grade)))
         return Callout(title="Answer", body=body, rows=[(a, tx.clean_units(b)) for a, b in rows], tone="caution")
     if f.ffa and not f.asks_trend and at:
-        main = at.get("gev_lmoments") or at.get("lp3") or at.get("gev_bootstrap")
+        key = _main_key(f, at) or "gev_lmoments"
+        main = at[key]
         body = f"{_t(t)}-year flood: {tx.value(main['q'], u)}"
         rows.append(("Estimator", main["label"] + " on annual maximum daily-mean flow"))
-        for name in ("lp3", "gev_bootstrap"):
+        for name in (key, "lp3", "gev_bootstrap"):
             alt = at.get(name)
             if alt and alt.get("ci") and alt["ci"][0] is not None:
                 label = f"{alt['level'] * 100:g} % interval" if alt.get("level") else "Interval"
@@ -1207,7 +1298,8 @@ def _recommendations(f: Facts) -> list[str]:
     t = _design_t(f)
     if f.ffa and not f.asks_trend:
         at = _fits_at(f, t)
-        main = at.get("gev_lmoments") or at.get("lp3") or at.get("gev_bootstrap")
+        key = _main_key(f, at)
+        main = at.get(key) if key else None
         if main and main.get("q") is not None:
             u = f.ffa.get("unit")
             if g == "established":

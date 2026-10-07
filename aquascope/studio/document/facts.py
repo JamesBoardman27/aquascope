@@ -133,6 +133,12 @@ class Facts:
     references: list[str] = field(default_factory=list)
     model: str = ""
     provider: str = ""
+    #: The fit the answer quotes (the Study Desk's choice, else GEV by L-moments).
+    estimator: str = "gev_lmoments"
+    #: The Desk: revisions, review comments, the sensitivity of the answer.
+    revisions: list[dict[str, Any]] = field(default_factory=list)
+    comments: list[dict[str, Any]] = field(default_factory=list)
+    sensitivity: list[dict[str, Any]] = field(default_factory=list)
     prose: dict[str, str] = field(default_factory=dict)
     version: str = ""
     created: str = ""
@@ -319,6 +325,11 @@ def facts_of(ws: Workspace) -> Facts:  # noqa: C901 - one pass over the workspac
     f.created = str(ws.created or "")[:10]
     f.workspace_id = str(ws.id or "")
     f.model, f.provider = str(ws.model or ""), str(ws.provider or "")
+    desk = ws.desk if isinstance(ws.desk, dict) else {}
+    if desk.get("estimator") in FIT_WORDS:
+        f.estimator = str(desk["estimator"])
+    f.revisions = [r for r in desk.get("revisions") or [] if isinstance(r, dict)]
+    f.comments = [c for c in desk.get("comments") or [] if isinstance(c, dict)]
 
     study = ws.study or {}
     steps_by_id = {str(s.get("id")): s for s in study.get("steps") or [] if isinstance(s, dict)}

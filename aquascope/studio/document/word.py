@@ -273,7 +273,8 @@ def _cover(doc: Any, d: Document, style: HouseStyle) -> None:
         stamp = doc.add_paragraph()
         stamp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         _runs(stamp, d.status.upper(), size=9, bold=True, font=style.heading_font,
-              color=FAIL if d.status.upper() not in ("FINAL", "ISSUED") else style.accent)
+              color=style.accent if d.status.upper() in ("FINAL", "ISSUED") else
+              CAUTION if d.status.upper() == "CHECKED" else FAIL)
     kicker = doc.add_paragraph()
     kicker.paragraph_format.space_before = Pt(36)
     kicker.paragraph_format.space_after = Pt(4)
@@ -311,7 +312,8 @@ def _caption(doc: Any, label: str, text: str, style: HouseStyle, *, above: bool)
     p.paragraph_format.space_after = Pt(4 if above else 12)
     if above:
         _keep_with_next(p)
-    _runs(p, label + "  ", size=style.body_size - 1.5, bold=True, font=style.heading_font)
+    if label:
+        _runs(p, label + "  ", size=style.body_size - 1.5, bold=True, font=style.heading_font)
     _runs(p, text, size=style.body_size - 1.5)
 
 
@@ -320,7 +322,7 @@ def _table(doc: Any, t: Table, style: HouseStyle) -> None:
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.shared import Pt
 
-    _caption(doc, f"Table {t.number}.", t.caption, style, above=True)
+    _caption(doc, f"Table {t.number}." if t.numbered and t.number else "", t.caption, style, above=True)
     n_cols = len(t.columns)
     table = doc.add_table(rows=1 + len(t.rows), cols=n_cols)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER if t.compact else WD_TABLE_ALIGNMENT.LEFT

@@ -7,6 +7,16 @@ All notable changes to AquaScope are documented here.
 
 ## [Unreleased]
 
+### Added
+- **The Study Desk**, where a finished study is revised, checked and signed (`aquascope.studio.desk`, `aquascope desk`, and a panel beside the report in the Explorer).
+  - The levers are the design return period, the record window, the years whose flood is left out of the fit, and the distribution the answer quotes.
+  - A change reruns only the flood steps it touches, with their checks, rewrites the documents, and is recorded as a lettered revision with the answer before and after.
+  - A sensitivity table shows the design value under the reasonable alternatives (other fits, the largest flood left out, the last 50 or 30 years, excluded years put back). It is computed from the stored annual maxima without a fetch.
+  - Review comments are kept with their responses.
+  - Signing as prepared, checked or approved fills the document control and moves the status from DRAFT to CHECKED to ISSUED.
+  - The report gains a revision history, a sensitivity section and a review log.
+- `analyze_station` and `flood_frequency` take `exclude_years`: those years' annual maxima leave the fit, its trend and step-change tests and its bootstrap. They are returned as `annual_max_excluded` and shown as crosses on the frequency curve. Steering offers it as a control.
+
 ### Fixed
 - Record the verified v0.24.0 Zenodo DOI (`10.5281/zenodo.23214018`) in release citations, Explorer BibTeX and generated study reports; retain the concept DOI for the project as a whole.
 

@@ -2208,6 +2208,127 @@ def cmd_studio(args: argparse.Namespace) -> None:
     checkpoint()
 
 
+def cmd_desk(args: argparse.Namespace) -> None:
+    """`aquascope desk WORKSPACE.json`: revise, review and sign a finished study (aquascope.studio.desk)."""
+    from aquascope.studio import desk
+    from aquascope.studio.coordinator import Studio
+    from aquascope.studio.workspace import Workspace
+
+    path = Path(args.workspace)
+    if path.is_dir():
+        path = path / "workspace.json"
+    try:
+        ws = Workspace.from_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.error("cannot read %s: %s", path, exc)
+        sys.exit(1)
+    if not getattr(args, "verbose", False):
+        logging.getLogger("aquascope").setLevel(logging.WARNING)
+        for name in ("aquascope.collectors", "aquascope.archive", "numexpr", "httpx"):
+            logging.getLogger(name).setLevel(logging.ERROR)
+    out_dir = Path(args.out) if args.out else path.parent
+    from aquascope.studio.progress import Narrator
+
+    narrator = Narrator()
+
+    def on_event(event: dict) -> None:
+        lines = [f"· {_format_event(event)}"] if getattr(args, "verbose", False) else narrator.feed(event)
+        for line in lines:
+            print(f"  {line}", file=sys.stderr)
+
+    studio = Studio(workspace=ws, on_event=on_event)
+
+    changes: dict[str, Any] = {}
+    for item in args.set or []:
+        key, _, value = item.partition("=")
+        changes[key.strip()] = value.strip()
+    if args.return_period is not None:
+        changes["return_period"] = args.return_period
+    if args.years is not None:
+        changes["years"] = args.years if args.years > 0 else None
+    if args.exclude_years is not None:
+        changes["exclude_years"] = args.exclude_years
+    if args.estimator:
+        changes["estimator"] = args.estimator
+    did = False
+    if changes:
+        print("  Revising: " + ", ".join(f"{k} = {v}" for k, v in changes.items()), file=sys.stderr)
+        reply = studio.revise(changes, by=args.by, note=args.note)
+        if reply.payload.get("errors"):
+            logger.error("%s", reply.text)
+            sys.exit(1)
+        rev = reply.payload.get("revision") or {}
+        print(f"  Revision {rev.get('rev')}: {rev.get('description')}")
+        did = True
+    for item in args.comment or []:
+        c = desk.comment(ws, item, section=args.section or "", author=args.by or "")
+        print(f"  Comment {c['id']} recorded.")
+        did = True
+    for item in args.resolve or []:
+        cid, _, response = item.partition("=")
+        try:
+            desk.resolve(ws, cid.strip(), response.strip(), by=args.by or "")
+        except ValueError as exc:
+            logger.error("%s", exc)
+            sys.exit(1)
+        print(f"  Comment {cid.strip()} resolved.")
+        did = True
+    for item in args.sign or []:
+        role, _, name = item.partition("=")
+        role = role.strip().lower()
+        role = role if role.endswith("_by") else f"{role}_by"
+        reply = studio.sign(role, name.strip())
+        if reply.payload.get("errors"):
+            logger.error("%s", reply.text)
+            sys.exit(1)
+        print(f"  {desk.ROLE_WORDS.get(role, role)} by {name.strip()}; status "
+              f"{(ws.house_style or {}).get('status')}.")
+        did = True
+    if (args.comment or args.resolve) and not (changes or args.sign):
+        studio._build_deliverables()
+
+    if did:
+        studio.export(out_dir)
+        (out_dir / "workspace.json").write_text(ws.to_json(), encoding="utf-8")
+        print(f"  Documents rewritten in {out_dir}")
+
+    print()
+    from aquascope.studio.document.text import num, value
+
+    levers = desk.levers(ws)
+    if levers:
+        print("Levers (change with --set ID=VALUE, or the shortcuts in --help):")
+        for lv in levers:
+            current = lv["value"]
+            if lv["id"] == "estimator":
+                current = (lv.get("labels") or {}).get(current, current)
+            if isinstance(current, list):
+                current = ", ".join(str(x) for x in current) or "none"
+            print(f"  {lv['id']:<15} {lv['label']}: {current if current not in (None, '') else 'default'}")
+        cand = next((lv.get("candidates") for lv in levers if lv["id"] == "exclude_years"), None)
+        if cand:
+            print("  largest floods: " + ", ".join(f"{c['year']} ({num(c['value'])})" for c in cand[:6]))
+    rows = desk.sensitivity(ws)
+    if len(rows) > 1:
+        unit = next(((r.get("result") or {}).get("unit") for r in (ws.run or {}).get("results") or []
+                     if isinstance(r.get("result"), dict) and (r["result"]).get("ffa")), None)
+        print("\nSensitivity of the design value:")
+        for r in rows:
+            ch = "" if r is rows[0] or r.get("change_pct") is None else f"{r['change_pct']:+.0f} %"
+            print(f"  {r['case']:<52} {value(r['value'], unit):>12} {ch:>6}")
+    revs = (ws.desk or {}).get("revisions") or []
+    if revs:
+        print("\nRevisions:")
+        for r in revs:
+            print(f"  {r['rev']:<3} {str(r.get('at'))[:10]}  {r.get('description')}" +
+                  (f" ({r['by']})" if r.get("by") else ""))
+    open_comments = [c for c in (ws.desk or {}).get("comments") or [] if c.get("status") != "resolved"]
+    if open_comments:
+        print("\nOpen review comments:")
+        for c in open_comments:
+            print(f"  {c['id']}: {c['text']}")
+
+
 def cmd_studio_showcase(args: argparse.Namespace) -> None:
     """`aquascope studio-showcase record | list`: the recorded studies the Explorer replays keyless."""
     from aquascope.studio import showcase
@@ -3586,6 +3707,32 @@ def main() -> None:
                           help="A house style for the documents: organisation, project, client, prepared_by, "
                                "checked_by, logo, accent (YAML or JSON)")
 
+    # ── desk ────────────────────────────────────────────────────────────
+    p_desk = sub.add_parser(
+        "desk",
+        help="Revise, review and sign a finished study: change an assumption and the documents are rewritten "
+        "with a revision record; see the sensitivity of the answer",
+    )
+    p_desk.add_argument("workspace", help="The study's workspace.json (or its bundle directory)")
+    p_desk.add_argument("--set", action="append", default=[], metavar="LEVER=VALUE",
+                        help="Change a lever: return_period, years, exclude_years, estimator (repeatable)")
+    p_desk.add_argument("--return-period", type=float, default=None, help="Shortcut for --set return_period=T")
+    p_desk.add_argument("--years", type=int, default=None, help="Use only the last N years (0 for the full record)")
+    p_desk.add_argument("--exclude-years", default=None, metavar="YEARS",
+                        help="Leave these years' floods out of the fit, e.g. 2008,1936 (empty string clears)")
+    p_desk.add_argument("--estimator", default=None, choices=["gev_lmoments", "lp3", "gev_bootstrap"],
+                        help="The distribution the answer quotes (every fit stays in the tables)")
+    p_desk.add_argument("--sign", action="append", default=[], metavar="ROLE=NAME",
+                        help="Sign as prepared, checked or approved, e.g. --sign checked=\"A. Hydrologist\"")
+    p_desk.add_argument("--comment", action="append", default=[], metavar="TEXT", help="Add a review comment")
+    p_desk.add_argument("--section", default=None, help="The section a --comment is about")
+    p_desk.add_argument("--resolve", action="append", default=[], metavar="ID=RESPONSE",
+                        help="Close a review comment with the response, e.g. --resolve c1=\"Done in rev C\"")
+    p_desk.add_argument("--by", default=None, help="Who is making the change or comment (goes in the record)")
+    p_desk.add_argument("--note", default=None, help="The revision's description, instead of the generated one")
+    p_desk.add_argument("--out", "-o", default=None, help="Where the documents go (default: beside the workspace)")
+    p_desk.add_argument("--verbose", "-v", action="store_true", help="Show every event of a rerun")
+
     # ── studio-showcase ───────────────────────────────────────────────
     p_show = sub.add_parser(
         "studio-showcase",
@@ -3836,6 +3983,7 @@ def main() -> None:
         "solve": cmd_solve,
         "studio": cmd_studio,
         "studio-showcase": cmd_studio_showcase,
+        "desk": cmd_desk,
         "update": cmd_update,
         "eval": cmd_eval,
         "playbooks": cmd_playbooks,

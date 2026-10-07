@@ -372,6 +372,16 @@ def _frequency_curve(payload: dict[str, Any], unit: str | None, site: dict[str, 
         px, py = px[ok], py[ok]
         ax.plot(gx(px), py, linestyle="none", marker="o", markersize=3.0, markerfacecolor="white",
                 markeredgecolor=DARK, markeredgewidth=0.7, label="Observed annual maxima", zorder=4)
+    ex = payload.get("annual_max_excluded") if isinstance(payload.get("annual_max_excluded"), dict) else None
+    n_ex = 0
+    if ex and ex.get("v") and len(py):
+        # An excluded year sits where it would rank in the whole sample, so the reader sees what was left out.
+        ex_vals = [float(v) for v in ex["v"] if v is not None]
+        allv = sorted(list(py) + ex_vals, reverse=True)
+        ex_t = [(len(allv) + 1) / (allv.index(v) + 1) for v in ex_vals]
+        ax.plot(gx(np.array(ex_t)), ex_vals, linestyle="none", marker="x", markersize=5, color=NEUTRAL,
+                markeredgewidth=1.0, label="Excluded from the fit", zorder=4)
+        n_ex = len(ex_vals)
     pub.return_period_axis(ax, 1.0101 if not len(px) or np.nanmin(px) < 1.5 else 1.1, t_max)
     ax.set_xlabel("Return period (years)")
     ax.set_ylabel(_ylabel(f"annual maximum {variable}", u))
@@ -387,6 +397,9 @@ def _frequency_curve(payload: dict[str, Any], unit: str | None, site: dict[str, 
         caption += f", the {pct} {kind} of the {owner} fit (shaded)" if owner else f", with its {kind} (shaded)"
     if emp:
         caption += f", and the {len(py)} observed annual maxima at their Weibull plotting positions, T = (n + 1) / rank"
+    if n_ex:
+        years = ", ".join(str(y) for y in (ex or {}).get("year") or [])
+        caption += f"; the crosses are the {n_ex} annual maxima left out of the fit ({years})"
     return fig, caption + "."
 
 

@@ -68,6 +68,7 @@ h1, h2, h3, .kicker, .cover-title, .cover-sub, table, .callout-title, .caption-l
 .stamp {{ position: absolute; top: 0; right: 0; border: 1.4pt solid var(--fail); color: var(--fail);
   font-weight: 700; font-size: 9pt; letter-spacing: .16em; padding: 3pt 8pt; transform: rotate(0deg); }}
 .stamp.final {{ border-color: var(--accent); color: var(--accent); }}
+.stamp.checked {{ border-color: var(--caution); color: var(--caution); }}
 table.kv {{ width: 100%; border-collapse: collapse; font-size: 9pt; margin: 0 0 20pt; }}
 table.kv th {{ text-align: left; font-weight: 600; color: var(--muted); width: 28%; padding: 2.5pt 10pt 2.5pt 0;
   vertical-align: top; border-bottom: .4pt solid #d5dade; }}
@@ -151,7 +152,8 @@ def render_html(doc: Document, style: HouseStyle | None = None) -> str:
     org += f"<span>{html.escape(style.author_line)}</span>"
     stamp = ""
     if doc.status:
-        cls = "stamp final" if doc.status.upper() in ("FINAL", "ISSUED") else "stamp"
+        cls = "stamp final" if doc.status.upper() in ("FINAL", "ISSUED") else \
+            "stamp checked" if doc.status.upper() == "CHECKED" else "stamp"
         stamp = f'<div class="{cls}">{html.escape(doc.status.upper())}</div>'
     out.append(f'<header class="cover">{stamp}<div class="org">{org}</div>'
                f'<div class="kicker">{html.escape(doc.kind)}</div>'
@@ -196,8 +198,9 @@ def _block(b: object) -> str:  # noqa: C901 - one branch per block type
         notes = ("<div class=\"tnotes\">" + "".join(f"<p>{_inline(n)}</p>" for n in b.notes) + "</div>"
                  if b.notes else "")
         compact = " compact" if b.compact else ""
+        label = f'<span class="caption-label">Table {b.number}.</span>' if b.numbered and b.number else ""
         return (f'<div class="tablewrap" id="tab-{html.escape(b.id)}"><div class="tcaption">'
-                f'<span class="caption-label">Table {b.number}.</span>{_inline(b.caption)}</div>'
+                f'{label}{_inline(b.caption)}</div>'
                 f'<table class="data{compact}"><thead><tr>{head}</tr></thead><tbody>{"".join(rows)}</tbody>'
                 f"</table>{notes}</div>")
     if isinstance(b, Callout):

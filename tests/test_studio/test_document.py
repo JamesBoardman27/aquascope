@@ -136,8 +136,8 @@ def test_the_report_leads_with_the_answer_and_is_organised_by_question():
     assert doc.kind == "Technical report" and doc.title == "100-year design flood estimate"
     assert doc.subtitle == "Fish River near Fort Kent, Maine"
     outline = doc.outline()
-    assert outline[0] == "Summary" and "5.1 Design flood" in outline and "5.2 Stationarity of the annual maxima" \
-        in outline
+    assert outline[0] == "Summary" and "5.1 Design flood" in outline and "5.2 Sensitivity of the design value" \
+        in outline and "5.3 Stationarity of the annual maxima" in outline
     assert not any("step" in h.lower() for h in outline)
     box = next(b for b in doc.blocks if isinstance(b, Callout))
     assert box.body == "100-year flood: 464 m³/s"
