@@ -284,16 +284,19 @@ with every change on record (`aquascope.studio.desk`).
 - **Review and sign-off.** Review comments are kept with their responses in an appendix. Signing as prepared,
   checked or approved fills the document control and moves the status from DRAFT to CHECKED to ISSUED.
 
-From the command line:
+From the command line, point `aquascope studio` at a finished study's bundle folder (`aquascope desk` is the
+same thing under a shorter name):
 
 ```bash
-aquascope desk studio-abc123/                      # the levers, the sensitivity, the revisions
-aquascope desk studio-abc123/ --exclude-years 2008 --by "A. Reviewer"
-aquascope desk studio-abc123/ --estimator lp3 --comment "Why GEV here?" --section "Design flood"
-aquascope desk studio-abc123/ --resolve c1="LP3 now leads, per agency practice" --sign checked="B. Checker"
+aquascope studio studio-abc123/                    # the levers, the sensitivity, the revisions
+aquascope studio studio-abc123/ --exclude-years 2008 --by "A. Reviewer"
+aquascope studio studio-abc123/ --estimator lp3 --comment "Why GEV here?" --section "Design flood"
+aquascope studio studio-abc123/ --resolve c1="LP3 now leads, per agency practice" --sign checked="B. Checker"
 ```
 
-Each call rewrites the documents and `workspace.json` in the bundle directory. In the Explorer, **Read the
+Each call rewrites the documents and `workspace.json` in the bundle directory. A revision refits the record
+the study already holds (its record table) instead of fetching it again, so a change of assumption never
+arrives with a change of data. In the Explorer, **Read the
 report** opens the document with the Desk beside it. A change there reruns in the browser and reloads the
 document in place. From Python, `Studio.revise({...})`, `Studio.sign(role, name)` and
 `aquascope.studio.desk.comment` / `resolve` / `sensitivity` do the same.

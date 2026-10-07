@@ -212,3 +212,30 @@ def test_not_now_at_the_plan_saves_and_says_how_to_resume(monkeypatch, capsys, t
     assert "Declined" not in err and "Saved. Pick it up any time: aquascope studio --resume" in err
     ws = json.loads((out / "workspace.json").read_text(encoding="utf-8"))
     assert ws["status"] == "review"
+
+
+def test_studio_on_a_finished_bundle_opens_the_desk(monkeypatch, capsys, tmp_path, no_deliverables):
+    out = tmp_path / "bundle"
+    _argv(monkeypatch, "--yes", "-q", "--out", str(out))
+    with patched():
+        cli.main()
+    capsys.readouterr()
+    monkeypatch.setattr(sys, "argv", ["aquascope", "studio", str(out), "--comment", "Check the rating.",
+                                      "--by", "A. Reviewer"])
+    cli.main()
+    printed = capsys.readouterr().out
+    assert "Comment c1 recorded." in printed and "Levers" in printed
+    ws = json.loads((out / "workspace.json").read_text(encoding="utf-8"))
+    assert ws["desk"]["comments"][0]["text"] == "Check the rating."
+    # the alias does the same
+    monkeypatch.setattr(sys, "argv", ["aquascope", "desk", str(out), "--resolve", "c1=Done."])
+    cli.main()
+    ws = json.loads((out / "workspace.json").read_text(encoding="utf-8"))
+    assert ws["desk"]["comments"][0]["status"] == "resolved"
+
+
+def test_desk_options_without_a_finished_study_are_refused(monkeypatch, tmp_path, no_deliverables):
+    monkeypatch.setattr(sys, "argv", ["aquascope", "studio", "a new question", "--lat", "1", "--lon", "2",
+                                      "--exclude-years", "2008"])
+    with pytest.raises(SystemExit):
+        cli.main()

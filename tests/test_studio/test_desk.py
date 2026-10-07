@@ -138,3 +138,53 @@ def test_the_years_control_refuses_what_is_not_a_year():
         _coerce(control, "next year")
     with pytest.raises(ValueError):
         _coerce(control, "1066")
+
+
+# ── a revision refits the record the study holds ────────────────────────────
+
+
+def _with_record(ws):
+    """The study's flood step keeps its observations in a record table, as a real run does."""
+    import numpy as np
+    import pandas as pd
+
+    from aquascope.studio.workspace import Artifact
+
+    idx = pd.date_range("1986-01-01", "2025-12-31", freq="D")
+    rng = np.random.default_rng(7)
+    values = rng.gamma(2.0, 20.0, len(idx))
+    for y, v in zip(YEARS, AMAX):
+        values[idx.get_loc(pd.Timestamp(f"{y}-04-15"))] = v
+    csv = "datetime,value\n" + "\n".join(f"{t.isoformat()},{v:.3f}" for t, v in zip(idx, values))
+    for r in ws.run["results"]:
+        if r["tool"] == "flood_frequency":
+            ws.add_artifact(Artifact(id=f"tab-{r['id']}-series", kind="table", name=f"tables/{r['id']}_series.csv",
+                                     data=csv.encode(), media_type="text/csv", step=r["id"]))
+    return ws
+
+
+def test_the_desk_refits_the_stored_record_without_a_fetch(done, monkeypatch):
+    import aquascope.explore
+
+    s, _ = done
+    _with_record(s.workspace)
+
+    def no_fetch(*a, **k):
+        raise AssertionError("the Desk must not fetch the record again")
+
+    monkeypatch.setattr(aquascope.explore, "fetch_series", no_fetch)
+    payload = next(r["result"] for r in s.workspace.run["results"] if r["tool"] == "flood_frequency")
+    tools = desk.stored_record_tools(s.workspace)
+    out = tools["flood_frequency"](payload["source"], payload["station_id"], exclude_years=[2008])
+    assert out["ffa"]["n_years"] == len(YEARS) - 1
+    assert out["annual_max_excluded"]["year"] == [2008]
+    assert "nothing was fetched again" in out["fetch_note"]
+    recent = tools["analyze_station"](payload["source"], payload["station_id"], years=20)
+    assert recent["annual_max"]["year"][0] >= 2005
+
+
+def test_a_station_the_study_holds_no_record_for_is_fetched_as_before(done):
+    s, _ = done
+    tools = desk.stored_record_tools(s.workspace)
+    assert desk._stored_series(s.workspace, "usgs", "nowhere") is None
+    assert callable(tools["flood_frequency"])

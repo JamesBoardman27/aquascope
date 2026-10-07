@@ -229,6 +229,99 @@ def describe(changes: dict[str, Any], before: dict[str, Any]) -> list[str]:
     return out
 
 
+# ── the record a revision refits ────────────────────────────────────────────
+
+#: The payload fields a refit carries over from the study's first fetch (who served the record, under what licence).
+_CARRY = ("source", "station_id", "agency", "license", "attribution", "requested", "archive_revision",
+          "station_name", "name", "software_revision")
+
+
+def _stored_series(ws: Workspace, source: str, station_id: str) -> tuple[Any, dict[str, Any]] | None:
+    """The daily record the study already analysed for ``(source, station_id)``, as a pandas Series, with the
+    payload it came from: read from the step's record table (``tab-<step>-series``, the full observations the
+    fit used). None when the study holds no such table (a workspace saved without its files)."""
+    import io
+
+    import pandas as pd
+
+    for r in (ws.run or {}).get("results") or []:
+        p = r.get("result") if isinstance(r.get("result"), dict) else None
+        if not p or str(p.get("source")) != str(source) or str(p.get("station_id")) != str(station_id):
+            continue
+        art = ws.artifact(f"tab-{r.get('id')}-series")
+        if art is None or not art.data:
+            continue
+        try:
+            frame = pd.read_csv(io.BytesIO(art.data))
+            if "datetime" not in frame.columns or "value" not in frame.columns or frame.empty:
+                continue
+            idx = pd.to_datetime(frame["datetime"], utc=True, errors="coerce").dt.tz_localize(None)
+            series = pd.Series(pd.to_numeric(frame["value"], errors="coerce").to_numpy(), index=idx).dropna()
+            series = series[~series.index.isna()].sort_index()
+        except Exception:  # noqa: BLE001 - an unreadable table means: fetch as before
+            continue
+        if not series.empty:
+            return series, p
+    return None
+
+
+def stored_record_tools(ws: Workspace) -> dict[str, Any]:
+    """``analyze_station`` and ``flood_frequency`` that refit the record the study already holds instead of
+    fetching it again, so a revision changes the assumptions and never the data (an agency that serves a longer
+    record today, or a rate-limited request that falls back to the archive's copy, would otherwise move the
+    answer under the reviewer's feet). ``years`` cuts the stored record to its last N years; ``exclude_years``
+    and ``return_periods`` go to the fit. A station the study holds no record table for is fetched as before."""
+    from aquascope.explore import analyze_series, flood_ci
+    from aquascope.mcp_server import _flood_result
+    from aquascope.studio.roles.analysts import analyze_station_full
+
+    def refit(source: str, station_id: str, years: int | None = None, bootstrap_ci: bool = False,
+              variable: str | None = None, return_periods: list[float] | None = None,
+              exclude_years: list[int] | None = None) -> dict[str, Any] | None:
+        got = _stored_series(ws, source, station_id)
+        if got is None:
+            return None
+        series, before = got
+        if years:
+            import pandas as pd
+
+            series = series[series.index >= series.index.max() - pd.DateOffset(years=int(years))]
+        out = {k: before.get(k) for k in _CARRY if before.get(k) is not None}
+        out.update(analyze_series(series, str(before.get("variable") or variable or "discharge"),
+                                  str(before.get("unit") or ""), return_periods=return_periods,
+                                  exclude_years=exclude_years))
+        out["fetch_note"] = (str(before.get("fetch_note") or "").rstrip() +
+                             " Refitted on the Study Desk from the record the study already holds; nothing was "
+                             "fetched again.").strip()
+        out["observations"] = {"t": [t.isoformat() for t in series.index], "v": [float(v) for v in series.values]}
+        if bootstrap_ci and out.get("ffa"):
+            try:
+                ci = flood_ci(series, return_periods=return_periods, exclude_years=exclude_years)
+                out["ffa"]["fits"]["gev_bootstrap"] = {
+                    k: ci[k] for k in ("q", "ci", "params", "n_bootstrap", "n_bootstrap_discarded", "estimator",
+                                       "interval_method", "ci_level") if k in ci}
+                out.setdefault("methods", []).append(ci["method"])
+            except Exception as exc:  # noqa: BLE001 - the band is optional
+                out.setdefault("notes", []).append(f"bootstrap CI failed: {exc}")
+        return out
+
+    def analyze_station(source: str, station_id: str, **kw: Any) -> dict[str, Any]:
+        res = refit(source, station_id, **kw)
+        return res if res is not None else analyze_station_full(source, station_id, **kw)
+
+    def flood_frequency(source: str, station_id: str, **kw: Any) -> dict[str, Any]:
+        res = refit(source, station_id, **kw)
+        if res is None:
+            from aquascope.studio.roles.analysts import flood_frequency_full
+
+            return flood_frequency_full(source, station_id, **kw)
+        result = _flood_result(res)
+        result["observations"] = res["observations"]
+        return result
+
+    return {"analyze_station": analyze_station, "flood_frequency": flood_frequency}
+
+
 # ── revisions ───────────────────────────────────────────────────────────────
 
 

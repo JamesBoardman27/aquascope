@@ -35,6 +35,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
 )
+# numexpr announces its thread count at INFO the moment pandas imports it, on every command; nobody asked.
+logging.getLogger("numexpr").setLevel(logging.WARNING)
 logger = logging.getLogger("aquascope")
 
 
@@ -1945,9 +1947,47 @@ def _parse_edits(text: str) -> dict:
     return out
 
 
+def _finished_study(target: str | None) -> Path | None:
+    """The workspace.json of a finished study ``target`` names (its bundle folder or the file), else None."""
+    if not target:
+        return None
+    path = Path(target).expanduser()
+    if path.is_dir():
+        path = path / "workspace.json"
+    if path.suffix != ".json" or not path.is_file():
+        return None
+    try:
+        status = json.loads(path.read_text(encoding="utf-8")).get("status")
+    except (OSError, ValueError):
+        return None
+    return path if status == "done" else None
+
+
+#: The Desk's options, so `aquascope studio <bundle>` and `aquascope desk <bundle>` take the same ones.
+_DESK_OPTIONS = ("set", "years", "exclude_years", "estimator", "sign", "comment", "section", "resolve", "by",
+                 "note")
+
+
 def cmd_studio(args: argparse.Namespace) -> None:
-    """`aquascope studio`: the crew, from the brief you agree and the plan you approve to the bundle."""
+    """`aquascope studio`: the crew, from the brief you agree and the plan you approve to the bundle. Given a
+    finished study (its bundle folder or workspace.json) it opens the Study Desk instead."""
     from aquascope.studio import Studio
+
+    finished = _finished_study(args.query)
+    if finished is not None:
+        args.workspace = str(finished)
+        cmd_desk(args)
+        return
+    if args.query and Path(args.query).expanduser().exists():
+        logger.error("%s is not a finished study; pick an unfinished one up with --resume WORKSPACE.JSON",
+                     args.query)
+        sys.exit(1)
+    if any(getattr(args, k, None) for k in _DESK_OPTIONS if k != "by"):
+        logger.error("those options revise a finished study: give its bundle folder, e.g. "
+                     "aquascope studio ./studio-<id>/ --exclude-years 2008")
+        sys.exit(1)
+    if getattr(args, "return_period", None) is not None:
+        args.intake = [*list(args.intake or []), f"return_period={args.return_period:g}"]
 
     workspace = None
     if args.resume:
@@ -3071,6 +3111,30 @@ def cmd_agri_productivity(args: argparse.Namespace) -> None:
         print(f"\n  ✓ Productivity results saved → {out_path}")
 
 
+def _add_desk_args(p: argparse.ArgumentParser, *, studio: bool = False) -> None:
+    """The Study Desk's options (aquascope.studio.desk), on `aquascope studio` and its `aquascope desk` alias."""
+    p.add_argument("--set", action="append", default=[], metavar="LEVER=VALUE",
+                   help="Revise a finished study: change a lever (return_period, years, exclude_years, estimator)")
+    p.add_argument("--return-period", type=float, default=None,
+                   help="The design return period: for a new study its intake, for a finished one a revision")
+    p.add_argument("--years", type=int, default=None, help="Revise: use only the last N years (0: the full record)")
+    p.add_argument("--exclude-years", default=None, metavar="YEARS",
+                   help="Revise: leave these years' floods out of the fit, e.g. 2008,1936 (empty string clears)")
+    p.add_argument("--estimator", default=None, choices=["gev_lmoments", "lp3", "gev_bootstrap"],
+                   help="Revise: the distribution the answer quotes (every fit stays in the tables)")
+    p.add_argument("--sign", action="append", default=[], metavar="ROLE=NAME",
+                   help="Sign as prepared, checked or approved, e.g. --sign checked=\"A. Hydrologist\"")
+    p.add_argument("--comment", action="append", default=[], metavar="TEXT", help="Add a review comment")
+    p.add_argument("--section", default=None, help="The section a --comment is about")
+    p.add_argument("--resolve", action="append", default=[], metavar="ID=RESPONSE",
+                   help="Close a review comment with the response, e.g. --resolve c1=\"Done in rev C\"")
+    p.add_argument("--by", default=None, help="Who is making the change, comment or signature (for the record)")
+    p.add_argument("--note", default=None, help="A revision's description, instead of the generated one")
+    if not studio:
+        p.add_argument("--out", "-o", default=None, help="Where the documents go (default: beside the workspace)")
+        p.add_argument("--verbose", "-v", action="store_true", help="Show every event of a rerun")
+
+
 def main() -> None:
     from aquascope import __version__
     from aquascope.registry import source_keys
@@ -3653,7 +3717,8 @@ def main() -> None:
     )
     p_studio.add_argument(
         "query", nargs="?", default=None,
-        help="The problem in plain language (run `aquascope studio` alone in a terminal and it asks)",
+        help="The problem in plain language (run `aquascope studio` alone in a terminal and it asks), or a "
+             "finished study's bundle folder to revise, review and sign it on the Study Desk",
     )
     p_studio.add_argument(
         "--at", default=None, metavar="PLACE",
@@ -3706,32 +3771,15 @@ def main() -> None:
     p_studio.add_argument("--style", default=None, metavar="STYLE.yaml",
                           help="A house style for the documents: organisation, project, client, prepared_by, "
                                "checked_by, logo, accent (YAML or JSON)")
+    _add_desk_args(p_studio, studio=True)
 
     # ── desk ────────────────────────────────────────────────────────────
     p_desk = sub.add_parser(
         "desk",
-        help="Revise, review and sign a finished study: change an assumption and the documents are rewritten "
-        "with a revision record; see the sensitivity of the answer",
+        help="Revise, review and sign a finished study (the same as `aquascope studio <bundle folder>`)",
     )
-    p_desk.add_argument("workspace", help="The study's workspace.json (or its bundle directory)")
-    p_desk.add_argument("--set", action="append", default=[], metavar="LEVER=VALUE",
-                        help="Change a lever: return_period, years, exclude_years, estimator (repeatable)")
-    p_desk.add_argument("--return-period", type=float, default=None, help="Shortcut for --set return_period=T")
-    p_desk.add_argument("--years", type=int, default=None, help="Use only the last N years (0 for the full record)")
-    p_desk.add_argument("--exclude-years", default=None, metavar="YEARS",
-                        help="Leave these years' floods out of the fit, e.g. 2008,1936 (empty string clears)")
-    p_desk.add_argument("--estimator", default=None, choices=["gev_lmoments", "lp3", "gev_bootstrap"],
-                        help="The distribution the answer quotes (every fit stays in the tables)")
-    p_desk.add_argument("--sign", action="append", default=[], metavar="ROLE=NAME",
-                        help="Sign as prepared, checked or approved, e.g. --sign checked=\"A. Hydrologist\"")
-    p_desk.add_argument("--comment", action="append", default=[], metavar="TEXT", help="Add a review comment")
-    p_desk.add_argument("--section", default=None, help="The section a --comment is about")
-    p_desk.add_argument("--resolve", action="append", default=[], metavar="ID=RESPONSE",
-                        help="Close a review comment with the response, e.g. --resolve c1=\"Done in rev C\"")
-    p_desk.add_argument("--by", default=None, help="Who is making the change or comment (goes in the record)")
-    p_desk.add_argument("--note", default=None, help="The revision's description, instead of the generated one")
-    p_desk.add_argument("--out", "-o", default=None, help="Where the documents go (default: beside the workspace)")
-    p_desk.add_argument("--verbose", "-v", action="store_true", help="Show every event of a rerun")
+    p_desk.add_argument("workspace", help="The study's bundle folder or its workspace.json")
+    _add_desk_args(p_desk)
 
     # ── studio-showcase ───────────────────────────────────────────────
     p_show = sub.add_parser(
